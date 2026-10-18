@@ -186,7 +186,7 @@ version_checks() {
     srv="srv-${RUN_ID}"
     start "${srv}" "${ADAPTER}" -- server --version "${V}"
     if wait_ready "${srv}"; then ok "server becomes ready"; else fail "server did not become ready"; return 0; fi
-    first=$(events "${srv}" | head -1)
+    first=$(events "${srv}" | sed -n 1p)
     if jq -e --arg a "${ADAPTER}" --arg v "${V}" '.event == "ready" and .adapter == $a and .version == $v and .port == 9000 and .fixture == "baseline" and (.time | type == "string")' <<<"${first}" >/dev/null 2>&1
     then ok "ready event"; else fail "first stdout line is not the ready event: ${first}"; fi
     health=$(docker inspect --format '{{if .State.Health}}yes{{else}}no{{end}}' "${srv}")
@@ -327,7 +327,7 @@ version_checks() {
     for _ in $(seq 1 100); do [[ "$(docker inspect -f '{{.State.Running}}' "${sta}")" == "true" ]] || break; sleep 0.2; done
     code=$(docker inspect --format '{{.State.ExitCode}}' "${sta}")
     exited "${sta}"
-    if [[ "${code}" == 3 ]] && events "${sta}" | head -1 | jq -e '.event == "connection-failed"' >/dev/null 2>&1
+    if [[ "${code}" == 3 ]] && events "${sta}" | sed -n 1p | jq -e '.event == "connection-failed"' >/dev/null 2>&1
     then ok "client run that cannot connect: connection-failed, exit 3"; else fail "client run that cannot connect: exit ${code}, events: $(events "${sta}" | tr '\n' ' ')"; fi
     stop_container "${sta}"
 }

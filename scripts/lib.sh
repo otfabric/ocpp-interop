@@ -71,6 +71,11 @@ wait_ready() {
 
 stop_container() { docker rm -f "$1" >/dev/null 2>&1; return 0; }
 
+# The scripts run with pipefail. A reader that stops early (head -1) makes
+# the writer die of SIGPIPE when it is still writing, and pipefail then
+# fails the whole pipeline although the reader got its line: take the first
+# line with sed -n 1p, which reads to the end.
+
 # events <container>: the JSON Lines a container wrote to stdout.
 events() { docker logs "$1" 2>/dev/null; }
 
@@ -80,7 +85,7 @@ wait_event() {
     local name="$1" condition="$2"; shift 2
     local i found
     for i in $(seq 1 50); do
-        found=$(events "${name}" | jq -c "$@" "select(${condition})" 2>/dev/null | head -1)
+        found=$(events "${name}" | jq -c "$@" "select(${condition})" 2>/dev/null | sed -n 1p)
         [[ -n "${found}" ]] && { echo "${found}"; return 0; }
         (( i < 50 )) && sleep 0.1
     done
