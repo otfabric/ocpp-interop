@@ -21,7 +21,10 @@ The `Upstream candidates` workflow runs every Monday. It compares each pin
 with the latest upstream release and keeps an issue open while a pin is
 behind. It never changes a pin.
 
-## Unreleased
+## v0.2.0
+
+**Date:** 2026-10-18
+**Previous release:** v0.1.0
 
 ### Summary
 
@@ -68,6 +71,8 @@ declares them.
   per version is a cross-field rule) and limits a token type to 20
 - versions.yaml: `interop_version` 0.2.0, the next planned release;
   `mobilityhouse` verifies 2.1; the `chargetime` note says where its 2.1 is
+
+---
 
 ## v0.1.0
 
