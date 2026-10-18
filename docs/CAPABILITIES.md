@@ -20,8 +20,9 @@ reports the rest as `SKIP_UNSUPPORTED`.
 
 ## Declared now
 
-All three adapters declare OCPP 1.6 and 2.0.1 in both roles, and
-`mobilityhouse` also OCPP 2.1, exactly what
+`mobilityhouse`, `chargetime` and `lorenzodonini` declare OCPP 1.6 and
+2.0.1 in both roles, `mobilityhouse` also OCPP 2.1, and `everest` OCPP 1.6,
+2.0.1 and 2.1 as a station only, exactly what
 [scripts/smoke.sh](../scripts/smoke.sh) and
 [scripts/interop.sh](../scripts/interop.sh) exercise. Each role sends every
 action of the version that the specification gives to it (the direction
@@ -62,16 +63,23 @@ the adapters declared 11, 19, 20 and 10 actions in 1.6 (station sends,
 station handles, CSMS sends, CSMS handles), 13, 14, 15 and 12 in 2.0.1, and
 18, 23, 24 and 17 in 2.1.
 
+`everest` (EVerest libocpp) is a station only: it declares `client` for
+1.6, 2.0.1 and 2.1 with the station lists above; its `server` is
+`supported: false` with empty lists. It can send BatterySwap (libocpp
+writes the battery fields `soC` and `soH` as the schema names them, and the
+mobilityhouse CSMS accepts the request), but does not declare it: no
+CSMS declares that it handles BatterySwap, so no self-test runs it.
+
 The features differ per adapter; they are the same in every version it
 declares, except `compression` for chargetime:
 
-| | mobilityhouse | chargetime | lorenzodonini |
-|---|---|---|---|
-| `securityProfiles` | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 |
-| `compression` | true (1.6, 2.0.1, 2.1) | 2.0.1: true, with known upstream defects in both roles; 1.6: false | false: the CSMS cannot accept it |
-| `fixtureCallErrors` | true | false | true |
-| `messageIds` | true | false | true |
-| `send`, `callResultError` | false | false | false |
+| | mobilityhouse | chargetime | lorenzodonini | everest |
+|---|---|---|---|---|
+| `securityProfiles` | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1 |
+| `compression` | true (1.6, 2.0.1, 2.1) | 2.0.1: true, with known upstream defects in both roles; 1.6: false | false: the CSMS cannot accept it | false: libocpp cannot offer it |
+| `fixtureCallErrors` | true | false | true | true |
+| `messageIds` | true | false | true | true |
+| `send`, `callResultError` | false | false | false | false |
 
 Each adapter explains its limitations in `notes`, per version. Known
 upstream defects that the self-tests show are in

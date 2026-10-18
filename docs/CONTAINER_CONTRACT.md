@@ -4,7 +4,8 @@ Version: **0.5 (draft)**. `contract_version` in [versions.yaml](../versions.yaml
 
 > Implemented by `mobilityhouse`, `chargetime` and `lorenzodonini` for OCPP
 > 1.6J and 2.0.1, and by `mobilityhouse` for OCPP 2.1, with security
-> profiles 0 to 3 everywhere; compression as each adapter declares it. It stays a draft (0.x)
+> profiles 0 to 3 everywhere; compression as each adapter declares it; and by `everest`
+> (a station only: `client` and `call`) for OCPP 1.6J, 2.0.1 and 2.1. It stays a draft (0.x)
 > until every adapter implements every part of it;
 > [Gaps before 1.0](#gaps-before-10) lists what is missing. Until 1.0 it may
 > change without a major version bump.
@@ -434,7 +435,7 @@ from what the image serves. A fixture the image does not have exits 1.
 | `compression` in `connection-opened` | chargetime: not exposed (`null` when it may have been negotiated). lorenzodonini: the station does not see it (`null` with `--compression`) |
 | HTTP 401 for refused credentials and certificates | chargetime: Java-WebSocket 1.6.0 answers every handshake the adapter refuses with HTTP 404 ([source](https://github.com/TooTallNate/Java-WebSocket/blob/da3cf2a777aed862f2f5b5cf060cae7969958667/src/main/java/org/java_websocket/WebSocketImpl.java#L426-L428)); the event has the right reason |
 | OCPP 2.1 | chargetime: the pinned release (v2.0, the latest on Maven Central) has no 2.1; the upstream's master added it after that release. lorenzodonini: ocpp-go v0.19.0 has no 2.1 |
-| An operation to send a SEND and to provoke a CALLRESULTERROR; the features `send` and `callResultError` | all: The Mobility House ocpp 2.1.0 knows the message types 2 to 4 only; the other upstreams have no 2.1 in their pinned releases |
+| An operation to send a SEND and to provoke a CALLRESULTERROR; the features `send` and `callResultError` | all: The Mobility House ocpp 2.1.0 and EVerest libocpp (everest-core 2026.02.1) know the message types 2 to 4 only; the other upstreams have no 2.1 in their pinned releases |
 | `NotImplemented` for an OCPP 2.1 action the fixture does not answer | mobilityhouse: ocpp 2.1.0 does not answer such a CALL at all (tests/known-bugs.tsv) |
 | `callError` answers from the fixture (`fixtureCallErrors`) | chargetime: Java-OCA-OCPP answers a failed handler with `InternalError` only |
 | `NotImplemented` for a Core profile action the fixture does not answer | chargetime, OCPP 1.6: JSONServer and JSONClient always register the Core profile, so such an action reaches the adapter, which can only fail it (`InternalError`) |
@@ -443,6 +444,9 @@ from what the image serves. A fixture the image does not have exits 1.
 | `connection-rejected` with reason `subprotocol` | chargetime: the 1.6 JSONServer also accepts a handshake without a subprotocol; mobilityhouse and lorenzodonini report it |
 | HTTP 404 for an identity the fixture does not list | lorenzodonini: ocpp-go's connection check refuses with 401 only (the event's reason is right) |
 | `--bind-address` other than `0.0.0.0` | lorenzodonini: ocpp-go's ws.Server listens on all addresses; another address exits 5 |
+| `server` (a CSMS) | everest: libocpp implements the charging station only; `server` exits 5 after the usage checks |
+| Close code in `connection-closed` | everest: libocpp's websocket does not pass it to the application |
+| `--station ""` | everest: libocpp always appends the identity to the URL; exits 5 |
 
 ## Changes
 

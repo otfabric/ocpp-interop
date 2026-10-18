@@ -10,7 +10,7 @@ REGISTRY  ?= ghcr.io/otfabric
 VERSION   ?= dev
 PLATFORMS ?= linux/amd64,linux/arm64
 
-# Registry of the base images (python, maven, eclipse-temurin). They are
+# Registry of the base images (python, maven, eclipse-temurin, golang, debian). They are
 # pinned by digest in the Dockerfiles, so any mirror of Docker Hub's official
 # images gives the same build. The workflows set
 #   BASE_REGISTRY=mirror.gcr.io/library
@@ -33,7 +33,7 @@ BUILDER ?= ocpp-interop
 
 # Adapters with an image, in priority order. The self-tests run over all of
 # them; override to work on one: make smoke ADAPTERS=mobilityhouse
-ADAPTERS ?= mobilityhouse chargetime lorenzodonini
+ADAPTERS ?= mobilityhouse chargetime lorenzodonini everest
 
 image = $(REGISTRY)/ocpp-interop-$(1)
 

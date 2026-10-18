@@ -16,6 +16,12 @@
 # OCPP 2.1 is served by mobilityhouse only (the others exit 5):
 #
 #   OCPP_INTEROP_OCPP=2.1 OCPP_INTEROP_FIXTURE_DIR=v21 docker compose up -d --wait mobilityhouse
+#
+# everest (EVerest libocpp) is a station only. The `station` profile runs it
+# as `client run` against the mobilityhouse CSMS; send its CALLs with
+#   docker compose exec everest ocpp-interop call Heartbeat
+#
+#   docker compose --profile station up -d --wait mobilityhouse everest
 
 x-server: &server
   command: ["server", "--version", "${OCPP_INTEROP_OCPP:-1.6}",
@@ -47,3 +53,20 @@ services:
     image: ghcr.io/otfabric/ocpp-interop-lorenzodonini:${OCPP_INTEROP_VERSION:-dev}
     ports:
       - "127.0.0.1:9002:9000"
+
+  everest:
+    image: ghcr.io/otfabric/ocpp-interop-everest:${OCPP_INTEROP_VERSION:-dev}
+    profiles: ["station"]
+    command: ["client", "run", "--version", "${OCPP_INTEROP_OCPP:-1.6}",
+              "--url", "ws://mobilityhouse:9000/ocpp",
+              "--fixture", "/fixtures/${OCPP_INTEROP_FIXTURE_DIR:-v16}/${OCPP_INTEROP_FIXTURE:-baseline}/fixture.json"]
+    depends_on:
+      mobilityhouse:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "test", "-f", "/run/ocpp-interop/ready"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 20s
+    stop_grace_period: 15s

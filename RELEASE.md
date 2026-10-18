@@ -38,6 +38,9 @@ pinned upstream can exchange, so 39 of 39 OCPP 1.6 actions, 64 of 64 2.0.1
 actions and 89 of 91 2.1 actions are now exchanged between the references
 (before: 30, 27 and 43).
 
+A fourth reference: `everest`, a station built on EVerest libocpp, the second
+independent OCPP 2.1 implementation.
+
 ### Added
 
 - Security profiles 2 (TLS and Basic authentication) and 3 (mutual TLS, the
@@ -84,8 +87,34 @@ actions and 89 of 91 2.1 actions are now exchanged between the references
   compression context although it offers `client_no_context_takeover`
   (Java-WebSocket 1.6.0)
 
+- `everest` adapter (C++): a station built on EVerest libocpp, pinned to
+  everest-core release 2026.02.1 (`b61bb12b8cb89ee9d0fab037b05c3bb8cea9b13e`,
+  libocpp 0.31.1 in `lib/everest/ocpp`; the standalone EVerest/libocpp
+  repository is archived). OCPP 1.6J, 2.0.1 and 2.1, `client` only (libocpp
+  has no CSMS; `server` exits 5), security profiles 0 and 1 declared. It is
+  the second independent OCPP 2.1 implementation in the self-tests. The
+  adapter uses libocpp's protocol layer (`ocpp::Websocket` on libwebsockets,
+  `ocpp::MessageQueue`, and libocpp's message structs for every payload),
+  not its `ChargePoint`, which sends BootNotification and StatusNotification
+  by itself; see adapters/everest/README.md. Security profiles 2 and 3 are
+  implemented with libocpp's TLS and `--tls-dir`, not declared yet;
+  `--compression` exits 5 (libocpp cannot offer permessage-deflate)
+- `scripts/smoke.sh`: an adapter without a server runs its fixture checks
+  with `client run` and its station checks against the server of
+  `SMOKE_PEER` (default `mobilityhouse`); `server` and `client run` of an
+  undeclared version are checked separately
+- `scripts/latest-upstream.py everest` (git tags of everest-core), and
+  `everest` in the candidate workflow
+- `compose.yaml`: the `everest` station, profile `station`
+- `tests/known-bugs.tsv`: libocpp's `ocpp::v2::MessageType` has no
+  ReportDERControl (nor GetCertificateChainStatus, NotifyWebPaymentStarted),
+  so its message queue cannot send it (`v21.from-station.report-dercontrol`)
+- Self-tests with everest (linux/arm64): smoke 146 checks; interop of the
+  four adapters 1099 PASS, 45 KNOWN_ISSUE, 44 SKIP_UNSUPPORTED, 0 FAIL
+
 ### Changed
 
+- CI: the self-test job may take 75 minutes (libocpp is compiled)
 - Container contract 0.5: the sections "Transport security" and
   "Compression"; `--tls-dir` is required with profiles 2 and 3; `wss://`
   with profiles 2 and 3 only; flags other than `--compression` keep the

@@ -12,6 +12,13 @@ Run: 2026-10-18, images built from this repository on linux/arm64
 `scripts/interop.sh` on images tagged `coverage`. The linux/amd64 images have not been
 self-tested locally; CI does that natively.
 
+`everest` (EVerest libocpp, everest-core 2026.02.1) is a station only. Its
+rows were added by a run on 2026-10-18 (linux/arm64, `scripts/smoke.sh
+everest` and `scripts/interop.sh mobilityhouse chargetime lorenzodonini
+everest`: 1099 PASS, 45 KNOWN_ISSUE, 44 SKIP_UNSUPPORTED, 0 FAIL); the other
+cells of that run are the ones below. Every pairing with `everest` as the
+CSMS is one `pairing` SKIP_UNSUPPORTED (not in the tables).
+
 Each cell: results of the CALLs and checks initiated by the station / by
 the CSMS. The baseline fixtures have a sample of every action of their
 version, so a pairing sends every action both ends declare. A 1.6 pairing
@@ -45,6 +52,7 @@ where both ends declare the profile or `compression`.
 | chargetime v2.0 | 25 pass 1 skip / 28 pass 1 skip | 26 pass / 28 pass 1 skip | 26 pass / 28 pass 1 skip |
 | lorenzodonini v0.19.0 | 25 pass 1 skip / 29 pass | 26 pass / 29 pass | 26 pass / 29 pass |
 | mobilityhouse 2.1.0 | 24 pass 1 skip 1 known / 29 pass | 25 pass 1 known / 29 pass | 25 pass 1 known / 29 pass |
+| everest 2026.02.1 | 21 pass 1 skip / 22 pass | 22 pass / 22 pass | 22 pass / 22 pass |
 
 Totals: 486 PASS, 3 KNOWN_ISSUE, 6 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
 Security profiles 2 and 3 pass in all nine pairings.
@@ -63,6 +71,7 @@ Security profiles 2 and 3 pass in all nine pairings.
 | chargetime v2.0 | 37 pass 1 skip / 43 pass 1 skip | 38 pass / 42 pass 1 skip 1 known | 38 pass / 43 pass 1 skip |
 | lorenzodonini v0.19.0 | 36 pass 1 skip 1 known / 43 pass 1 known | 37 pass 1 known / 43 pass 1 known | 37 pass 1 known / 41 pass 3 known |
 | mobilityhouse 2.1.0 | 8 pass 1 skip 29 known / 1 pass 43 known | 38 pass / 43 pass 1 known | 38 pass / 44 pass |
+| everest 2026.02.1 | 24 pass 1 skip / 18 pass | 25 pass / 18 pass | 25 pass / 18 pass |
 
 Totals: 650 PASS, 82 KNOWN_ISSUE, 6 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
 Security profiles 2 and 3 pass in all nine pairings.
@@ -87,15 +96,18 @@ it, and 34 tests against the chargetime CSMS were KNOWN_ISSUE).
 
 ## OCPP 2.1
 
-Only `mobilityhouse` declares 2.1: the pinned releases of Java-OCA-OCPP
-(v2.0) and ocpp-go (v0.19.0) have no 2.1, so every pairing with them is one
-`v21.pairing` SKIP_UNSUPPORTED.
+`mobilityhouse` declares 2.1 in both roles and `everest` as a station: the
+pinned releases of Java-OCA-OCPP (v2.0) and ocpp-go (v0.19.0) have no 2.1, so
+every pairing with them is one `v21.pairing` SKIP_UNSUPPORTED. The everest
+station against the mobilityhouse CSMS is the pairing of two independent
+2.1 implementations.
 
 | Station ↓ / CSMS → | chargetime v2.0 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 |
 |---|---|---|---|
 | chargetime v2.0 | 1 skip / — | 1 skip / — | 1 skip / — |
 | lorenzodonini v0.19.0 | 1 skip / — | 1 skip / — | 1 skip / — |
 | mobilityhouse 2.1.0 | 1 skip / — | 1 skip / — | 47 pass 3 skip 1 known / 58 pass 1 skip 1 known |
+| everest 2026.02.1 | 1 skip / — | 1 skip / — | 28 pass 3 skip 2 known / 27 pass 1 skip |
 
 Totals: 105 PASS, 2 KNOWN_ISSUE, 12 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
 `v21.tls.profile2`, `v21.tls.profile3` and `v21.compression` pass.
@@ -107,6 +119,9 @@ Totals: 105 PASS, 2 KNOWN_ISSUE, 12 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
 | mobilityhouse | mobilityhouse | `v21.send.notify-periodic-event-stream` | SKIP_UNSUPPORTED | no adapter declares `send` |
 | mobilityhouse | mobilityhouse | `v21.rpc.call-result-error` (from each end) | SKIP_UNSUPPORTED (2) | no adapter declares `callResultError` |
 | chargetime, lorenzodonini | all three | `v21.pairing` | SKIP_UNSUPPORTED (8) | 2.1 not declared by one of the two |
+| everest | mobilityhouse | `v21.from-station.report-dercontrol` | KNOWN_ISSUE | [libocpp `ocpp::v2::MessageType`](https://github.com/EVerest/everest-core/blob/b61bb12b8cb89ee9d0fab037b05c3bb8cea9b13e/lib/everest/ocpp/include/ocpp/v2/types.hpp#L15-L195) has no ReportDERControl |
+| everest | mobilityhouse | `v21.from-station.reservation-status-update` | KNOWN_ISSUE | the mobilityhouse defect above (no answer to an unanswered 2.1 action) |
+| everest | mobilityhouse | `v21.from-station.battery-swap-in`, `v21.send.notify-periodic-event-stream`, `v21.rpc.call-result-error` (from each end) | SKIP_UNSUPPORTED (4) | everest does not declare BatterySwap (no CSMS declares that it handles it, so no test would run it); libocpp has no SEND and no CALLRESULTERROR |
 
 Every smoke test ([scripts/smoke.sh](../scripts/smoke.sh)) passes: 187
 checks for lorenzodonini and 188 for chargetime (1.6 and 2.0.1; chargetime
@@ -115,7 +130,8 @@ also has its 2.0.1 compression session reported as a known upstream bug),
 security profiles 2 and 3 with RSA and ECDSA keys and what must not connect
 (wrong password, a client certificate of another identity, from another CA
 or none, a server certificate from another CA or for another host name,
-`ws://` to a TLS server), and compression.
+`ws://` to a TLS server), and compression. everest: 146 (1.6, 2.0.1 and 2.1, station checks against
+the mobilityhouse CSMS).
 
 ### What a PASS means
 
@@ -152,6 +168,7 @@ about conformance to the specification.
 | mobilityhouse (station, 2.1) | ocpp 2.1.0 | `snake_to_camel_case` writes the `soc` and `soh` fields of `BatteryDataType` as `SoC` and `soh` (the schema has `soC`, `soH`), so a BatterySwapRequest fails the upstream's own validation and cannot be sent. Not in known-bugs.tsv: BatterySwap is not declared, so no test runs it. Still so on master (2026-10-04) | [source](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/charge_point.py#L57-L64) |
 | lorenzodonini (both roles, 2.0.1) | ocpp-go v0.19.0 | `GetCompositeScheduleResponse` does not have the OCA structure: a top-level `evseId`, always written, which the schema does not allow; no `statusInfo`; a `schedule` of `{startDateTime, chargingSchedule}` instead of `CompositeScheduleType`. The station cannot answer with a schedule, and the CSMS drops the schedule of a correct answer | [source](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/smartcharging/get_composite_schedule.go#L31-L50) |
 | mobilityhouse (both roles, 2.1) | ocpp 2.1.0 | `snake_to_camel_case` also misspells other optional 2.1 fields: `receiptUrl` (NotifySettlement, written `receiptURL`), the per-phase `limit_L2`-style fields (`limitL2`), `fixedPF...`, `prioritizedEMAIDs`, `taxRuleID`, `soC` of `LimitAtSoCType`; a payload with one fails the upstream's own validation. Not in known-bugs.tsv: the baseline's payloads use none of them (NotifySettlement is answered with `receiptId` only) | [source](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/charge_point.py#L46-L80) |
+| everest (station, 2.1) | libocpp of everest-core 2026.02.1 | `ocpp::v2::MessageType` has no ReportDERControl, GetCertificateChainStatus or NotifyWebPaymentStarted, though libocpp has their message structs: `ocpp::MessageQueue` converts every CALL's action to that enum (`ControlMessage`, `receive`), so libocpp can neither send these CALLs nor read one it receives | [source](https://github.com/EVerest/everest-core/blob/b61bb12b8cb89ee9d0fab037b05c3bb8cea9b13e/lib/everest/ocpp/include/ocpp/v2/types.hpp#L15-L195) |
 | lorenzodonini (station, 2.0.1) | ocpp-go v0.19.0 | `NotifyReportRequest.Tbc` is a `bool` with `omitempty`: an explicit `"tbc": false` is dropped from the request (false is the default) | [source](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/provisioning/notify_report.go#L98-L104) |
 
 See [tests/known-bugs.tsv](../tests/known-bugs.tsv).

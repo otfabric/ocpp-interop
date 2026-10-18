@@ -90,12 +90,20 @@ interoperability. First slice: OCPP 1.6J only (2026-10-18).
       exchangeable: 2.1 BatterySwap (upstream defect) and
       NotifyPeriodicEventStream (SEND). NotImplemented is tested with a
       fixture copy that leaves one action per side unanswered
+- [x] `everest` adapter (C++, EVerest libocpp of everest-core 2026.02.1):
+      a station for 1.6J, 2.0.1 and 2.1 on libocpp's websocket, message
+      queue and message types; the second independent 2.1 implementation.
+      `scripts/smoke.sh` runs the station checks of an adapter without a
+      server against `SMOKE_PEER` (default mobilityhouse)
+- [ ] `everest`: declare security profiles 2 and 3 (implemented with
+      libocpp's TLS) once the self-tests exercise TLS (contract 0.5)
 - [ ] 2.1 in `chargetime`: Java-OCA-OCPP has 2.1 (with SEND and
       CALLRESULTERROR) on master since 2025-12-13, after its v2.0 release,
       the latest on Maven Central. Waits for a release (R2.2)
 - [ ] SEND and CALLRESULTERROR: a contract operation and the features
       `send` and `callResultError`, once a pinned upstream release
-      implements them
+      implements them (neither ocpp 2.1.0 nor libocpp of everest-core
+      2026.02.1 does)
 
 ## Later
 
