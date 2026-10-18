@@ -3,12 +3,12 @@
 # The Dockerfiles are the source of truth for a build:
 # scripts/check-versions.sh fails when this file disagrees with them.
 #
-# Phase 4: mobilityhouse and chargetime are built for OCPP 1.6J, both roles.
-# lorenzodonini and citrineos are candidates (status `planned`): their
-# `latest` is what the upstream released as of 2026-10-18, unverified.
+# Phase 5: mobilityhouse, chargetime and lorenzodonini are built for OCPP
+# 1.6J and 2.0.1, both roles. citrineos is a candidate (status `planned`):
+# its entry records what the upstream says, unverified.
 
-interop_version: "0.0.1"
-contract_version: "0.2"        # docs/CONTAINER_CONTRACT.md (draft until 1.0); documents carry schemaVersion "1.0"
+interop_version: "0.1.0"       # the next planned release; v0.0.1 is the last one made
+contract_version: "0.3"        # docs/CONTAINER_CONTRACT.md (draft until 1.0); documents carry schemaVersion "1.0"
 fixture_schema: "1.0"          # fixtures/schema/ocpp-fixture.schema.json
 
 protocol:
@@ -34,19 +34,19 @@ implementations:
     language: "Python"
     independent_engine: true
     roles: [server, client]
-    versions_verified: ["1.6"]   # by the self-tests (scripts/smoke.sh, scripts/interop.sh)
+    versions_verified: ["1.6", "2.0.1"]   # by the self-tests (scripts/smoke.sh, scripts/interop.sh)
     versions_claimed: ["1.6", "2.0.1", "2.1"]
     note: >-
       The README names 1.6 and 2.0.1 only; an ocpp/v21 package exists since
-      2.1.0. 2.0.1 and 2.1 are candidates until a self-test exercises them
-      (PLAN.md, Phases 5 and 6).
+      2.1.0. 2.1 is a candidate until a self-test exercises it (PLAN.md,
+      Phase 6).
 
   chargetime:
     priority: P0
     status: built
     upstream: "ChargeTimeEU Java-OCA-OCPP"
     repository: "https://github.com/ChargeTimeEU/Java-OCA-OCPP"
-    artifact: "maven:eu.chargetime.ocpp:ocpp16j:2.0"   # Maven Central; its -sources jars are the tree of the tag
+    artifact: "maven:eu.chargetime.ocpp:ocpp16j:2.0, maven:eu.chargetime.ocpp:ocpp2:2.0"   # Maven Central; their -sources jars are the tree of the tag
     version: "v2.0"              # 2025-12-12, git tag
     revision: "f27fe5bfb03e01491100597d6859080f5ae07545"
     lock: "adapters/chargetime/dependencies.sha256"   # every jar of the runtime class path by sha256
@@ -55,28 +55,37 @@ implementations:
     language: "Java"
     independent_engine: true
     roles: [server, client]
-    versions_verified: ["1.6"]   # by the self-tests (scripts/smoke.sh, scripts/interop.sh)
+    versions_verified: ["1.6", "2.0.1"]   # by the self-tests (scripts/smoke.sh, scripts/interop.sh)
     versions_claimed: ["1.6", "2.0.1", "2.1"]
     note: >-
       1.6J in ocpp-v1_6 and ocpp-v1_6-json (artifacts ocpp16, ocpp16j); 2.0.1
-      and 2.1 in the multi-protocol ocpp-v2 module (artifact ocpp2, packages
-      eu.chargetime.ocpp.v201 and eu.chargetime.ocpp.v21), not used yet.
+      in the multi-protocol ocpp-v2 module (artifact ocpp2, package
+      eu.chargetime.ocpp.v201, MultiProtocolJSONServer and
+      MultiProtocolJSONClient). The v2.0 release has no OCPP 2.1 package:
+      ocpp-v2 holds eu.chargetime.ocpp.v201 only.
 
   lorenzodonini:
     priority: P1
-    status: planned
+    status: built
     upstream: "lorenzodonini ocpp-go"
     repository: "https://github.com/lorenzodonini/ocpp-go"
     module: "github.com/lorenzodonini/ocpp-go"
-    latest: "v0.19.0"            # 2025-02-02, marked pre-release
+    artifact: "go:github.com/lorenzodonini/ocpp-go@v0.19.0"   # from proxy.golang.org; the module is the tree of the tag
+    version: "v0.19.0"           # 2025-02-02, git tag (the Go module version)
+    revision: "a1eec917af884db0585752f909a61893aa667480"
+    lock: "adapters/lorenzodonini/go.mod"   # with go.sum: every module by version and checksum
+    transport: "gorilla/websocket 1.5.3 (through ocpp-go's ws package)"
+    latest: "v0.19.0"
     license: "MIT"
     language: "Go"
     independent_engine: true
     roles: [server, client]
+    versions_verified: ["1.6", "2.0.1"]   # by the self-tests (scripts/smoke.sh, scripts/interop.sh)
     versions_claimed: ["1.6", "2.0.1"]
     note: >-
       The upstream says its 2.0.1 support needs more real-world testing.
-      No 2.1.
+      No 2.1. The adapter uses ocpp-go's high-level API (ocpp16 and ocpp2
+      packages) on its ocppj endpoints and ws transport.
 
   citrineos:
     priority: P2
@@ -106,6 +115,14 @@ base_images:
     image: "docker.io/library/eclipse-temurin:25.0.4.1_1-jre-noble"
     digest: "sha256:3f2223fe04b750aa5a8179e29b5c9a1ddf7665fc9bb08bfe11ad01d143bc13a5"
     used_by: [chargetime]
+  golang:
+    image: "docker.io/library/golang:1.27.2-trixie"
+    digest: "sha256:e58d6f83b3416618d8bcac2b3dde1b7f7e3c4a77d25e88637f8bbae81536c48d"
+    used_by: [lorenzodonini]       # build stage only
+  debian:
+    image: "docker.io/library/debian:trixie-slim"
+    digest: "sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f"
+    used_by: [lorenzodonini]
 
 images:
   mobilityhouse: "ghcr.io/otfabric/ocpp-interop-mobilityhouse"

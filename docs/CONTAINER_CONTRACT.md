@@ -1,11 +1,11 @@
 # Container contract
 
-Version: **0.2 (draft)**. `contract_version` in [versions.yaml](../versions.yaml).
+Version: **0.3 (draft)**. `contract_version` in [versions.yaml](../versions.yaml).
 
-> Implemented by `mobilityhouse` and `chargetime` for OCPP 1.6J. It stays a
-> draft (0.x) until both implement every part of it; [Gaps before
-> 1.0](#gaps-before-10) lists what is missing. Until 1.0 it may change
-> without a major version bump.
+> Implemented by `mobilityhouse`, `chargetime` and `lorenzodonini` for OCPP
+> 1.6J and 2.0.1. It stays a draft (0.x) until every adapter implements every
+> part of it; [Gaps before 1.0](#gaps-before-10) lists what is missing. Until
+> 1.0 it may change without a major version bump.
 
 Every adapter image exposes the same commands, flags, JSON documents and exit
 codes. Consumers depend on this document, not on any adapter's source. After
@@ -177,8 +177,8 @@ that station, or a `client run` asked for another station, answers with
 
 `call` talks to the running process through the control socket, which
 serves only this command and only inside the container. Its protocol is
-internal to each image and may change with the image; for reference, both
-adapters use one JSON line each way: the request
+internal to each image and may change with the image; for reference, every
+adapter uses one JSON line each way: the request
 `{"station": "ID" | null, "action": "...", "payload": {...}, "timeoutMs": N}`
 and the result document.
 
@@ -189,10 +189,10 @@ nothing to stdout, a diagnostic to stderr, and exits 3.
 
 When an endpoint receives a CALL, it answers as [the fixture](FIXTURES.md)
 defines: with the payload, with a derived payload (`idTokens`,
-`configuration`), with `"${now}"` replaced by the current UTC time, or with
-the fixture's CALLERROR. The adapter turns the answer into the upstream's
-confirmation type with the upstream's deserialisation, and the upstream
-sends it.
+`configuration` in 1.6, `variables` in 2.x), with `"${now}"` replaced by the
+current UTC time, or with the fixture's CALLERROR. The adapter turns the
+answer into the upstream's confirmation type with the upstream's
+deserialisation, and the upstream sends it.
 
 - An action of the version that the fixture does not answer is answered with
   the CALLERROR `NotImplemented`, by the upstream.
@@ -201,6 +201,9 @@ sends it.
 - An adapter whose upstream cannot answer with a chosen CALLERROR declares
   the feature `fixtureCallErrors: false` and refuses a fixture with
   `callError` answers (exit 5).
+- A `callError` answer whose code the upstream cannot send (every reference
+  upstream sends only the error codes of the OCPP-J specification) is
+  refused with exit 5, also by an adapter that declares `fixtureCallErrors`.
 - An upstream may answer a CALL it cannot route itself, without the adapter
   seeing it. Such CALLs have no `call-received` or `call-answered` event.
 
@@ -319,20 +322,26 @@ from what the image serves. A fixture the image does not have exits 1.
 
 ## Gaps before 1.0
 
-1.0 needs both adapters to implement all of the above. What is missing:
+1.0 needs every adapter to implement all of the above. What is missing:
 
 | Gap | Adapter |
 |---|---|
-| Security profiles 2 and 3 (TLS); `--tls-dir` exits 5 | both |
-| OCPP 2.0.1 and 2.1 | both (PLAN.md, Phases 5 and 6) |
+| Security profiles 2 and 3 (TLS); `--tls-dir` exits 5 | all |
+| OCPP 2.1 | all (PLAN.md, Phase 6) |
 | `callError` answers from the fixture (`fixtureCallErrors`) | chargetime: Java-OCA-OCPP answers a failed handler with `InternalError` only |
-| `NotImplemented` for a Core profile action the fixture does not answer | chargetime: JSONServer and JSONClient always register the Core profile, so such an action reaches the adapter, which can only fail it (`InternalError`) |
-| Message ids of sent CALLs (`messageIds`), subprotocol and close code in events | chargetime: not exposed by Java-OCA-OCPP |
+| `NotImplemented` for a Core profile action the fixture does not answer | chargetime, OCPP 1.6: JSONServer and JSONClient always register the Core profile, so such an action reaches the adapter, which can only fail it (`InternalError`) |
+| Message ids of sent CALLs (`messageIds`), subprotocol and close code in events | chargetime: not exposed by Java-OCA-OCPP. lorenzodonini: the station does not see the negotiated subprotocol, the server not the close code |
 | `protocol-error` events | chargetime: the upstream logs unparsable frames without a hook |
-| `connection-rejected` with reason `subprotocol` | chargetime: the 1.6 JSONServer also accepts a handshake without a subprotocol; mobilityhouse reports it |
+| `connection-rejected` with reason `subprotocol` | chargetime: the 1.6 JSONServer also accepts a handshake without a subprotocol; mobilityhouse and lorenzodonini report it |
+| HTTP 404 for an identity the fixture does not list | lorenzodonini: ocpp-go's connection check refuses with 401 only (the event's reason is right) |
+| `--bind-address` other than `0.0.0.0` | lorenzodonini: ocpp-go's ws.Server listens on all addresses; another address exits 5 |
 
 ## Changes
 
+- **0.3** (unreleased): OCPP 2.0.1, and the third adapter. The derived
+  answer `variables` (GetVariables, SetVariables) is part of the answers. A
+  `callError` answer whose code the upstream cannot send is refused (exit
+  5). The gaps are listed per adapter and version.
 - **0.2** (unreleased): first implementation. Added `--control-socket`, the
   `connection-failed` event, `remote` on `connection-rejected`, the error
   codes `invalid-request` and `not-connected`, the [Answers](#answers)

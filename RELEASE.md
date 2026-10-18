@@ -18,6 +18,64 @@ The `Upstream candidates` workflow runs every Monday. It compares each pin
 with the latest upstream release and keeps an issue open while a pin is
 behind. It never changes a pin.
 
+## Unreleased
+
+Planned as v0.1.0 (`interop_version` in versions.yaml); the maintainer
+decides when to release it.
+
+### Summary
+
+OCPP 2.0.1 in every adapter, and the third adapter, `lorenzodonini` (Go,
+lorenzodonini/ocpp-go v0.19.0), for 1.6J and 2.0.1 (PLAN.md, Phase 5). The
+container contract is draft 0.3.
+
+### Added
+
+- Adapter `lorenzodonini`: ocpp-go v0.19.0 (Go module, pinned with go.mod
+  and go.sum), OCPP 1.6J and 2.0.1, CSMS and station, security profiles 0
+  and 1. It uses ocpp-go's high-level API on its ocppj endpoints and ws
+  transport; compose.yaml runs its CSMS on 127.0.0.1:9002
+- OCPP 2.0.1 in `mobilityhouse` (ocpp.v201) and `chargetime` (artifact
+  `eu.chargetime.ocpp:ocpp2:2.0`, MultiProtocolJSONServer and
+  MultiProtocolJSONClient; the dependency lock adds ocpp2 and jsr305)
+- The derived answers of 2.0.1: `idTokenInfo` (a token matches by value
+  and type) and `variables` for GetVariables and SetVariables, in every
+  adapter
+- The 2.0.1 baseline fixture: samples for every action it answers in both
+  directions (NotifyReport, NotifyEvent, SecurityEventNotification,
+  FirmwareStatusNotification, LogStatusNotification, DataTransfer,
+  GetBaseReport, ChangeAvailability, ClearCache, UnlockConnector,
+  ClearChargingProfile, GetLocalListVersion are new), and two it does not
+  answer (ReservationStatusUpdate, CancelReservation)
+- `scripts/validate-payloads.py`: checks the fixtures' samples and answers
+  against a copy of the OCA JSON schemas (not in `make ci`, because the
+  schemas are not in the repository)
+- Self-tests per OCPP version: `scripts/smoke.sh` runs its version
+  dependent checks for every version an image declares (new: an id token
+  without a type, a CALLERROR code that is not an OCPP-J error code);
+  `scripts/interop.sh` runs every station against every CSMS for 1.6 and
+  2.0.1 (new for 2.0.1: unknown device model component and variable,
+  case-insensitive names, a read-only variable). `OCPP_VERSIONS` limits a
+  run to some versions
+- `tests/known-bugs.tsv`: an entry may name the peer a defect shows with
+  (`adapter:role@peer`). New entries: the chargetime 2.0.1 CSMS with a
+  station that offers permessage-deflate (Java-WebSocket 1.6.0), and the
+  lorenzodonini 2.0.1 station's `"statusInfo": null` in ResetResponse
+- `make run-<adapter> RUN_OCPP=2.0.1`
+
+### Changed
+
+- Container contract 0.3: the `variables` derived answer is part of the
+  answers; a `callError` answer whose code the upstream cannot send is
+  refused with exit 5; the gaps before 1.0 are listed per adapter
+- The capability documents declare 2.0.1 next to 1.6, in both roles
+- `scripts/interop.sh`: a station of the CALLERROR test starts only once
+  its CSMS listens (the Go station connected before the server was ready)
+- smoke.sh compares the CSMS's Reset answer as interop.sh compares answers
+  (every field of the fixture's answer), not for equality
+- versions.yaml: `interop_version` 0.1.0, the next planned release;
+  `lorenzodonini` built, with its base images
+
 ## v0.0.1
 
 **Date:** 2026-10-18

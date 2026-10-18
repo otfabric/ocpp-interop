@@ -89,6 +89,23 @@
       "evseId": 1,
       "meterValue": [{"timestamp": "2026-01-01T10:05:00Z", "sampledValue": [
         {"value": 7360.0, "measurand": "Power.Active.Import"}]}]}},
+    "notifyReport": {"action": "NotifyReport", "from": "station", "payload": {
+      "requestId": 1, "generatedAt": "2026-01-01T10:00:00Z", "seqNo": 0, "tbc": false,
+      "reportData": [{"component": {"name": "OCPPCommCtrlr"}, "variable": {"name": "HeartbeatInterval"},
+        "variableAttribute": [{"type": "Actual", "value": "300", "mutability": "ReadWrite"}]}]}},
+    "notifyEvent": {"action": "NotifyEvent", "from": "station", "payload": {
+      "generatedAt": "2026-01-01T10:00:00Z", "seqNo": 0,
+      "eventData": [{"eventId": 1, "timestamp": "2026-01-01T10:00:00Z", "trigger": "Delta", "actualValue": "Available",
+        "eventNotificationType": "HardWiredNotification",
+        "component": {"name": "ChargingStation"}, "variable": {"name": "AvailabilityState"}}]}},
+    "securityEvent": {"action": "SecurityEventNotification", "from": "station", "payload": {
+      "type": "SettingSystemTime", "timestamp": "2026-01-01T10:00:00Z", "techInfo": "clock set by test"}},
+    "firmwareStatus": {"action": "FirmwareStatusNotification", "from": "station", "payload": {"status": "Idle"}},
+    "logStatus": {"action": "LogStatusNotification", "from": "station", "payload": {"status": "Idle"}},
+    "dataTransfer": {"action": "DataTransfer", "from": "station", "payload": {
+      "vendorId": "org.otfabric", "messageId": "Ping", "data": "hello"}},
+    "reservationStatusUpdate": {"action": "ReservationStatusUpdate", "from": "station", "payload": {
+      "reservationId": 7, "reservationUpdateStatus": "Expired"}},
     "requestStart": {"action": "RequestStartTransaction", "from": "csms", "payload": {
       "evseId": 1, "remoteStartId": 1, "idToken": {"idToken": "04A1B2C3D4E5F6", "type": "ISO14443"}}},
     "requestStop": {"action": "RequestStopTransaction", "from": "csms", "payload": {"transactionId": "OTF-TX-0001"}},
@@ -104,6 +121,16 @@
         "id": 1, "stackLevel": 0,
         "chargingProfilePurpose": "TxDefaultProfile", "chargingProfileKind": "Absolute",
         "chargingSchedule": [{"id": 1, "chargingRateUnit": "W", "startSchedule": "2026-01-01T00:00:00Z",
-          "chargingSchedulePeriod": [{"startPeriod": 0, "limit": 11000.0}]}]}}}
+          "chargingSchedulePeriod": [{"startPeriod": 0, "limit": 11000.0}]}]}}},
+    "getBaseReport": {"action": "GetBaseReport", "from": "csms", "payload": {"requestId": 1, "reportBase": "ConfigurationInventory"}},
+    "changeAvailability": {"action": "ChangeAvailability", "from": "csms", "payload": {
+      "operationalStatus": "Inoperative", "evse": {"id": 1}}},
+    "clearCache": {"action": "ClearCache", "from": "csms", "payload": {}},
+    "unlockConnector": {"action": "UnlockConnector", "from": "csms", "payload": {"evseId": 1, "connectorId": 1}},
+    "clearChargingProfile": {"action": "ClearChargingProfile", "from": "csms", "payload": {"chargingProfileId": 1}},
+    "getLocalListVersion": {"action": "GetLocalListVersion", "from": "csms", "payload": {}},
+    "dataTransferFromCsms": {"action": "DataTransfer", "from": "csms", "payload": {
+      "vendorId": "org.otfabric", "messageId": "Ping", "data": "hello"}},
+    "cancelReservation": {"action": "CancelReservation", "from": "csms", "payload": {"reservationId": 7}}
   }
 }

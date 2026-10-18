@@ -36,10 +36,29 @@ Temurin JRE 25, GPL-2.0 with the Classpath Exception).
 
 | Component | Version | Licence | Source |
 |---|---|---|---|
-| Java-OCA-OCPP: ocpp16j, ocpp16, ocpp-json, ocpp-common (ChargeTimeEU) | 2.0 | MIT | https://github.com/ChargeTimeEU/Java-OCA-OCPP |
+| Java-OCA-OCPP: ocpp16j, ocpp16, ocpp2, ocpp-json, ocpp-common (ChargeTimeEU) | 2.0 | MIT | https://github.com/ChargeTimeEU/Java-OCA-OCPP |
 | Java-WebSocket | 1.6.0 | MIT | https://github.com/TooTallNate/Java-WebSocket |
 | Gson | 2.13.2 | Apache-2.0 | https://github.com/google/gson |
 | error_prone_annotations | 2.41.0 | Apache-2.0 | https://github.com/google/error-prone |
+| jsr305 (com.google.code.findbugs) | 3.0.2 | Apache-2.0 | http://findbugs.sourceforge.net (code.google.com/p/jsr-305) |
 | jaxb-api (javax.xml.bind) | 2.3.1 | CDDL-1.1 or GPL-2.0 with the Classpath Exception | https://github.com/javaee/jaxb-spec |
 | javax.activation-api | 1.2.0 | CDDL-1.1 or GPL-2.0 with the Classpath Exception | https://github.com/javaee/activation |
 | SLF4J API and SLF4J Simple | 2.0.17 | MIT | https://www.slf4j.org |
+
+## `ocpp-interop-lorenzodonini`
+
+Base image `debian:trixie-slim` (Debian trixie). One statically linked Go
+binary (built with Go 1.27.2); `/licenses/BUNDLED-MODULES.txt` lists the
+modules in it, as `go version -m` reports them.
+
+| Component | Version | Licence | Source |
+|---|---|---|---|
+| ocpp-go (lorenzodonini) | v0.19.0 | MIT | https://github.com/lorenzodonini/ocpp-go |
+| gorilla/websocket | v1.5.3 | BSD-2-Clause | https://github.com/gorilla/websocket |
+| gorilla/mux | v1.8.1 | BSD-3-Clause | https://github.com/gorilla/mux |
+| go-playground/validator (gopkg.in/go-playground/validator.v9) | v9.30.0 | MIT | https://github.com/go-playground/validator |
+| go-playground/universal-translator | v0.16.0 | MIT | https://github.com/go-playground/universal-translator |
+| go-playground/locales | v0.12.1 | MIT | https://github.com/go-playground/locales |
+| leodido/go-urn | v1.1.0 | MIT (the module has no licence file; the text in `/licenses` is the one the project added with v1.2.0) | https://github.com/leodido/go-urn |
+| relvacode/iso8601 | v1.6.0 | MIT | https://github.com/relvacode/iso8601 |
+| Go standard library and runtime | 1.27.2 | BSD-3-Clause | https://go.dev |

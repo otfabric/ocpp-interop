@@ -6,7 +6,7 @@
 #   docker build -f adapters/chargetime/Dockerfile -t ocpp-interop-chargetime:dev .
 #
 # Java-OCA-OCPP is MIT and is used as published on Maven Central
-# (eu.chargetime.ocpp:ocpp16j and what its POM pulls in), unmodified: the image
+# (eu.chargetime.ocpp:ocpp16j and ocpp2, and what their POMs pull in), unmodified: the image
 # carries its jars next to the adapter's (MIT). The pin is UPSTREAM_VERSION
 # below (the git tag) and UPSTREAM_SHA (its commit), mirrored in pom.xml
 # (ocpp.version), dependencies.sha256 and versions.yaml.
@@ -43,6 +43,7 @@ RUN set -eu; \
     echo "${UPSTREAM_SHA}" | grep -Eq '^[0-9a-f]{40}$'; \
     mvn -B -q -C -Docpp.version="${maven_version}" package -DskipTests; \
     test -f "target/lib/ocpp16j-${maven_version}.jar"; \
+    test -f "target/lib/ocpp2-${maven_version}.jar"; \
     if [ "${UPSTREAM_VERSION}" = "$(sed -nE 's/^# pin: (.+)$/\1/p' dependencies.sha256)" ]; then \
         (cd target/lib && sha256sum -c --strict ../../dependencies.sha256); \
         test "$(ls target/lib | wc -l)" = "$(grep -c '^[0-9a-f]' dependencies.sha256)"; \
@@ -96,7 +97,7 @@ COPY THIRD_PARTY_NOTICES.md /licenses/THIRD_PARTY_NOTICES.md
 COPY fixtures /fixtures
 
 LABEL org.opencontainers.image.title="ocpp-interop-chargetime" \
-      org.opencontainers.image.description="OCPP 1.6J reference CSMS and station built on ChargeTimeEU Java-OCA-OCPP" \
+      org.opencontainers.image.description="OCPP 1.6J and 2.0.1 reference CSMS and station built on ChargeTimeEU Java-OCA-OCPP" \
       org.opencontainers.image.source="https://github.com/otfabric/ocpp-interop" \
       org.opencontainers.image.licenses="MIT AND Apache-2.0 AND CDDL-1.1" \
       org.opencontainers.image.version="${ADAPTER_VERSION}"

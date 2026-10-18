@@ -20,27 +20,37 @@ reports the rest as `SKIP_UNSUPPORTED`.
 
 ## Declared now
 
-Both adapters declare OCPP 1.6 in both roles, exactly what
+All three adapters declare OCPP 1.6 and 2.0.1 in both roles, exactly what
 [scripts/smoke.sh](../scripts/smoke.sh) and
-[scripts/interop.sh](../scripts/interop.sh) exercise:
+[scripts/interop.sh](../scripts/interop.sh) exercise. The action lists are
+the same for every adapter:
 
-| | mobilityhouse | chargetime |
+| | OCPP 1.6 | OCPP 2.0.1 |
 |---|---|---|
-| Station sends | Authorize, BootNotification, DataTransfer, DiagnosticsStatusNotification, FirmwareStatusNotification, Heartbeat, MeterValues, SecurityEventNotification, StartTransaction, StatusNotification, StopTransaction | same |
-| Station handles | CancelReservation, ChangeAvailability, ChangeConfiguration, ClearCache, ClearChargingProfile, DataTransfer, GetCompositeSchedule, GetConfiguration, GetDiagnostics, GetLocalListVersion, RemoteStartTransaction, RemoteStopTransaction, ReserveNow, Reset, SendLocalList, SetChargingProfile, TriggerMessage, UnlockConnector, UpdateFirmware | same |
-| CSMS sends | the station's handled actions, and ExtendedTriggerMessage | same |
-| CSMS handles | the station's sent actions except SecurityEventNotification | same |
-| `securityProfiles` | 0, 1 | 0, 1 |
-| `fixtureCallErrors` | true | false |
-| `messageIds` | true | false |
-| `compression`, `send`, `callResultError` | false | false |
+| Station sends | Authorize, BootNotification, DataTransfer, DiagnosticsStatusNotification, FirmwareStatusNotification, Heartbeat, MeterValues, SecurityEventNotification, StartTransaction, StatusNotification, StopTransaction | Authorize, BootNotification, DataTransfer, FirmwareStatusNotification, Heartbeat, LogStatusNotification, MeterValues, NotifyEvent, NotifyReport, ReservationStatusUpdate, SecurityEventNotification, StatusNotification, TransactionEvent |
+| Station handles | CancelReservation, ChangeAvailability, ChangeConfiguration, ClearCache, ClearChargingProfile, DataTransfer, GetCompositeSchedule, GetConfiguration, GetDiagnostics, GetLocalListVersion, RemoteStartTransaction, RemoteStopTransaction, ReserveNow, Reset, SendLocalList, SetChargingProfile, TriggerMessage, UnlockConnector, UpdateFirmware | ChangeAvailability, ClearCache, ClearChargingProfile, DataTransfer, GetBaseReport, GetLocalListVersion, GetVariables, RequestStartTransaction, RequestStopTransaction, Reset, SetChargingProfile, SetVariables, TriggerMessage, UnlockConnector |
+| CSMS sends | the station's handled actions, and ExtendedTriggerMessage | the station's handled actions, and CancelReservation |
+| CSMS handles | the station's sent actions except SecurityEventNotification | the station's sent actions except ReservationStatusUpdate |
 
-SecurityEventNotification and ExtendedTriggerMessage are listed as sent
-because the self-tests send them and check that the other end answers
-`NotImplemented` (the baseline fixture has no answer for them). Each adapter
-explains its limitations in `notes`; the mobilityhouse station cannot send a
-SecurityEventNotification without `techInfo` (see
-[tests/known-bugs.tsv](../tests/known-bugs.tsv)).
+The actions the other end does not handle are listed as sent because the
+self-tests send them and check that the other end answers `NotImplemented`
+(the baseline fixtures have no answer for them).
+
+The features differ per adapter; they are the same in both versions:
+
+| | mobilityhouse | chargetime | lorenzodonini |
+|---|---|---|---|
+| `securityProfiles` | 0, 1 | 0, 1 | 0, 1 |
+| `fixtureCallErrors` | true | false | true |
+| `messageIds` | true | false | true |
+| `compression`, `send`, `callResultError` | false | false | false |
+
+Each adapter explains its limitations in `notes`, per version. Known
+upstream defects that the self-tests show are in
+[tests/known-bugs.tsv](../tests/known-bugs.tsv) and
+[COMPATIBILITY.md](COMPATIBILITY.md); a declared action can still fail
+against a particular peer because of one (for example, the chargetime
+2.0.1 CSMS with a station that offers compression).
 
 ## Example
 
@@ -49,7 +59,7 @@ SecurityEventNotification without `techInfo` (see
   "schemaVersion": "1.0",
   "adapter": "mobilityhouse",
   "adapterVersion": "v0.1.0",
-  "contractVersion": "0.2",
+  "contractVersion": "0.3",
   "upstream": {
     "name": "The Mobility House ocpp",
     "repository": "https://github.com/mobilityhouse/ocpp",

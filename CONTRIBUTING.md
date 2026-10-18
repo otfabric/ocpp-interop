@@ -38,8 +38,8 @@ schema for that version before committing.
 
 ## Adding an adapter
 
-`adapters/mobilityhouse` (Python) and `adapters/chargetime` (Java) show the
-expected structure.
+`adapters/mobilityhouse` (Python), `adapters/chargetime` (Java) and
+`adapters/lorenzodonini` (Go) show the expected structure.
 
 1. Read the upstream's source for what it really supports; its README is a
    candidate list, not a fact.
@@ -60,7 +60,10 @@ expected structure.
    Makefile, to compose.yaml, and to THIRD_PARTY_NOTICES.md. Then
    `make ci`.
 6. Record real upstream defects in `tests/known-bugs.tsv` with a link to the
-   evidence (a permanent link to the upstream source or an issue).
+   evidence (a permanent link to the upstream source or an issue). An entry
+   names the adapter, optionally the role the defect is in and the peer it
+   shows with (`adapter:role@peer`), and a regular expression of the test
+   ids it explains.
 
 ## Style
 

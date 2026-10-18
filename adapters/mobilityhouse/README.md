@@ -1,6 +1,6 @@
 # mobilityhouse adapter
 
-OCPP 1.6J reference CSMS and station built on
+OCPP 1.6J and 2.0.1 reference CSMS and station built on
 [The Mobility House ocpp](https://github.com/mobilityhouse/ocpp), behind the
 [container contract](../../docs/CONTAINER_CONTRACT.md).
 
@@ -13,7 +13,7 @@ OCPP 1.6J reference CSMS and station built on
 | Other dependencies | jsonschema 4.26.0 (the upstream's only dependency) with attrs, jsonschema-specifications, referencing and rpds-py |
 | Licences | ocpp MIT; websockets BSD-3-Clause; jsonschema and its dependencies MIT; Python PSF-2.0. The OCA JSON schemas inside the ocpp package are CC BY-ND 4.0 and are used unmodified |
 | Base image | `python:3.14.8-slim-trixie`, pinned by digest in the [Dockerfile](Dockerfile) |
-| OCPP | 1.6J, both roles, security profiles 0 and 1 |
+| OCPP | 1.6J and 2.0.1, both roles, security profiles 0 and 1 |
 
 The adapter code is MIT. `/licenses` in the image holds the licence of every
 installed package, of Python and of this repository, and
@@ -34,26 +34,27 @@ recorded as `upstream.revision`; PyPI cannot prove it.
 
 ## How the upstream is used
 
-`ocpp.v16.ChargePoint` is one class for both ends of a connection. The
-adapter ([ocpp_interop/endpoint.py](ocpp_interop/endpoint.py)) subclasses it
-only to:
+`ocpp.v16.ChargePoint` (`ocpp.v201.ChargePoint` for 2.0.1) is one class for
+both ends of a connection. The adapter
+([ocpp_interop/endpoint.py](ocpp_interop/endpoint.py)) subclasses it only
+to:
 
 - register a handler for every action the fixture answers, in the upstream's
   route map (what its `@on()` decorator builds). The handler builds the
-  answer as the upstream's `ocpp.v16.call_result` dataclass, with the
+  answer as the upstream's `call_result` dataclass of the version, with the
   upstream's `camel_to_snake_case`; a `callError` answer raises the
-  upstream's `OCPPError` subclass of that code. Schema validation of the
-  request and of the answer, serialisation, and the CALLERRORs for unknown
-  actions (`NotImplemented`, `NotSupported`) or invalid payloads are the
-  upstream's;
+  upstream's `OCPPError` subclass of that code (a fixture with a code that
+  has none exits 5). Schema validation of the request and of the answer,
+  serialisation, and the CALLERRORs for unknown actions (`NotImplemented`,
+  `NotSupported`) or invalid payloads are the upstream's;
 - observe the frames the upstream sends (`_send`) and receives
   (`route_message`), for the events;
 - keep the raw response of a CALL (`_get_specific_response`), so that a
   CALLERROR can be told apart from a response the upstream rejects.
 
-Sending: the payload becomes the upstream's `ocpp.v16.call` dataclass and
-goes out with `ChargePoint.call(..., suppress=False)`, which validates it
-against the OCA schema first (`invalid-request` when that fails). The
+Sending: the payload becomes the upstream's `call` dataclass of the version
+and goes out with `ChargePoint.call(..., suppress=False)`, which validates
+it against the OCA schema first (`invalid-request` when that fails). The
 response is the upstream's `call_result` dataclass, written back with the
 upstream's own serialisation. Message ids are the upstream's (UUID 4),
 passed explicitly so that they can be reported.

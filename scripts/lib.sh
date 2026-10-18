@@ -18,8 +18,8 @@ KNOWN=0
 SKIPPED=0
 
 log()  { echo "[$(basename "$0" .sh)] $*" >&2; }
-ok()   { PASS=$((PASS + 1)); [[ -n "${VERBOSE:-}" ]] && log "ok: $*"; return 0; }
-fail() { FAIL=$((FAIL + 1)); log "FAIL: $*"; return 0; }
+ok()   { PASS=$((PASS + 1)); [[ -n "${VERBOSE:-}" ]] && log "ok: ${CHECK_PREFIX:-}$*"; return 0; }
+fail() { FAIL=$((FAIL + 1)); log "FAIL: ${CHECK_PREFIX:-}$*"; return 0; }
 
 image_of() { echo "${REGISTRY}/ocpp-interop-$1:${VERSION}"; }
 

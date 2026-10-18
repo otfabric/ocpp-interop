@@ -2,8 +2,9 @@
 """One OCPP connection, driven by the upstream ChargePoint.
 
 The Mobility House package has one class for both ends of a connection,
-ocpp.v16.ChargePoint: it routes received CALLs to handlers, answers them, and
-sends CALLs with ChargePoint.call(). The adapter subclasses it only to
+ocpp.v16.ChargePoint (ocpp.v201.ChargePoint for OCPP 2.0.1): it routes
+received CALLs to handlers, answers them, and sends CALLs with
+ChargePoint.call(). The adapter subclasses it only to
 
 - register a handler for every action the fixture answers, in the upstream's
   own route map (what its @on() decorator produces);
@@ -13,9 +14,10 @@ sends CALLs with ChargePoint.call(). The adapter subclasses it only to
 
 Raw JSON payloads become upstream types with the upstream's own helpers
 (camel_to_snake_case, then the dataclasses of ocpp.v16.call and
-ocpp.v16.call_result), and go back to JSON the way the upstream serialises
-them (serialize_as_dict, remove_nones, snake_to_camel_case). Validation
-against the OCPP JSON schemas, framing and routing are the upstream's.
+ocpp.v16.call_result, or of ocpp.v201), and go back to JSON the way the
+upstream serialises them (serialize_as_dict, remove_nones,
+snake_to_camel_case). Validation against the OCPP JSON schemas, framing and
+routing are the upstream's.
 """
 
 from __future__ import annotations
@@ -31,12 +33,14 @@ from ocpp.exceptions import OCPPError
 from ocpp.messages import CallError, MessageType, unpack
 from ocpp.v16 import ChargePoint as ChargePoint16
 from ocpp.v16.enums import Action as Action16
+from ocpp.v201 import ChargePoint as ChargePoint201
+from ocpp.v201.enums import Action as Action201
 
 from . import output
 from .fixture import CallErrorAnswer
 
-CHARGE_POINTS = {"1.6": ChargePoint16}
-ACTIONS = {"1.6": {a.value for a in Action16}}
+CHARGE_POINTS = {"1.6": ChargePoint16, "2.0.1": ChargePoint201}
+ACTIONS = {"1.6": {a.value for a in Action16}, "2.0.1": {a.value for a in Action201}}
 
 
 def error_class(code: str):
