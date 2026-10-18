@@ -33,10 +33,11 @@ public final class Main {
           "  ocpp-interop server --version V [--fixture PATH] [--bind-address ADDR] [--port N]",
           "                      [--security-profile N] [--tls-dir DIR] [--ready-file PATH] [--control-socket PATH]",
           "  ocpp-interop client run --version V --url URL [--station ID] [--fixture PATH] [--security-profile N]",
-          "                      [--tls-dir DIR] [--connect-timeout-ms N] [--timeout-ms N] [--hold-ms N]",
+          "                      [--tls-dir DIR] [--compression] [--connect-timeout-ms N] [--timeout-ms N] [--hold-ms N]",
           "                      [--ready-file PATH] [--control-socket PATH]",
           "  ocpp-interop client <Action> --version V --url URL [--station ID] [--fixture PATH] [--payload JSON]",
-          "                      [--security-profile N] [--tls-dir DIR] [--connect-timeout-ms N] [--timeout-ms N]",
+          "                      [--security-profile N] [--tls-dir DIR] [--compression] [--connect-timeout-ms N]",
+          "                      [--timeout-ms N]",
           "  ocpp-interop call [--station ID] <Action> [--payload JSON] [--timeout-ms N] [--control-socket PATH]",
           "  ocpp-interop print-capabilities",
           "  ocpp-interop print-fixture --version V [NAME]",
@@ -185,6 +186,9 @@ public final class Main {
     }
   }
 
+  /** Flags without a value (docs/CONTAINER_CONTRACT.md, Commands). */
+  static final Set<String> SWITCHES = Set.of("compression");
+
   static Flags flags(List<String> args, Set<String> known) throws UsageException {
     Flags flags = new Flags();
     for (int i = 0; i < args.size(); i++) {
@@ -196,6 +200,13 @@ public final class Main {
       String name = arg.substring(2);
       if (!known.contains(name)) {
         throw new UsageException("unknown flag '" + arg + "'");
+      }
+      if (SWITCHES.contains(name)) {
+        if (flags.given.containsKey(name)) {
+          throw new UsageException(arg + " is given more than once");
+        }
+        flags.given.put(name, "true");
+        continue;
       }
       if (i + 1 >= args.size()) {
         throw new UsageException(arg + " needs a value");
@@ -227,8 +238,8 @@ public final class Main {
     if (flags.has("tls-dir") && profile < 2) {
       throw new UsageException("--tls-dir is for security profiles 2 and 3");
     }
-    if (profile >= 2) {
-      throw new UnsupportedException("security profile " + profile + " (TLS) is not supported by this adapter yet");
+    if (profile >= 2 && !flags.has("tls-dir")) {
+      throw new UsageException("security profile " + profile + " needs --tls-dir");
     }
     return profile;
   }
@@ -332,8 +343,10 @@ public final class Main {
     JsonArray profiles = new JsonArray();
     profiles.add(0);
     profiles.add(1);
+    profiles.add(2);
+    profiles.add(3);
     features.add("securityProfiles", profiles);
-    features.addProperty("compression", false);
+    features.addProperty("compression", !version.equals("1.6"));
     features.addProperty("send", false);
     features.addProperty("callResultError", false);
     features.addProperty("fixtureCallErrors", false);
@@ -347,12 +360,27 @@ public final class Main {
       notes.add(
           "JSONServer and JSONClient always register the Core profile: a Core action without a fixture "
               + "answer is answered with InternalError, not NotImplemented.");
+      notes.add(
+          "No compression in OCPP 1.6: JSONServer and JSONClient build their Draft_6455 without extensions "
+              + "(https://github.com/ChargeTimeEU/Java-OCA-OCPP/blob/f27fe5bfb03e01491100597d6859080f5ae07545/"
+              + "ocpp-v1_6-json/src/main/java/eu/chargetime/ocpp/JSONServer.java#L70), so the CSMS never "
+              + "negotiates permessage-deflate and the station cannot offer it (--compression exits 5).");
     } else {
       notes.add(
           "OCPP 2.0.1 runs on MultiProtocolJSONServer and MultiProtocolJSONClient (artifact ocpp2), for "
-              + "that one protocol version. The server offers permessage-deflate by default (upstream "
-              + "default); compression is not declared because no self-test checks it.");
+              + "that one protocol version. The server accepts permessage-deflate whenever a station offers it "
+              + "(the upstream default); the station offers it with --compression "
+              + "(JSONConfiguration.WEBSOCKET_COMPRESSION_SUPPORT). Java-WebSocket 1.6.0 keeps its compression "
+              + "context although it announces no context takeover, at either end, so compression fails with "
+              + "peers that rely on the announcement (tests/known-bugs.tsv). Whether it was negotiated is not "
+              + "exposed: connection-opened has compression null when it may have been.");
     }
+    notes.add(
+        "Security profiles 2 and 3: the upstream's enableWSS, with a JSSE SSLContext (TLS 1.2 or later); the "
+            + "CSMS uses Java-WebSocket's SSLParametersWebSocketServerFactory. With profile 3 a client "
+            + "certificate that does not verify against ca.crt fails the TLS handshake, before an identity is "
+            + "known (no connection-rejected event); a verified certificate whose CommonName is not the "
+            + "identity is refused with HTTP 401 and the event. Private keys must be PKCS #8 PEM.");
     notes.add(
         "The message id of a CALL the upstream sends is not exposed: result documents have no "
             + "messageId, and call-sent and call-result events carry null.");

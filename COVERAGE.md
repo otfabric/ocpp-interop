@@ -27,8 +27,8 @@ release has it.
 | Periodic event streams (2.1): OpenPeriodicEventStream, ClosePeriodicEventStream, GetPeriodicEventStream, AdjustPeriodicEventStream | — | — | tested |
 | Battery swap (2.1): RequestBatterySwap; BatterySwap | — | — | RequestBatterySwap tested; BatterySwap not sendable (upstream defect) |
 | Security profile 1 (Basic): accepted, no credentials, wrong password | tested | tested | tested |
-| Security profiles 2 and 3 (TLS) | planned | planned | planned |
-| Compression | — | planned | planned |
+| Security profiles 2 and 3 (TLS, RSA and ECDSA keys): accepted, CALLs from both ends; refused: wrong password, client certificate of another identity, from another CA, or none, server certificate from another CA or for another host name, `ws://` to a TLS server | tested | tested | tested |
+| Compression (permessage-deflate): the CSMS accepts it, the station offers it only with `--compression`, CALLs from both ends | tested | tested (chargetime: known upstream defects) | tested |
 | SEND and CALLRESULTERROR (NotifyPeriodicEventStream as a SEND) | — | — | planned: no pinned upstream release implements them; a SEND action is refused (exit 5) |
 | Container contract: usage errors, exit codes, fixture validation, readiness, events, SIGTERM, health check, uid, licences | tested | tested | tested |
 

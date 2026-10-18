@@ -50,21 +50,30 @@ func commandServer(args []string) error {
 	if bind := f.get("bind-address", "0.0.0.0"); bind != "0.0.0.0" {
 		return unsupportedf("--bind-address %s: ocpp-go's ws.Server listens on all addresses", bind)
 	}
+	var wsServer *ws.Server
+	if profile >= 2 {
+		config, certPath, keyPath, err := serverTLS(f.get("tls-dir", ""), profile)
+		if err != nil {
+			return err
+		}
+		wsServer = ws.NewTLSServer(certPath, keyPath, config)
+	} else {
+		wsServer = ws.NewServer()
+	}
 	fx, err := fixtureOf(f, version)
 	if err != nil {
 		return err
 	}
-	return exitCode(runServer(version, fx, int(port), profile, f.get("ready-file", readyFile),
+	return exitCode(runServer(version, fx, wsServer, int(port), profile, f.get("ready-file", readyFile),
 		f.get("control-socket", controlSocket)))
 }
 
-func runServer(version string, fx *fixture, port, profile int, ready, controlPath string) int {
+func runServer(version string, fx *fixture, wsServer *ws.Server, port, profile int, ready, controlPath string) int {
 	info := versions[version]
 	tr := newTracker(true)
 	var mu sync.Mutex
 	sessions := map[string]chan struct{}{} // station -> closed when its connection closes
 
-	wsServer := ws.NewServer()
 	observed := &observedServer{WsServer: wsServer, t: tr}
 	dispatcher := ocppj.NewDefaultServerDispatcher(ocppj.NewFIFOQueueMap(0))
 	server := ocppj.NewServer(observed, dispatcher, nil, info.profiles...)
@@ -79,7 +88,15 @@ func runServer(version string, fx *fixture, port, profile int, ready, controlPat
 			event("connection-rejected", id, "reason", "unknown-station", "remote", r.RemoteAddr)
 			return false
 		}
-		if profile == 1 {
+		if profile == 3 {
+			// The handshake verified the certificate against ca.crt; its
+			// subject must name this station.
+			if cn, err := peerCommonName(r.TLS); err != nil || cn != id {
+				event("connection-rejected", id, "reason", "authentication", "remote", r.RemoteAddr)
+				return false
+			}
+		}
+		if profile == 1 || profile == 2 {
 			user, password, ok := r.BasicAuth()
 			if !ok || user != id || password != fx.password(id) {
 				event("connection-rejected", id, "reason", "authentication", "remote", r.RemoteAddr)
@@ -101,7 +118,8 @@ func runServer(version string, fx *fixture, port, profile int, ready, controlPat
 		mu.Lock()
 		sessions[id] = make(chan struct{})
 		mu.Unlock()
-		event("connection-opened", id, "subprotocol", info.subprotocol, "remote", remote.String())
+		// ws.Server's Upgrader never negotiates permessage-deflate.
+		event("connection-opened", id, "subprotocol", info.subprotocol, "remote", remote.String(), "compression", false)
 	}
 	closed := func(id string) {
 		mu.Lock()

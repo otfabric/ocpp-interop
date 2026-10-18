@@ -20,6 +20,7 @@ from websockets.typing import Subprotocol
 
 from . import ADAPTER, control, output
 from .endpoint import make_endpoint_class
+from .tls import compression_negotiated, peer_common_name
 
 SUBPROTOCOLS = {"1.6": "ocpp1.6", "2.0.1": "ocpp2.0.1", "2.1": "ocpp2.1"}
 
@@ -45,7 +46,8 @@ def credentials(header: str | None):
     return user, password
 
 
-async def run(version, fixture, bind_address, port, security_profile, ready_file, control_path) -> int:
+async def run(version, fixture, bind_address, port, security_profile, ssl_context, ready_file,
+              control_path) -> int:
     endpoint_class = make_endpoint_class(version)
     subprotocol = SUBPROTOCOLS[version]
     sessions = {}
@@ -56,7 +58,12 @@ async def run(version, fixture, bind_address, port, security_profile, ready_file
         if station not in fixture.stations:
             output.event("connection-rejected", station, reason="unknown-station", remote=remote_of(connection))
             return connection.respond(HTTPStatus.NOT_FOUND, "Unknown station\n")
-        if security_profile == 1:
+        if security_profile == 3 and peer_common_name(connection) != station:
+            # The handshake verified the certificate against ca.crt; its
+            # subject must name this station.
+            output.event("connection-rejected", station, reason="authentication", remote=remote_of(connection))
+            return connection.respond(HTTPStatus.UNAUTHORIZED, "Unauthorized\n")
+        if security_profile in (1, 2):
             given = credentials(request.headers.get("Authorization"))
             if given != (station, fixture.stations[station]["password"]):
                 output.event("connection-rejected", station, reason="authentication", remote=remote_of(connection))
@@ -75,7 +82,8 @@ async def run(version, fixture, bind_address, port, security_profile, ready_file
         station = station_of(connection.request.path)
         endpoint = endpoint_class(station, connection, fixture, "csms")
         sessions[station] = endpoint
-        output.event("connection-opened", station, subprotocol=connection.subprotocol, remote=remote_of(connection))
+        output.event("connection-opened", station, subprotocol=connection.subprotocol, remote=remote_of(connection),
+                     compression=compression_negotiated(connection))
         try:
             await endpoint.start()
         except ConnectionClosed:
@@ -95,8 +103,11 @@ async def run(version, fixture, bind_address, port, security_profile, ready_file
         loop.add_signal_handler(sig, stop.set)
 
     try:
+        # compression="deflate" (websockets' default, explicit here): permessage-deflate
+        # is accepted whenever a station offers it.
         server = await serve(handler, bind_address, port, subprotocols=[Subprotocol(subprotocol)],
-                             process_request=process_request, server_header=f"ocpp-interop-{ADAPTER}")
+                             process_request=process_request, server_header=f"ocpp-interop-{ADAPTER}",
+                             ssl=ssl_context, compression="deflate")
     except OSError as e:
         print(f"server: cannot listen on {bind_address}:{port}: {e}", file=sys.stderr)
         return 3

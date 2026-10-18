@@ -18,6 +18,7 @@ from websockets.typing import Subprotocol
 from . import output
 from .endpoint import make_endpoint_class
 from .server import SUBPROTOCOLS
+from .tls import compression_negotiated
 
 
 class ConnectFailed(Exception):
@@ -29,17 +30,20 @@ def station_url(url: str, station: str) -> str:
     return url if not station else url.rstrip("/") + "/" + station
 
 
-async def open_connection(version, url, station, fixture, security_profile, connect_timeout_s):
+async def open_connection(version, url, station, fixture, security_profile, ssl_context, compression,
+                          connect_timeout_s):
     headers = {}
-    if security_profile == 1:
+    if security_profile in (1, 2):
         password = fixture.stations[station]["password"]
         token = base64.b64encode(f"{station}:{password}".encode()).decode()
         headers["Authorization"] = f"Basic {token}"
     subprotocol = SUBPROTOCOLS[version]
     try:
+        # permessage-deflate is offered only with --compression.
         connection = await connect(station_url(url, station), subprotocols=[Subprotocol(subprotocol)],
-                                   additional_headers=headers, open_timeout=connect_timeout_s)
-    except (OSError, InvalidHandshake, asyncio.TimeoutError, TimeoutError, ValueError) as e:
+                                   additional_headers=headers, open_timeout=connect_timeout_s, ssl=ssl_context,
+                                   compression="deflate" if compression else None)
+    except (OSError, EOFError, InvalidHandshake, asyncio.TimeoutError, TimeoutError, ValueError) as e:
         raise ConnectFailed(f"{e.__class__.__name__}: {e}") from e
     if connection.subprotocol != subprotocol:
         await connection.close()
@@ -47,12 +51,13 @@ async def open_connection(version, url, station, fixture, security_profile, conn
     return connection
 
 
-async def one_shot(version, url, station, fixture, security_profile, connect_timeout_s, timeout_s,
-                   action, payload) -> dict:
+async def one_shot(version, url, station, fixture, security_profile, ssl_context, compression, connect_timeout_s,
+                   timeout_s, action, payload) -> dict:
     """`client <Action>`: connect, send one CALL, disconnect."""
     started = time.monotonic()
     try:
-        connection = await open_connection(version, url, station, fixture, security_profile, connect_timeout_s)
+        connection = await open_connection(version, url, station, fixture, security_profile, ssl_context, compression,
+                                           connect_timeout_s)
     except ConnectFailed as e:
         return output.result(version, action, ok=False, request=payload, error_code="connect-failed",
                              error_message=str(e), elapsed_ms=(time.monotonic() - started) * 1000)
@@ -77,8 +82,8 @@ async def _serve(endpoint, connection):
             endpoint.closed.set_result(True)
 
 
-async def run(version, url, station, fixture, security_profile, connect_timeout_s, hold_ms, ready_file,
-              control_path) -> int:
+async def run(version, url, station, fixture, security_profile, ssl_context, compression, connect_timeout_s,
+              hold_ms, ready_file, control_path) -> int:
     """`client run`: stay connected, answer from the fixture, accept `call`."""
     from . import control  # pylint: disable=import-outside-toplevel
 
@@ -89,13 +94,15 @@ async def run(version, url, station, fixture, security_profile, connect_timeout_
 
     full_url = station_url(url, station)
     try:
-        connection = await open_connection(version, url, station, fixture, security_profile, connect_timeout_s)
+        connection = await open_connection(version, url, station, fixture, security_profile, ssl_context, compression,
+                                           connect_timeout_s)
     except ConnectFailed as e:
         output.event("connection-failed", station, url=full_url, detail=str(e))
         output.event("stopped")
         return 3
     endpoint = make_endpoint_class(version)(station, connection, fixture, "station")
-    output.event("connection-opened", station, subprotocol=connection.subprotocol, remote=full_url)
+    output.event("connection-opened", station, subprotocol=connection.subprotocol, remote=full_url,
+                 compression=compression_negotiated(connection))
     reader = asyncio.ensure_future(_serve(endpoint, connection))
 
     def find(wanted):

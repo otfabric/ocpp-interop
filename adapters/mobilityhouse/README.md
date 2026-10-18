@@ -13,7 +13,7 @@ OCPP 1.6J, 2.0.1 and 2.1 reference CSMS and station built on
 | Other dependencies | jsonschema 4.26.0 (the upstream's only dependency) with attrs, jsonschema-specifications, referencing and rpds-py |
 | Licences | ocpp MIT; websockets BSD-3-Clause; jsonschema and its dependencies MIT; Python PSF-2.0. The OCA JSON schemas inside the ocpp package are CC BY-ND 4.0 and are used unmodified |
 | Base image | `python:3.14.8-slim-trixie`, pinned by digest in the [Dockerfile](Dockerfile) |
-| OCPP | 1.6J, 2.0.1 and 2.1, both roles, security profiles 0 and 1 |
+| OCPP | 1.6J, 2.0.1 and 2.1, both roles, security profiles 0 to 3, compression |
 
 The adapter code is MIT. `/licenses` in the image holds the licence of every
 installed package, of Python and of this repository, and
@@ -65,6 +65,26 @@ version; `process_request` refuses unknown identities (404) and, with
 profile 1, wrong Basic credentials (401). websockets itself refuses a
 handshake without the subprotocol (400). Client:
 `websockets.asyncio.client.connect`.
+
+## Transport security and compression
+
+Security profiles 2 and 3: `serve` and `connect` take an `ssl.SSLContext`
+([ocpp_interop/tls.py](ocpp_interop/tls.py)), TLS 1.2 or later. The server's
+context holds `server.crt` and `server.key`, and with profile 3 requires a
+client certificate that verifies against `ca.crt` (`CERT_REQUIRED`);
+`process_request` then compares the certificate's subject CommonName with
+the identity (401 when it differs). The station's context is
+`ssl.create_default_context` with `ca.crt` as its only trust anchor, so
+Python checks the server's host name, and holds `client.crt` and
+`client.key` with profile 3. A client certificate that does not verify fails
+in the TLS handshake, before websockets sees a request: no
+`connection-rejected` event.
+
+Compression: websockets' permessage-deflate (`compression="deflate"`). The
+server accepts it whenever a station offers it, in every OCPP version; the
+station offers it only with `--compression` (`compression=None` otherwise).
+`connection-opened` reports whether it was negotiated
+(`connection.protocol.extensions`), at both ends.
 
 ## OCPP 2.1
 

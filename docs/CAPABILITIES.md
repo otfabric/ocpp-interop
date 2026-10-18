@@ -53,21 +53,22 @@ a CSMS with it. NotifyPeriodicEventStream is a SEND and is not declared
 either ([CONTAINER_CONTRACT.md](CONTAINER_CONTRACT.md#ocpp-21-send-and-callresulterror)).
 
 The features differ per adapter; they are the same in every version it
-declares:
+declares, except `compression` for chargetime:
 
 | | mobilityhouse | chargetime | lorenzodonini |
 |---|---|---|---|
-| `securityProfiles` | 0, 1 | 0, 1 | 0, 1 |
+| `securityProfiles` | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 |
+| `compression` | true (1.6, 2.0.1, 2.1) | 2.0.1: true, with known upstream defects in both roles; 1.6: false | false: the CSMS cannot accept it |
 | `fixtureCallErrors` | true | false | true |
 | `messageIds` | true | false | true |
-| `compression`, `send`, `callResultError` | false | false | false |
+| `send`, `callResultError` | false | false | false |
 
 Each adapter explains its limitations in `notes`, per version. Known
 upstream defects that the self-tests show are in
 [tests/known-bugs.tsv](../tests/known-bugs.tsv) and
-[COMPATIBILITY.md](COMPATIBILITY.md); a declared action can still fail
-against a particular peer because of one (for example, the chargetime
-2.0.1 CSMS with a station that offers compression).
+[COMPATIBILITY.md](COMPATIBILITY.md); a declared action or feature can
+still fail against a particular peer because of one (for example,
+compression with the chargetime 2.0.1 CSMS or station).
 
 ## Example
 
@@ -76,7 +77,7 @@ against a particular peer because of one (for example, the chargetime
   "schemaVersion": "1.0",
   "adapter": "mobilityhouse",
   "adapterVersion": "v0.1.0",
-  "contractVersion": "0.4",
+  "contractVersion": "0.5",
   "upstream": {
     "name": "The Mobility House ocpp",
     "repository": "https://github.com/mobilityhouse/ocpp",
@@ -90,7 +91,7 @@ against a particular peer because of one (for example, the chargetime
     "1.6": {
       "client": {"supported": true, "sends": ["BootNotification", "Heartbeat"], "handles": ["Reset"]},
       "server": {"supported": true, "sends": ["Reset"], "handles": ["BootNotification", "Heartbeat"]},
-      "features": {"securityProfiles": [0, 1], "compression": false, "send": false, "callResultError": false,
+      "features": {"securityProfiles": [0, 1, 2, 3], "compression": true, "send": false, "callResultError": false,
                    "fixtureCallErrors": true, "messageIds": true},
       "notes": ["..."]
     }
@@ -108,8 +109,8 @@ artifact.
 
 | Key | Meaning |
 |---|---|
-| `securityProfiles` | Profiles exercised: 0 (none), 1 (Basic over `ws://`), 2 (TLS + Basic), 3 (mutual TLS) |
-| `compression` | `permessage-deflate` negotiated and used |
+| `securityProfiles` | Profiles exercised, in both roles: 0 (none), 1 (Basic over `ws://`), 2 (TLS + Basic), 3 (mutual TLS); see [Transport security](CONTAINER_CONTRACT.md#transport-security) |
+| `compression` | `permessage-deflate`: the station offers it with `--compression` and the CSMS accepts it, and it is used; both roles ([Compression](CONTAINER_CONTRACT.md#compression)) |
 | `send` | OCPP 2.1 SEND frames (message type 6) sent and received. `false` everywhere: no pinned upstream release implements SEND |
 | `callResultError` | OCPP 2.1 CALLRESULTERROR frames (message type 5) sent and received. `false` everywhere, for the same reason |
 | `fixtureCallErrors` | The adapter answers with the CALLERROR a fixture's `callError` answer names. Without it, such a fixture exits 5 |

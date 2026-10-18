@@ -64,8 +64,11 @@ interoperability. First slice: OCPP 1.6J only (2026-10-18).
       2.0.1, every station against every CSMS for both (3 x 3 each)
 - [x] Contract 0.3: what implementing 2.0.1 and the third adapter required
 - [x] Known bugs that show only with one peer (`adapter:role@peer`)
-- [ ] TLS scenarios (profiles 2 and 3) with keys generated at test time
-- [ ] Compression (`permessage-deflate`)
+- [x] TLS scenarios (profiles 2 and 3) with keys generated at test time:
+      contract 0.5, every adapter, smoke and cross-stack tests
+- [x] Compression (`permessage-deflate`): contract 0.5; mobilityhouse in
+      every version, chargetime in 2.0.1 (known Java-WebSocket defects);
+      lorenzodonini's CSMS cannot accept it
 
 ## Phase 6 - OCPP 2.1 (open)
 

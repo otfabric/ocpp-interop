@@ -21,6 +21,12 @@
 #                  both ends declare the features send and callResultError;
 #   connectivity   one-shot client, an unknown identity, the close of a session;
 #   profile 1      Basic authentication: accepted, no credentials, wrong password;
+#   tls, compression  a station that stays connected over security profile 2
+#                  (TLS with RSA keys, Basic authentication), security profile 3
+#                  (mutual TLS with ECDSA keys) or permessage-deflate, with CALLs
+#                  from both ends; the CA and the certificates are generated for
+#                  the run. They run where both ends declare the profile or
+#                  compression;
 #   errors         NotImplemented for an action without an answer, the fixture's
 #                  own CALLERROR answers.
 #
@@ -521,6 +527,9 @@ pairing() {  # pairing <client adapter> <server adapter>
         done
     fi
 
+    # ---- transport security and compression ----
+    transport "${client}" "${server}"
+
     # ---- the fixture's own CALLERROR answers ----
     if feature "${server}" fixtureCallErrors; then
         start "${srv}" "${server}" -v "${WORK}/fixtures:/errors:ro" -- server --version "${OCPP}" --fixture /errors/callerror/${VDIR}/baseline/fixture.json
@@ -564,6 +573,82 @@ pairing() {  # pairing <client adapter> <server adapter>
     fi
 }
 
+# session <id> <client> <server> <feature> <server flags...> -- <client run flags...>
+# A station that stays connected over the transport the flags set up (the
+# run's TLS material is mounted at /tls): two CALLs from the station, two from
+# the CSMS. The second message in each direction is the first one a broken
+# compression context cannot read. With the feature compression, neither end
+# may report that compression was not negotiated.
+session() {
+    local id="$1" client="$2" server="$3" feat="$4"; shift 4
+    local srv="csms-${server}-${RUN_ID}" sta="station-${client}-${RUN_ID}" sflags=() problems=() doc t0 ms
+    while [[ "$1" != "--" ]]; do sflags+=("$1"); shift; done
+    shift
+    start "${srv}" "${server}" -v "${WORK}/tls:/tls:ro" -- server --version "${OCPP}" ${sflags[@]+"${sflags[@]}"}
+    if ! wait_ready "${srv}"; then
+        record "${id}" "${client}" "${server}" client "${feat}" "" INFRA_ERROR 0 "the server did not become ready"
+        stop_container "${srv}"; return
+    fi
+    t0=$(now_ms)
+    start "${sta}" "${client}" -v "${WORK}/tls:/tls:ro" -- client run --version "${OCPP}" "$@"
+    if wait_ready "${sta}"; then
+        doc=$(docker exec "${sta}" ocpp-interop call BootNotification --payload "$(jq -c '.samples.boot.payload' "${FIXTURE}")" --timeout-ms 5000 2>/dev/null)
+        jq -e '.ok' <<<"${doc}" >/dev/null 2>&1 || problems+=("BootNotification: ${doc:0:200}")
+        doc=$(docker exec "${sta}" ocpp-interop call Heartbeat --timeout-ms 5000 2>/dev/null)
+        jq -e '.ok' <<<"${doc}" >/dev/null 2>&1 || problems+=("Heartbeat: ${doc:0:200}")
+        doc=$(docker exec "${srv}" ocpp-interop call --station "${STATION}" ChangeAvailability \
+            --payload "$(jq -c '.samples.changeAvailability.payload' "${FIXTURE}")" --timeout-ms 5000 2>/dev/null)
+        jq -e '.ok' <<<"${doc}" >/dev/null 2>&1 || problems+=("ChangeAvailability from the CSMS: ${doc:0:200}")
+        doc=$(docker exec "${srv}" ocpp-interop call --station "${STATION}" ClearCache --payload '{}' --timeout-ms 5000 2>/dev/null)
+        jq -e '.ok' <<<"${doc}" >/dev/null 2>&1 || problems+=("ClearCache from the CSMS: ${doc:0:200}")
+        wait_event "${srv}" '.event == "connection-opened" and .station == $s' --arg s "${STATION}" >/dev/null \
+            || problems+=("the server reported no connection-opened event")
+        if [[ "${feat}" == compression ]]; then
+            events "${sta}" | jq -e 'select(.event == "connection-opened") | .compression == false' >/dev/null 2>&1 \
+                && problems+=("the station reports that compression was not negotiated")
+            events "${srv}" | jq -e 'select(.event == "connection-opened") | .compression == false' >/dev/null 2>&1 \
+                && problems+=("the CSMS reports that compression was not negotiated")
+        fi
+    else
+        problems+=("client run did not connect: $(events "${sta}" | jq -r 'select(.event == "connection-failed") | .detail' 2>/dev/null | sed -n 1p)")
+    fi
+    ms=$(( $(now_ms) - t0 ))
+    if [[ ${#problems[@]} -eq 0 ]]; then
+        record "${id}" "${client}" "${server}" client "${feat}" "" PASS "${ms}"
+    else
+        record "${id}" "${client}" "${server}" client "${feat}" "" FAIL "${ms}" "$(IFS='; '; echo "${problems[*]}")"
+    fi
+    events "${srv}" | grep -v '^{' | grep -q . && record "${id}.events.json-lines" "${client}" "${server}" server other "" FAIL 0 "server stdout has lines that are not JSON"
+    stop_container "${sta}"; stop_container "${srv}"
+}
+
+# transport <client> <server>: security profiles 2 and 3, and compression.
+transport() {
+    local client="$1" server="$2" url="csms-$2-${RUN_ID}:9000/ocpp" tls="/tls/${VDIR}"
+    if profile "${client}" 2 && profile "${server}" 2; then
+        session "${VDIR}.tls.profile2" "${client}" "${server}" security-profile-2 \
+            --security-profile 2 --tls-dir "${tls}/rsa/server" -- \
+            --url "wss://${url}" --security-profile 2 --tls-dir "${tls}/rsa/station"
+    else
+        record "${VDIR}.tls.profile2" "${client}" "${server}" client security-profile-2 "" SKIP_UNSUPPORTED 0 \
+            "security profile 2 is not declared by both ${client} and ${server}"
+    fi
+    if profile "${client}" 3 && profile "${server}" 3; then
+        session "${VDIR}.tls.profile3" "${client}" "${server}" security-profile-3 \
+            --security-profile 3 --tls-dir "${tls}/ec/server" -- \
+            --url "wss://${url}" --security-profile 3 --tls-dir "${tls}/ec/station"
+    else
+        record "${VDIR}.tls.profile3" "${client}" "${server}" client security-profile-3 "" SKIP_UNSUPPORTED 0 \
+            "security profile 3 is not declared by both ${client} and ${server}"
+    fi
+    if feature "${client}" compression && feature "${server}" compression; then
+        session "${VDIR}.compression" "${client}" "${server}" compression -- --url "ws://${url}" --compression
+    else
+        record "${VDIR}.compression" "${client}" "${server}" client compression "" SKIP_UNSUPPORTED 0 \
+            "compression is not declared by both ${client} and ${server}"
+    fi
+}
+
 # A Reset the fixture's station answers: Hard in 1.6, Immediate in 2.x.
 reset_payload() { if [[ "${OCPP}" == 1.6 ]]; then echo '{"type":"Hard"}'; else echo '{"type":"Immediate"}'; fi; }
 
@@ -576,6 +661,17 @@ for v in "${VERSIONS[@]}"; do
     jq '.answers.csms.Heartbeat = {"callError": {"code": "GenericError", "description": "fixture says no"}}
         | .answers.station.Reset = {"callError": {"code": "GenericError", "description": "fixture says no"}}' "${FIXTURE}" \
         > "${WORK}/fixtures/callerror/${VDIR}/baseline/fixture.json"
+done
+# The TLS material of docs/CONTAINER_CONTRACT.md (Transport security), from
+# CAs made for this run: RSA keys for profile 2, ECDSA P-256 keys for profile
+# 3. The server certificates name every CSMS container.
+csms_names=()
+for a in "${ADAPTERS[@]}"; do csms_names+=("csms-${a}-${RUN_ID}"); done
+for v in "${VERSIONS[@]}"; do
+    use_version "${v}"
+    { make_pki "${WORK}/tls/${VDIR}/rsa" rsa "${STATION}" "${csms_names[@]}" localhost 127.0.0.1 \
+        && make_pki "${WORK}/tls/${VDIR}/ec" ec "${STATION}" "${csms_names[@]}" localhost 127.0.0.1; } \
+        || { log "cannot generate the TLS material"; exit 1; }
 done
 chmod -R a+rX "${WORK}"
 

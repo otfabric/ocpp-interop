@@ -132,6 +132,94 @@ def within($want; $got):
   else $want == $got end;
 '
 
+# ---- transport security: a throwaway PKI, generated at test time ----
+# Nothing of it is committed or baked into an image (REQUIREMENTS.md R7.3).
+
+# new_key <file> <rsa|ec>: an unencrypted PKCS #8 PEM key, RSA 2048 or ECDSA P-256.
+new_key() {
+    if [[ "$2" == ec ]]; then
+        openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$1" 2>/dev/null
+    else
+        openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$1" 2>/dev/null
+    fi
+}
+
+# new_ca <dir> <rsa|ec> <name>: <dir>/ca.key and the self-signed <dir>/ca.crt.
+new_ca() {
+    local dir="$1"
+    mkdir -p "${dir}"
+    new_key "${dir}/ca.key" "$2" || return 1
+    cat > "${dir}/ca.cnf" <<CNF
+[req]
+distinguished_name = dn
+prompt = no
+x509_extensions = ca
+[dn]
+CN = $3
+[ca]
+basicConstraints = critical, CA:TRUE
+keyUsage = critical, keyCertSign, cRLSign
+subjectKeyIdentifier = hash
+CNF
+    openssl req -x509 -new -key "${dir}/ca.key" -config "${dir}/ca.cnf" -days 2 -sha256 -out "${dir}/ca.crt" 2>/dev/null
+}
+
+# new_leaf <ca dir> <out prefix> <rsa|ec> <server|client> <common name> [<subject alternative names>...]
+# writes <out prefix>.crt and <out prefix>.key, signed by the CA of <ca dir>.
+new_leaf() {
+    local ca="$1" out="$2" type="$3" role="$4" cn="$5"; shift 5
+    local usage="digitalSignature" san="" name
+    [[ "${type}" == rsa ]] && usage="digitalSignature, keyEncipherment"
+    for name in "$@"; do
+        if [[ "${name}" =~ ^[0-9.]+$ ]]; then san="${san:+${san}, }IP:${name}"; else san="${san:+${san}, }DNS:${name}"; fi
+    done
+    new_key "${out}.key" "${type}" || return 1
+    openssl req -new -key "${out}.key" -subj "/CN=${cn}" -out "${out}.csr" 2>/dev/null || return 1
+    {
+        echo "basicConstraints = critical, CA:FALSE"
+        echo "keyUsage = critical, ${usage}"
+        echo "extendedKeyUsage = $([[ "${role}" == server ]] && echo serverAuth || echo clientAuth)"
+        echo "subjectKeyIdentifier = hash"
+        echo "authorityKeyIdentifier = keyid"
+        [[ -n "${san}" ]] && echo "subjectAltName = ${san}"
+    } > "${out}.ext"
+    local status=0
+    openssl x509 -req -in "${out}.csr" -CA "${ca}/ca.crt" -CAkey "${ca}/ca.key" -CAcreateserial \
+        -days 2 -sha256 -extfile "${out}.ext" -out "${out}.crt" 2>"${out}.err" || status=$?
+    [[ "${status}" == 0 ]] || { log "openssl x509: $(cat "${out}.err")"; }
+    rm -f "${out}.csr" "${out}.ext" "${out}.err"
+    return "${status}"
+}
+
+# make_pki <dir> <rsa|ec> <station> <server host names...>: the --tls-dir
+# directories of docs/CONTAINER_CONTRACT.md (Transport security), from a CA
+# made for this run:
+#   server/      server.crt (for every host name given), server.key, ca.crt
+#   station/     ca.crt, client.crt and client.key with CN = <station>
+#   other-cn/    as station/, with a client certificate for another identity
+#   other-ca/    as station/, with a client certificate from another CA
+#   untrusted/   ca.crt of another CA (the server's certificate does not
+#                verify), and the station's client certificate
+make_pki() {
+    local dir="$1" type="$2" station="$3"; shift 3
+    local d
+    command -v openssl >/dev/null || { log "missing required tool: openssl"; return 1; }
+    mkdir -p "${dir}"
+    new_ca "${dir}/.ca" "${type}" "ocpp-interop test CA ${RUN_ID}" || return 1
+    new_ca "${dir}/.rogue" "${type}" "ocpp-interop other CA ${RUN_ID}" || return 1
+    for d in server station other-cn other-ca untrusted; do mkdir -p "${dir}/${d}"; done
+    new_leaf "${dir}/.ca" "${dir}/server/server" "${type}" server "$1" "$@" || return 1
+    new_leaf "${dir}/.ca" "${dir}/station/client" "${type}" client "${station}" || return 1
+    new_leaf "${dir}/.ca" "${dir}/other-cn/client" "${type}" client "NOT-${station}" || return 1
+    new_leaf "${dir}/.rogue" "${dir}/other-ca/client" "${type}" client "${station}" || return 1
+    for d in server station other-cn other-ca; do cp "${dir}/.ca/ca.crt" "${dir}/${d}/ca.crt"; done
+    cp "${dir}/.rogue/ca.crt" "${dir}/untrusted/ca.crt"
+    cp "${dir}/station/client.crt" "${dir}/station/client.key" "${dir}/untrusted/"
+    rm -rf "${dir}/.ca" "${dir}/.rogue"
+    # The containers run as uid 10001 and mount the directories read-only.
+    chmod -R a+rX "${dir}"
+}
+
 finish() {
     echo "" >&2
     local extra=""
