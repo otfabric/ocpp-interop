@@ -16,7 +16,10 @@ otfabric/go-ocpp, is in that repository's IMPLEMENTATION_PLAN.md.
       cross-field validation
 - [x] versions.yaml with the candidate upstreams (status `planned`)
 - [x] Schema and document validators, shellcheck
-- [ ] CI green on GitHub (not yet pushed)
+- [x] CI green on GitHub
+- [x] Release workflow (contract, schemas and fixtures; no images yet) and
+      the weekly upstream candidate workflow
+- [ ] Release v0.0.1
 
 ## Phase 4 - First adapters (open)
 
@@ -33,8 +36,9 @@ interoperability.
 - [ ] Self-tests: smoke tests per image, then every client against every
       server, with requests from both ends
 - [ ] Reports and a generated compatibility matrix
-- [ ] Per-architecture CI (native amd64 and arm64), the release workflow,
-      the candidate workflow for newer upstreams
+- [ ] Per-architecture CI (native amd64 and arm64); image build, self-test
+      and GHCR publish jobs in the release workflow; candidate builds in the
+      candidate workflow
 - [ ] Contract 1.0, release v0.1.0
 
 ## Phase 5 - OCPP 2.0.1 and the third adapter (open)

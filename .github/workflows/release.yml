@@ -1,0 +1,60 @@
+name: Release
+run-name: "Release ${{ github.ref_name }}"
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write   # create the GitHub release
+
+env:
+  TOOLS_REGISTRY: mirror.gcr.io
+  VERSION: ${{ github.ref_name }}
+
+jobs:
+  # Until the first adapter lands (PLAN.md, Phase 4) a release publishes the
+  # contract, schemas and fixtures only. The per-architecture build, self-test
+  # and GHCR push jobs of iec104-interop and modbus-interop are added with the
+  # first adapter; the guard below fails the release if an adapter exists
+  # before they are, so that images can never be silently left out.
+  release:
+    name: Validate and release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install jsonschema
+
+      - name: Validate
+        run: |
+          make validate
+          want="interop_version: \"${VERSION#v}\""
+          grep -qF "$want" versions.yaml || { echo "::error::versions.yaml does not say $want"; exit 1; }
+          grep -qE "^## ${VERSION}\$" RELEASE.md || { echo "::error::RELEASE.md has no section ## ${VERSION}"; exit 1; }
+
+      - name: No adapter may be left out of a release
+        run: |
+          if compgen -G "adapters/*/Dockerfile" >/dev/null; then
+            echo "::error::adapters exist, but this workflow does not build images yet: add the build, self-test and publish jobs"
+            exit 1
+          fi
+
+      - name: Write manifest.json and the release notes
+        run: |
+          : > digests.txt
+          scripts/release-manifest.py "${VERSION}" "${GITHUB_SHA}" digests.txt manifest.json release-body.md
+          cat manifest.json release-body.md
+          sha256sum manifest.json > checksums.txt
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          body_path: release-body.md
+          files: |
+            manifest.json
+            checksums.txt
