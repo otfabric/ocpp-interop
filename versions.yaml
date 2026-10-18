@@ -1,0 +1,91 @@
+# Machine-readable version manifest for ocpp-interop.
+# Upstream pins and base image digests are release inputs; nothing floats.
+# The Dockerfiles are the source of truth for a build:
+# scripts/check-versions.sh fails when this file disagrees with them.
+#
+# Phase 1: no adapter is built yet. The entries below record the candidates
+# as of 2026-10-18; `version` and `revision` are filled in, and verified,
+# when an adapter is implemented (PLAN.md, Phase 4).
+
+interop_version: "0.0.0"
+contract_version: "0.1"        # docs/CONTAINER_CONTRACT.md (draft until 1.0); documents carry schemaVersion "1.0"
+fixture_schema: "1.0"          # fixtures/schema/ocpp-fixture.schema.json
+
+protocol:
+  name: "OCPP-J"
+  versions: ["1.6", "2.0.1", "2.1"]
+  subprotocols: ["ocpp1.6", "ocpp2.0.1", "ocpp2.1"]
+  default_port: 9000           # inside the images; plain WebSocket, for test networks only
+  path: "/ocpp/{station}"
+
+implementations:
+  mobilityhouse:
+    priority: P0
+    status: planned
+    upstream: "The Mobility House ocpp"
+    repository: "https://github.com/mobilityhouse/ocpp"
+    artifact: "pypi:ocpp"
+    latest: "2.1.0"              # 2025-07-16; master has commits after it (last seen 2026-10-04)
+    license: "MIT"               # the specification documents in its docs/ are CC BY-ND 4.0 and are not used
+    language: "Python"
+    independent_engine: true
+    roles: [server, client]
+    versions_claimed: ["1.6", "2.0.1", "2.1"]
+    note: >-
+      The README names 1.6 and 2.0.1 only; an ocpp/v21 package exists since
+      2.1.0. 2.1 is a candidate until a self-test exercises it.
+
+  chargetime:
+    priority: P0
+    status: planned
+    upstream: "ChargeTimeEU Java-OCA-OCPP"
+    repository: "https://github.com/ChargeTimeEU/Java-OCA-OCPP"
+    artifact: "maven:eu.chargetime.ocpp"
+    latest: "v2.0"               # 2025-12-12
+    license: "MIT"
+    language: "Java"
+    independent_engine: true
+    roles: [server, client]
+    versions_claimed: ["1.6", "2.0.1", "2.1"]
+    note: >-
+      1.6J in ocpp-v1_6 and ocpp-v1_6-json; 2.0.1 and 2.1 in the
+      multi-protocol ocpp-v2 module (packages eu.chargetime.ocpp.v201 and
+      eu.chargetime.ocpp.v21). Feature coverage of 2.1 is unverified.
+
+  lorenzodonini:
+    priority: P1
+    status: planned
+    upstream: "lorenzodonini ocpp-go"
+    repository: "https://github.com/lorenzodonini/ocpp-go"
+    module: "github.com/lorenzodonini/ocpp-go"
+    latest: "v0.19.0"            # 2025-02-02, marked pre-release
+    license: "MIT"
+    language: "Go"
+    independent_engine: true
+    roles: [server, client]
+    versions_claimed: ["1.6", "2.0.1"]
+    note: >-
+      The upstream says its 2.0.1 support needs more real-world testing.
+      No 2.1.
+
+  citrineos:
+    priority: P2
+    status: planned
+    upstream: "CitrineOS core"
+    repository: "https://github.com/citrineos/citrineos-core"
+    license: "Apache-2.0"
+    language: "TypeScript"
+    independent_engine: true
+    roles: [server]
+    note: >-
+      A complete CSMS; needs PostgreSQL and a message broker. A later
+      integration target, not a lightweight reference.
+
+base_images: {}                # filled with digests when the first Dockerfile lands
+
+images:
+  mobilityhouse: "ghcr.io/otfabric/ocpp-interop-mobilityhouse"
+  chargetime: "ghcr.io/otfabric/ocpp-interop-chargetime"
+  lorenzodonini: "ghcr.io/otfabric/ocpp-interop-lorenzodonini"
+
+platforms: ["linux/amd64", "linux/arm64"]

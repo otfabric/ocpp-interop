@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/otfabric/ocpp-interop/fixtures/schema/ocpp-fixture.schema.json",
+  "title": "ocpp-interop fixture",
+  "description": "What a reference station or CSMS knows and how it answers. See docs/FIXTURES.md.",
+  "type": "object",
+  "required": ["schemaVersion", "name", "ocppVersion", "description", "stations", "idTokens", "answers", "samples"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "name": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "ocppVersion": {"enum": ["1.6", "2.0.1", "2.1"]},
+    "description": {"type": "string", "minLength": 1},
+    "stations": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/station"}},
+    "idTokens": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/idToken"}},
+    "configuration": {
+      "description": "OCPP 1.6 configuration keys, as GetConfiguration reports them",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "value", "readonly"],
+        "additionalProperties": false,
+        "properties": {
+          "key": {"type": "string", "maxLength": 50},
+          "value": {"type": "string", "maxLength": 500},
+          "readonly": {"type": "boolean"}
+        }
+      }
+    },
+    "variables": {
+      "description": "OCPP 2.x device model variables, as GetVariables reports them",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["component", "variable", "value", "mutability"],
+        "additionalProperties": false,
+        "properties": {
+          "component": {"$ref": "#/$defs/named"},
+          "variable": {"$ref": "#/$defs/named"},
+          "value": {"type": "string", "maxLength": 2500},
+          "mutability": {"enum": ["ReadOnly", "WriteOnly", "ReadWrite"]}
+        }
+      }
+    },
+    "answers": {
+      "type": "object",
+      "required": ["csms", "station"],
+      "additionalProperties": false,
+      "properties": {
+        "csms": {"$ref": "#/$defs/answerTable"},
+        "station": {"$ref": "#/$defs/answerTable"}
+      }
+    },
+    "samples": {
+      "description": "Named requests a test can send. Consumers read them from print-fixture.",
+      "type": "object",
+      "propertyNames": {"pattern": "^[a-z][a-zA-Z0-9]*$"},
+      "additionalProperties": {
+        "type": "object",
+        "required": ["action", "from", "payload"],
+        "additionalProperties": false,
+        "properties": {
+          "action": {"$ref": "#/$defs/action"},
+          "from": {"enum": ["station", "csms"]},
+          "payload": {"type": "object"}
+        }
+      }
+    }
+  },
+  "allOf": [
+    {"if": {"properties": {"ocppVersion": {"const": "1.6"}}},
+     "then": {"required": ["configuration"], "not": {"required": ["variables"]},
+              "properties": {"stations": {"items": {"required": ["connectors"], "not": {"required": ["evses"]}}}}}},
+    {"if": {"properties": {"ocppVersion": {"enum": ["2.0.1", "2.1"]}}},
+     "then": {"required": ["variables"], "not": {"required": ["configuration"]},
+              "properties": {"stations": {"items": {"required": ["evses"], "not": {"required": ["connectors"]}}}}}}
+  ],
+  "$defs": {
+    "action": {"type": "string", "pattern": "^[A-Z][A-Za-z0-9]+$"},
+    "named": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "maxLength": 50},
+        "instance": {"type": "string", "maxLength": 50}
+      }
+    },
+    "station": {
+      "type": "object",
+      "required": ["id", "vendor", "model", "serialNumber", "firmwareVersion", "password"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Za-z0-9*\\-_=:+|@.]{1,48}$"},
+        "vendor": {"type": "string", "maxLength": 20},
+        "model": {"type": "string", "maxLength": 20},
+        "serialNumber": {"type": "string", "maxLength": 25},
+        "firmwareVersion": {"type": "string", "maxLength": 50},
+        "password": {"type": "string", "minLength": 16, "maxLength": 40, "description": "Basic authentication password for security profiles 1 and 2. A test value, public by design."},
+        "connectors": {"type": "integer", "minimum": 1, "maximum": 16, "description": "OCPP 1.6: connectors 1..n"},
+        "evses": {
+          "description": "OCPP 2.x: EVSEs and their connectors",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "connectors"],
+            "additionalProperties": false,
+            "properties": {
+              "id": {"type": "integer", "minimum": 1},
+              "connectors": {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 1}, "uniqueItems": true}
+            }
+          }
+        }
+      }
+    },
+    "idToken": {
+      "type": "object",
+      "required": ["idToken", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "idToken": {"type": "string", "minLength": 1, "maxLength": 36},
+        "type": {"type": "string", "description": "OCPP 2.x IdTokenEnumType"},
+        "status": {"enum": ["Accepted", "Blocked", "Expired", "Invalid", "ConcurrentTx", "NoCredit", "NotAllowedTypeEVSE", "NotAtThisLocation", "NotAtThisTime", "Unknown"]}
+      }
+    },
+    "answerTable": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[A-Z][A-Za-z0-9]+$"},
+      "additionalProperties": {
+        "oneOf": [
+          {"type": "object", "required": ["payload"], "additionalProperties": false,
+           "properties": {"payload": {"type": "object"}}},
+          {"type": "object", "required": ["derived"], "additionalProperties": false,
+           "properties": {"derived": {"enum": ["idTokens", "configuration", "variables"]},
+                          "payload": {"type": "object", "description": "Fixed fields merged into the derived answer"}}},
+          {"type": "object", "required": ["callError"], "additionalProperties": false,
+           "properties": {"callError": {"type": "object", "required": ["code", "description"],
+                                        "properties": {"code": {"type": "string"}, "description": {"type": "string"}}}}}
+        ]
+      }
+    }
+  }
+}
