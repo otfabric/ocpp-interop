@@ -43,39 +43,23 @@ public final class Main {
           "  ocpp-interop version");
 
   // What the self-tests exercise (scripts/smoke.sh, scripts/interop.sh), per
-  // version. Nothing else is declared (REQUIREMENTS.md R4.2).
-  static final Map<String, List<String>> STATION_SENDS =
-      Map.of(
-          "1.6",
-          List.of(
-              "Authorize", "BootNotification", "DataTransfer", "DiagnosticsStatusNotification",
-              "FirmwareStatusNotification", "Heartbeat", "MeterValues", "SecurityEventNotification",
-              "StartTransaction", "StatusNotification", "StopTransaction"),
-          "2.0.1",
-          List.of(
-              "Authorize", "BootNotification", "DataTransfer", "FirmwareStatusNotification", "Heartbeat",
-              "LogStatusNotification", "MeterValues", "NotifyEvent", "NotifyReport", "ReservationStatusUpdate",
-              "SecurityEventNotification", "StatusNotification", "TransactionEvent"));
-  static final Map<String, List<String>> CSMS_SENDS =
-      Map.of(
-          "1.6",
-          List.of(
-              "CancelReservation", "ChangeAvailability", "ChangeConfiguration", "ClearCache",
-              "ClearChargingProfile", "DataTransfer", "ExtendedTriggerMessage", "GetCompositeSchedule",
-              "GetConfiguration", "GetDiagnostics", "GetLocalListVersion", "RemoteStartTransaction",
-              "RemoteStopTransaction", "ReserveNow", "Reset", "SendLocalList", "SetChargingProfile",
-              "TriggerMessage", "UnlockConnector", "UpdateFirmware"),
-          "2.0.1",
-          List.of(
-              "CancelReservation", "ChangeAvailability", "ClearCache", "ClearChargingProfile", "DataTransfer",
-              "GetBaseReport", "GetLocalListVersion", "GetVariables", "RequestStartTransaction",
-              "RequestStopTransaction", "Reset", "SetChargingProfile", "SetVariables", "TriggerMessage",
-              "UnlockConnector"));
-  /** Sent by the self-tests and answered NotImplemented: the baseline fixtures have no answer. */
-  static final Map<String, String> UNANSWERED_BY_CSMS =
-      Map.of("1.6", "SecurityEventNotification", "2.0.1", "ReservationStatusUpdate");
-  static final Map<String, String> UNANSWERED_BY_STATION =
-      Map.of("1.6", "ExtendedTriggerMessage", "2.0.1", "CancelReservation");
+  // version: every action of the version in the direction the specification
+  // gives it (Registry), for each of which Java-OCA-OCPP has a feature, less
+  // NOT_SENT. The baseline fixtures have a sample and an answer for each.
+  // Nothing else is declared (REQUIREMENTS.md R4.2).
+  /** Actions the upstream has a feature for but cannot send as the fixture's sample asks (README.md). */
+  static final Map<String, Set<String>> NOT_SENT = Map.of("1.6", Set.of(), "2.0.1", Set.of());
+
+  /** The actions a role sends in a version, sorted. */
+  static Set<String> declaredSends(String version, boolean station) {
+    Set<String> out = new TreeSet<>();
+    for (String action : station ? Registry.fromStation(version) : Registry.fromCsms(version)) {
+      if (Registry.feature(version, action, null) != null && !NOT_SENT.get(version).contains(action)) {
+        out.add(action);
+      }
+    }
+    return out;
+  }
 
   /** Exit 2: nothing was sent. */
   static final class UsageException extends Exception {
@@ -315,18 +299,19 @@ public final class Main {
   }
 
   private static JsonObject versionCapabilities(String version) {
-    Set<String> stationHandles = new TreeSet<>(CSMS_SENDS.get(version));
-    stationHandles.remove(UNANSWERED_BY_STATION.get(version));
-    Set<String> csmsHandles = new TreeSet<>(STATION_SENDS.get(version));
-    csmsHandles.remove(UNANSWERED_BY_CSMS.get(version));
+    Set<String> stationSends = declaredSends(version, true);
+    Set<String> csmsSends = declaredSends(version, false);
+    // An end handles what the other end sends.
+    Set<String> stationHandles = csmsSends;
+    Set<String> csmsHandles = stationSends;
 
     JsonObject client = new JsonObject();
     client.addProperty("supported", true);
-    client.add("sends", array(STATION_SENDS.get(version)));
+    client.add("sends", array(stationSends));
     client.add("handles", array(stationHandles));
     JsonObject server = new JsonObject();
     server.addProperty("supported", true);
-    server.add("sends", array(CSMS_SENDS.get(version)));
+    server.add("sends", array(csmsSends));
     server.add("handles", array(csmsHandles));
     JsonObject features = new JsonObject();
     JsonArray profiles = new JsonArray();

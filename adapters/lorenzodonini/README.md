@@ -71,6 +71,17 @@ station identity from the last path segment. The adapter's
 profile 1, wrong Basic credentials. Client: `ws.Client` with the handshake
 timeout of `--connect-timeout-ms`; ocpp-go appends the identity to the URL.
 
+## Actions
+
+ocpp-go v0.19.0 has a feature, with request and response types, for every
+OCPP 1.6 action (39: Core, Firmware Management, Local Auth List, Remote
+Trigger, Reservation, Smart Charging and the Security Whitepaper profiles
+logging, security, extendedtriggermessage, certificates and securefirmware)
+and every OCPP 2.0.1 action (64, in 16 functional blocks), and the adapter
+registers a handler for each. It therefore declares every action of both
+versions in the direction the specification gives it, both roles; the
+baseline fixtures have a sample and an answer for each.
+
 ## Limitations of the upstream
 
 These are listed in the `notes` of the capabilities and in
@@ -94,10 +105,22 @@ These are listed in the `notes` of the capabilities and in
 Recorded in [tests/known-bugs.tsv](../../tests/known-bugs.tsv), with the
 evidence:
 
-- OCPP 2.0.1 `ResetResponse` (and `SetNetworkProfileResponse`) declare
+- OCPP 2.0.1 `ResetResponse` and `SetNetworkProfileResponse` declare
   `statusInfo` without `omitempty`, so the station sends
   `"statusInfo": null`, which the OCA schema does not allow: a CSMS that
   validates responses (mobilityhouse) rejects the answer.
+- OCPP 2.0.1 `GetCompositeScheduleResponse` does not have the OCA structure
+  ([source](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/smartcharging/get_composite_schedule.go#L31-L50)):
+  a top-level `evseId`, always written, which the schema does not allow; no
+  `statusInfo`; and a `schedule` of `{startDateTime, chargingSchedule}`
+  where the schema has `CompositeScheduleType` `{evseId, duration,
+  scheduleStart, chargingRateUnit, chargingSchedulePeriod}`. The station
+  cannot answer with a schedule (mobilityhouse rejects the answer, the
+  chargetime CSMS never completes the CALL, which times out, and ocpp-go
+  reads an empty schedule), and the CSMS
+  drops the schedule of a correct answer. GetCompositeSchedule stays
+  declared: the request goes out and an answer comes back; the test is
+  KNOWN_ISSUE with every peer.
 - OCPP 2.0.1 `NotifyReportRequest` declares `tbc` as a `bool` with
   `omitempty`, so the station cannot send an explicit `"tbc": false`; the
   field is left out (false is its default).

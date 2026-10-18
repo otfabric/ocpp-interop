@@ -27,7 +27,7 @@ import asyncio
 import json
 import time
 import uuid
-from dataclasses import is_dataclass
+from dataclasses import fields, is_dataclass
 
 from ocpp.charge_point import camel_to_snake_case, remove_nones, serialize_as_dict, snake_to_camel_case
 from ocpp.exceptions import OCPPError
@@ -59,6 +59,19 @@ def error_class(code: str):
 def to_json(dataclass_instance) -> dict:
     """An upstream payload type as the upstream serialises it on the wire."""
     return snake_to_camel_case(remove_nones(serialize_as_dict(dataclass_instance)))
+
+
+def as_fields(cls, payload: dict) -> dict:
+    """The keyword arguments of an upstream payload dataclass, from a JSON
+    payload: camel_to_snake_case, as the upstream converts what it receives,
+    and then the dataclass's own name for a field whose name the conversion
+    does not give back. ocpp 2.1.0 names two OCPP 2.1 fields with an
+    underscore before the digits (iso_15118_schema_version of
+    Get15118EVCertificate, iso_15118_certificate_hash_data of Authorize),
+    which camel_to_snake_case writes as iso15118_...; snake_to_camel_case
+    writes both spellings as the same wire name."""
+    names = {f.name.replace("_", ""): f.name for f in fields(cls)}
+    return {names.get(key.replace("_", ""), key): value for key, value in camel_to_snake_case(payload).items()}
 
 
 def request_type(version: str, action: str):
@@ -102,7 +115,8 @@ def make_endpoint_class(version: str):
                 if isinstance(answer, CallErrorAnswer):
                     # The upstream answers an OCPPError with a CALLERROR of its code.
                     raise error_class(answer.code)(description=answer.description)
-                return getattr(self._call_result, action)(**camel_to_snake_case(answer))
+                cls = getattr(self._call_result, action)
+                return cls(**as_fields(cls, answer))
 
             return handler
 
@@ -168,7 +182,7 @@ def make_endpoint_class(version: str):
                 return done(ok=False, request=payload, error_code="unsupported",
                             error_message=f"ocpp {self.version} has no request type for {action}")
             try:
-                request = cls(**camel_to_snake_case(payload))
+                request = cls(**as_fields(cls, payload))
             except TypeError as e:
                 return done(ok=False, request=payload, error_code="invalid-request", error_message=str(e))
 

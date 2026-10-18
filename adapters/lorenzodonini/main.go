@@ -344,9 +344,9 @@ func capabilities() *object {
 }
 
 func versionCapabilities(version string) *object {
-	d := declared[version]
-	stationHandles := minus(d.csmsSends, d.unansweredByStation)
-	csmsHandles := minus(d.stationSends, d.unansweredByCSMS)
+	stationSends, csmsSends := declaredSends(version)
+	// An end handles what the other end sends.
+	stationHandles, csmsHandles := csmsSends, stationSends
 	notes := []string{
 		"The adapter uses ocpp-go's own high-level API (ocpp16.CentralSystem and ChargePoint, ocpp2.CSMS and " +
 			"ChargingStation) on its ocppj endpoints and ws transport, with the profiles ocpp-go registers by default.",
@@ -363,8 +363,8 @@ func versionCapabilities(version string) *object {
 			"ocppj.SetMessageIdGenerator.",
 	}
 	return newObject().
-		set("client", newObject().set("supported", true).set("sends", d.stationSends).set("handles", stationHandles)).
-		set("server", newObject().set("supported", true).set("sends", d.csmsSends).set("handles", csmsHandles)).
+		set("client", newObject().set("supported", true).set("sends", stationSends).set("handles", stationHandles)).
+		set("server", newObject().set("supported", true).set("sends", csmsSends).set("handles", csmsHandles)).
 		set("features", newObject().
 			set("securityProfiles", []int{0, 1}).
 			set("compression", false).
@@ -375,53 +375,24 @@ func versionCapabilities(version string) *object {
 		set("notes", notes)
 }
 
-func minus(list []string, drop string) []string {
-	out := []string{}
-	for _, a := range list {
-		if a != drop {
-			out = append(out, a)
+// declaredSends is what the self-tests exercise in one version: every action
+// of the version in the direction the specification gives it (registry.go),
+// for each of which ocpp-go has a feature, less notSent. The baseline
+// fixtures have a sample and an answer for each.
+func declaredSends(version string) (station, csms []string) {
+	list := func(actions map[string]bool) []string {
+		out := []string{}
+		for a := range actions {
+			if feature(version, a) != nil && !notSent[version][a] {
+				out = append(out, a)
+			}
 		}
+		sort.Strings(out)
+		return out
 	}
-	sort.Strings(out)
-	return out
+	return list(versions[version].fromStation), list(versions[version].fromCSMS)
 }
 
-// declaredActions is what the self-tests exercise in one version.
-type declaredActions struct {
-	stationSends, csmsSends               []string
-	unansweredByCSMS, unansweredByStation string
-}
-
-var declared = map[string]declaredActions{
-	"1.6": {
-		stationSends: []string{
-			"Authorize", "BootNotification", "DataTransfer", "DiagnosticsStatusNotification",
-			"FirmwareStatusNotification", "Heartbeat", "MeterValues", "SecurityEventNotification",
-			"StartTransaction", "StatusNotification", "StopTransaction",
-		},
-		csmsSends: []string{
-			"CancelReservation", "ChangeAvailability", "ChangeConfiguration", "ClearCache",
-			"ClearChargingProfile", "DataTransfer", "ExtendedTriggerMessage", "GetCompositeSchedule",
-			"GetConfiguration", "GetDiagnostics", "GetLocalListVersion", "RemoteStartTransaction",
-			"RemoteStopTransaction", "ReserveNow", "Reset", "SendLocalList", "SetChargingProfile",
-			"TriggerMessage", "UnlockConnector", "UpdateFirmware",
-		},
-		unansweredByCSMS:    "SecurityEventNotification",
-		unansweredByStation: "ExtendedTriggerMessage",
-	},
-	"2.0.1": {
-		stationSends: []string{
-			"Authorize", "BootNotification", "DataTransfer", "FirmwareStatusNotification", "Heartbeat",
-			"LogStatusNotification", "MeterValues", "NotifyEvent", "NotifyReport", "ReservationStatusUpdate",
-			"SecurityEventNotification", "StatusNotification", "TransactionEvent",
-		},
-		csmsSends: []string{
-			"CancelReservation", "ChangeAvailability", "ClearCache", "ClearChargingProfile", "DataTransfer",
-			"GetBaseReport", "GetLocalListVersion", "GetVariables", "RequestStartTransaction",
-			"RequestStopTransaction", "Reset", "SetChargingProfile", "SetVariables", "TriggerMessage",
-			"UnlockConnector",
-		},
-		unansweredByCSMS:    "ReservationStatusUpdate",
-		unansweredByStation: "CancelReservation",
-	},
-}
+// notSent: actions of a version that ocpp-go has a feature for but cannot
+// send as the fixture's sample asks, with the reason (README.md). None.
+var notSent = map[string]map[string]bool{}

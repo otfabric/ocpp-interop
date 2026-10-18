@@ -23,34 +23,44 @@ reports the rest as `SKIP_UNSUPPORTED`.
 All three adapters declare OCPP 1.6 and 2.0.1 in both roles, and
 `mobilityhouse` also OCPP 2.1, exactly what
 [scripts/smoke.sh](../scripts/smoke.sh) and
-[scripts/interop.sh](../scripts/interop.sh) exercise. For 1.6 and 2.0.1 the
-action lists are the same for every adapter:
+[scripts/interop.sh](../scripts/interop.sh) exercise. Each role sends every
+action of the version that the specification gives to it (the direction
+tables of [scripts/validate-fixtures.py](../scripts/validate-fixtures.py):
+OCPP 1.6 with the Security Whitepaper messages, 2.0.1 Part 2, 2.1 Edition 2
+Part 2), and handles every action the other role sends. The baseline
+fixtures have a sample and an answer for each, so the self-tests send every
+declared action and check its answer.
 
-| | OCPP 1.6 | OCPP 2.0.1 |
-|---|---|---|
-| Station sends | Authorize, BootNotification, DataTransfer, DiagnosticsStatusNotification, FirmwareStatusNotification, Heartbeat, MeterValues, SecurityEventNotification, StartTransaction, StatusNotification, StopTransaction | Authorize, BootNotification, DataTransfer, FirmwareStatusNotification, Heartbeat, LogStatusNotification, MeterValues, NotifyEvent, NotifyReport, ReservationStatusUpdate, SecurityEventNotification, StatusNotification, TransactionEvent |
-| Station handles | CancelReservation, ChangeAvailability, ChangeConfiguration, ClearCache, ClearChargingProfile, DataTransfer, GetCompositeSchedule, GetConfiguration, GetDiagnostics, GetLocalListVersion, RemoteStartTransaction, RemoteStopTransaction, ReserveNow, Reset, SendLocalList, SetChargingProfile, TriggerMessage, UnlockConnector, UpdateFirmware | ChangeAvailability, ClearCache, ClearChargingProfile, DataTransfer, GetBaseReport, GetLocalListVersion, GetVariables, RequestStartTransaction, RequestStopTransaction, Reset, SetChargingProfile, SetVariables, TriggerMessage, UnlockConnector |
-| CSMS sends | the station's handled actions, and ExtendedTriggerMessage | the station's handled actions, and CancelReservation |
-| CSMS handles | the station's sent actions except SecurityEventNotification | the station's sent actions except ReservationStatusUpdate |
+| Declared actions | OCPP 1.6 (39) | OCPP 2.0.1 (64) | OCPP 2.1 (91) |
+|---|---|---|---|
+| Station sends | 14, all three adapters | 25, all three adapters | 35, mobilityhouse |
+| Station handles | 26, all three adapters | 40, all three adapters | 55, mobilityhouse |
+| CSMS sends | 26, all three adapters | 40, all three adapters | 55, mobilityhouse |
+| CSMS handles | 14, all three adapters | 25, all three adapters | 35, mobilityhouse |
 
-The actions the other end does not handle are listed as sent because the
-self-tests send them and check that the other end answers `NotImplemented`
-(the baseline fixtures have no answer for them).
+DataTransfer goes both ways and is counted in each direction. The pinned
+releases of Java-OCA-OCPP (v2.0) and ocpp-go (v0.19.0) have a request and a
+response type for every 1.6 and 2.0.1 action; ocpp 2.1.0 has one for every
+action of the three versions except NotifyPeriodicEventStream.
 
-OCPP 2.1 (`mobilityhouse` only: the pinned releases of the other upstreams
-have no 2.1):
+Not declared, in OCPP 2.1 (the station's 37 actions less these two):
 
-| | OCPP 2.1 |
-|---|---|
-| Station sends | the 2.0.1 list, and ClosePeriodicEventStream, NotifyDERAlarm, NotifyDERStartStop, OpenPeriodicEventStream, ReportDERControl |
-| Station handles | the 2.0.1 list, and AdjustPeriodicEventStream, ClearDERControl, ClearTariffs, GetDERControl, GetPeriodicEventStream, GetTariffs, RequestBatterySwap, SetDERControl, SetDefaultTariff |
-| CSMS sends | the station's handled actions, and CancelReservation |
-| CSMS handles | the station's sent actions except ReservationStatusUpdate |
+- BatterySwap: ocpp 2.1.0 cannot send it (it writes the battery fields
+  `soC` and `soH` as `SoC` and `soh`), so no self-test reaches a CSMS with
+  it; the CSMS does not declare it either.
+- NotifyPeriodicEventStream: a SEND
+  ([CONTAINER_CONTRACT.md](CONTAINER_CONTRACT.md#ocpp-21-send-and-callresulterror)).
 
-BatterySwap is not declared: ocpp 2.1.0 cannot send it (it writes the
-battery fields `soC` and `soH` as `SoC` and `soh`), so no self-test reaches
-a CSMS with it. NotifyPeriodicEventStream is a SEND and is not declared
-either ([CONTAINER_CONTRACT.md](CONTAINER_CONTRACT.md#ocpp-21-send-and-callresulterror)).
+A declared action can still fail with a particular peer, or with any peer,
+because of an upstream defect; those are in
+[tests/known-bugs.tsv](../tests/known-bugs.tsv) and
+[COMPATIBILITY.md](COMPATIBILITY.md) (for example GetCompositeSchedule with
+ocpp-go 2.0.1, whose response type does not have the OCA structure).
+
+Before the baseline fixtures covered every action (contract 0.4, v0.2.0),
+the adapters declared 11, 19, 20 and 10 actions in 1.6 (station sends,
+station handles, CSMS sends, CSMS handles), 13, 14, 15 and 12 in 2.0.1, and
+18, 23, 24 and 17 in 2.1.
 
 The features differ per adapter; they are the same in every version it
 declares:

@@ -54,7 +54,10 @@ to:
   CALLERROR can be told apart from a response the upstream rejects.
 
 Sending: the payload becomes the upstream's `call` dataclass of the version
-and goes out with `ChargePoint.call(..., suppress=False)`, which validates
+(keys converted with the upstream's `camel_to_snake_case`, then matched to
+the dataclass's own field names: ocpp 2.1.0 names two 2.1 fields
+`iso_15118_...`, which `camel_to_snake_case` writes `iso15118_...`) and goes
+out with `ChargePoint.call(..., suppress=False)`, which validates
 it against the OCA schema first (`invalid-request` when that fails). The
 response is the upstream's `call_result` dataclass, written back with the
 upstream's own serialisation. Message ids are the upstream's (UUID 4),
@@ -65,6 +68,16 @@ version; `process_request` refuses unknown identities (404) and, with
 profile 1, wrong Basic credentials (401). websockets itself refuses a
 handshake without the subprotocol (400). Client:
 `websockets.asyncio.client.connect`.
+
+## Actions
+
+`ocpp.v16`, `ocpp.v201` and `ocpp.v21` have a request and a response
+dataclass for every action of their version (39, 64 and 90 of 91: not
+NotifyPeriodicEventStream), and the upstream routes any action to a
+handler. The adapter therefore declares every action in the direction the
+specification gives it, both roles, all three versions, except in 2.1
+BatterySwap and NotifyPeriodicEventStream (below). The baseline fixtures
+have a sample and an answer for each.
 
 ## OCPP 2.1
 
@@ -105,3 +118,19 @@ The features `send` and `callResultError` are therefore `false`.
   BatterySwap. The CSMS answers one (checked by hand with a raw frame), but
   without a station that can send it no self-test does, so the CSMS does
   not declare it either.
+- OCPP 2.1: more field names that `snake_to_camel_case` does not write as
+  the OCA schema spells them, so a payload with one of them fails the
+  upstream's own validation, whichever end builds it: `receiptUrl` of
+  NotifySettlement (request and response; written `receiptURL`, because of
+  the `_url` to `URL` rule for `responderURL`), the per-phase fields
+  `limit_L2`, `setpoint_L3` and the like of `ChargingSchedulePeriodType`,
+  `ChargingScheduleUpdateType` (UpdateDynamicSchedule,
+  PullDynamicScheduleUpdate), `V2XChargingParametersType` and
+  `DERChargingParametersType` (written `limitL2`), `fixedPF...`
+  (`fixedPf...`) of the DER control messages, `prioritizedEMAIDs`
+  (`prioritizedEmaids`) of Get15118EVCertificate, `taxRuleID`, `soC` of
+  `LimitAtSoCType`, and others
+  ([`snake_to_camel_case`](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/charge_point.py#L46-L80)).
+  The baseline's 2.1 samples and answers use none of these optional fields
+  (NotifySettlement is answered with `receiptId` only), so no self-test
+  runs into them, and they are not in known-bugs.tsv.
