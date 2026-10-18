@@ -4,7 +4,8 @@
 # scripts/check-versions.sh fails when this file disagrees with them.
 #
 # Phase 6: mobilityhouse, chargetime and lorenzodonini are built for OCPP
-# 1.6J and 2.0.1, both roles; mobilityhouse also for OCPP 2.1. citrineos is a
+# 1.6J and 2.0.1, both roles; mobilityhouse also for OCPP 2.1. everest
+# (EVerest libocpp) is a station for OCPP 1.6J, 2.0.1 and 2.1. citrineos is a
 # candidate (status `planned`): its entry records what the upstream says,
 # unverified.
 
@@ -92,6 +93,33 @@ implementations:
       No 2.1. The adapter uses ocpp-go's high-level API (ocpp16 and ocpp2
       packages) on its ocppj endpoints and ws transport.
 
+  everest:
+    priority: P1
+    status: built
+    upstream: "EVerest libocpp"
+    repository: "https://github.com/EVerest/everest-core"
+    artifact: "git:https://github.com/EVerest/everest-core@2026.02.1 (lib/everest/ocpp, log, timer, sqlite, evse_security)"
+    version: "2026.02.1"         # 2026-07-16, git tag of everest-core; its libocpp is project version 0.31.1
+    revision: "b61bb12b8cb89ee9d0fab037b05c3bb8cea9b13e"
+    lock: "adapters/everest/Dockerfile"   # every source by tag and commit; Boost, OpenSSL, SQLite from Debian trixie
+    transport: "libwebsockets 4.5.2 (through libocpp's ocpp::Websocket)"
+    latest: "2026.02.1"          # the standalone EVerest/libocpp is archived (last release v0.31.1, 2025-12-11)
+    license: "Apache-2.0"
+    language: "C++"
+    independent_engine: true
+    roles: [client]              # libocpp implements the charging station only
+    versions_verified: ["1.6", "2.0.1", "2.1"]   # by the self-tests (scripts/smoke.sh, scripts/interop.sh)
+    versions_claimed: ["1.6", "2.0.1", "2.1"]
+    note: >-
+      libocpp moved from github.com/EVerest/libocpp (archived) into the
+      everest-core monorepo, lib/everest/ocpp. The README says OCPP 2.1 is
+      under development: its websocket subprotocol ocpp2.1 and every message
+      (include/ocpp/v21/messages) are there. libocpp knows the OCPP-J
+      message types 2 to 4 only (ocpp::MessageTypeId): no SEND, no
+      CALLRESULTERROR. The adapter uses libocpp's protocol layer
+      (ocpp::Websocket, ocpp::MessageQueue and the message types), not its
+      ChargePoint, which runs a station of its own (adapters/everest/README.md).
+
   citrineos:
     priority: P2
     status: planned
@@ -127,11 +155,12 @@ base_images:
   debian:
     image: "docker.io/library/debian:trixie-slim"
     digest: "sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f"
-    used_by: [lorenzodonini]
+    used_by: [lorenzodonini, everest]   # everest: build stage and runtime
 
 images:
   mobilityhouse: "ghcr.io/otfabric/ocpp-interop-mobilityhouse"
   chargetime: "ghcr.io/otfabric/ocpp-interop-chargetime"
   lorenzodonini: "ghcr.io/otfabric/ocpp-interop-lorenzodonini"
+  everest: "ghcr.io/otfabric/ocpp-interop-everest"
 
 platforms: ["linux/amd64", "linux/arm64"]

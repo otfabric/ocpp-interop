@@ -85,10 +85,19 @@ def lorenzodonini():
     return latest, tags[latest], "git tags of lorenzodonini/ocpp-go"
 
 
+def everest():
+    # libocpp is released with the EVerest monorepo (calendar versions such
+    # as 2026.02.1); the standalone EVerest/libocpp repository is archived.
+    tags = git_tags("https://github.com/EVerest/everest-core.git")
+    latest = newest(tags)
+    return latest, tags[latest], "git tags of EVerest/everest-core"
+
+
 RESOLVERS = {
     "mobilityhouse": mobilityhouse,
     "chargetime": chargetime,
     "lorenzodonini": lorenzodonini,
+    "everest": everest,
 }
 
 

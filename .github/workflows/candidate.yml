@@ -32,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        adapter: [mobilityhouse, chargetime, lorenzodonini]
+        adapter: [mobilityhouse, chargetime, lorenzodonini, everest]
     steps:
       - name: Checkout
         uses: actions/checkout@v7

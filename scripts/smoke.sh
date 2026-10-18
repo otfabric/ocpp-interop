@@ -11,8 +11,12 @@
 # declares. Where a check needs a peer, the image talks to itself;
 # scripts/interop.sh pairs different adapters.
 #
+# An adapter without a server role (everest: libocpp is a station only) runs
+# the station checks against the server of SMOKE_PEER.
+#
 # Environment: REGISTRY, VERSION (image tag, default dev), VERBOSE=1,
-#              REPORT_DIR (keeps the capability document when set).
+#              REPORT_DIR (keeps the capability document when set),
+#              SMOKE_PEER (default mobilityhouse, which serves every version).
 
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -22,6 +26,7 @@ source "${SCRIPT_DIR}/lib.sh"
 
 ADAPTER="${1:?usage: smoke.sh <adapter>}"
 IMAGE="$(image_of "${ADAPTER}")"
+PEER="${SMOKE_PEER:-mobilityhouse}"
 FIXTURE="${ROOT}/fixtures/v16/baseline/fixture.json"
 STATION=$(jq -r '.stations[0].id' "${FIXTURE}")
 # Set per version by use_version, as in scripts/interop.sh.
@@ -100,10 +105,11 @@ expect_exit 2 "client with an action that is not an action name" "${IMAGE}" clie
 expect_exit 2 "client run with --payload" "${IMAGE}" client run --version 1.6 --url ws://nowhere:9000/ocpp --payload '{}'
 expect_exit 2 "call without an action" "${IMAGE}" call --payload '{}'
 expect_exit 2 "--tls-dir with security profile 0" "${IMAGE}" server --version 1.6 --tls-dir /tmp
-for v in 2.0.1 2.1; do
-    jq -e --arg v "${v}" '.versions[$v].server.supported == true' <<<"${caps}" >/dev/null 2>&1 && continue
-    expect_exit 5 "server --version ${v} (not declared)" "${IMAGE}" server --version "${v}"
-    expect_exit 5 "client run --version ${v} (not declared)" "${IMAGE}" client run --version "${v}" --url ws://nowhere:9000/ocpp
+for v in 1.6 2.0.1 2.1; do
+    jq -e --arg v "${v}" '.versions[$v].server.supported == true' <<<"${caps}" >/dev/null 2>&1 \
+        || expect_exit 5 "server --version ${v} (not declared)" "${IMAGE}" server --version "${v}"
+    jq -e --arg v "${v}" '.versions[$v].client.supported == true' <<<"${caps}" >/dev/null 2>&1 \
+        || expect_exit 5 "client run --version ${v} (not declared)" "${IMAGE}" client run --version "${v}" --url ws://nowhere:9000/ocpp
 done
 for p in 2 3; do
     has_profile "${p}" && continue
@@ -158,27 +164,38 @@ version_checks() {
         > "${bad}/badcode/${VDIR}/baseline/fixture.json"
     chmod -R a+rX "${WORK}"
     mount=(-v "${bad}:/bad:ro")
-    expect_exit 4 "server with a fixture that is not JSON" "${mount[@]}" "${IMAGE}" server --version "${V}" --fixture /bad/json/${VDIR}/baseline/fixture.json
-    expect_exit 4 "server with a fixture whose name is not its directory" "${mount[@]}" "${IMAGE}" server --version "${V}" --fixture /bad/name/${VDIR}/other/fixture.json
-    expect_exit 4 "server with a CSMS answer to an action the CSMS does not receive" "${mount[@]}" "${IMAGE}" server --version "${V}" --fixture /bad/role/${VDIR}/baseline/fixture.json
-    expect_exit 4 "server with an id token longer than $((${#long} - 1)) characters" "${mount[@]}" "${IMAGE}" server --version "${V}" --fixture /bad/token/${VDIR}/baseline/fixture.json
-    [[ "${V}" != 1.6 ]] && expect_exit 4 "server with an id token without a type" "${mount[@]}" "${IMAGE}" server --version "${V}" --fixture /bad/untyped/${VDIR}/baseline/fixture.json
-    expect_exit 4 "server with a fixture of another OCPP version" "${mount[@]}" "${IMAGE}" server --version "${V}" --fixture /bad/version/${VDIR}/baseline/fixture.json
-    expect_exit 4 "server with a derived answer that does not fit the action" "${mount[@]}" "${IMAGE}" server --version "${V}" --fixture /bad/derived/${VDIR}/baseline/fixture.json
-    [[ "${V}" == 2.1 ]] && expect_exit 4 "server with an answer to a SEND" "${mount[@]}" "${IMAGE}" server --version "${V}" --fixture /bad/send/${VDIR}/baseline/fixture.json
-    expect_exit 5 "server with a callError answer that is not an OCPP-J error code" "${mount[@]}" "${IMAGE}" server --version "${V}" --fixture /bad/badcode/${VDIR}/baseline/fixture.json
-    expect_exit 4 "server with a missing fixture" "${IMAGE}" server --version "${V}" --fixture /no/such/fixture.json
+    # The fixture is checked before any network access: by the server, or by
+    # client run in an adapter without one.
+    if has_role server; then role="server" endpoint=(server --version "${V}")
+    else role="client run" endpoint=(client run --version "${V}" --url "ws://nowhere-${RUN_ID}:9000/ocpp"); fi
+    expect_exit 4 "${role} with a fixture that is not JSON" "${mount[@]}" "${IMAGE}" "${endpoint[@]}" --fixture /bad/json/${VDIR}/baseline/fixture.json
+    expect_exit 4 "${role} with a fixture whose name is not its directory" "${mount[@]}" "${IMAGE}" "${endpoint[@]}" --fixture /bad/name/${VDIR}/other/fixture.json
+    expect_exit 4 "${role} with a CSMS answer to an action the CSMS does not receive" "${mount[@]}" "${IMAGE}" "${endpoint[@]}" --fixture /bad/role/${VDIR}/baseline/fixture.json
+    expect_exit 4 "${role} with an id token longer than $((${#long} - 1)) characters" "${mount[@]}" "${IMAGE}" "${endpoint[@]}" --fixture /bad/token/${VDIR}/baseline/fixture.json
+    [[ "${V}" != 1.6 ]] && expect_exit 4 "${role} with an id token without a type" "${mount[@]}" "${IMAGE}" "${endpoint[@]}" --fixture /bad/untyped/${VDIR}/baseline/fixture.json
+    expect_exit 4 "${role} with a fixture of another OCPP version" "${mount[@]}" "${IMAGE}" "${endpoint[@]}" --fixture /bad/version/${VDIR}/baseline/fixture.json
+    expect_exit 4 "${role} with a derived answer that does not fit the action" "${mount[@]}" "${IMAGE}" "${endpoint[@]}" --fixture /bad/derived/${VDIR}/baseline/fixture.json
+    [[ "${V}" == 2.1 ]] && expect_exit 4 "${role} with an answer to a SEND" "${mount[@]}" "${IMAGE}" "${endpoint[@]}" --fixture /bad/send/${VDIR}/baseline/fixture.json
+    expect_exit 5 "${role} with a callError answer that is not an OCPP-J error code" "${mount[@]}" "${IMAGE}" "${endpoint[@]}" --fixture /bad/badcode/${VDIR}/baseline/fixture.json
+    expect_exit 4 "${role} with a missing fixture" "${IMAGE}" "${endpoint[@]}" --fixture /no/such/fixture.json
     expect_exit 4 "client with a missing fixture" "${IMAGE}" client Heartbeat --version "${V}" --url ws://nowhere:9000/ocpp --fixture /no/such/fixture.json
 
-    start "ctl-${RUN_ID}" "${ADAPTER}" "${mount[@]}" -- server --version "${V}" --fixture /bad/good/${VDIR}/baseline/fixture.json
+    if ! has_role server; then
+        # client run needs a server to become ready.
+        start "peer-${RUN_ID}" "${PEER}" -- server --version "${V}"
+        wait_ready "peer-${RUN_ID}" || fail "${PEER} server did not become ready"
+        endpoint=(client run --version "${V}" --url "ws://peer-${RUN_ID}:9000/ocpp")
+    fi
+    start "ctl-${RUN_ID}" "${ADAPTER}" "${mount[@]}" -- "${endpoint[@]}" --fixture /bad/good/${VDIR}/baseline/fixture.json
     got=$(served "ctl-${RUN_ID}"); stop_container "ctl-${RUN_ID}"
-    if [[ "${got}" == ready ]]; then ok "server with a mounted valid fixture: ready"; else fail "server with a mounted valid fixture: ${got}"; fi
-    start "cerr-${RUN_ID}" "${ADAPTER}" "${mount[@]}" -- server --version "${V}" --fixture /bad/callerror/${VDIR}/baseline/fixture.json
+    if [[ "${got}" == ready ]]; then ok "${role} with a mounted valid fixture: ready"; else fail "${role} with a mounted valid fixture: ${got}"; fi
+    start "cerr-${RUN_ID}" "${ADAPTER}" "${mount[@]}" -- "${endpoint[@]}" --fixture /bad/callerror/${VDIR}/baseline/fixture.json
     got=$(served "cerr-${RUN_ID}"); stop_container "cerr-${RUN_ID}"
+    stop_container "peer-${RUN_ID}"
     if has_feature fixtureCallErrors; then
-        if [[ "${got}" == ready ]]; then ok "server with a callError answer: ready (fixtureCallErrors)"; else fail "server with a callError answer: ${got}"; fi
+        if [[ "${got}" == ready ]]; then ok "${role} with a callError answer: ready (fixtureCallErrors)"; else fail "${role} with a callError answer: ${got}"; fi
     else
-        if [[ "${got}" == "exit 5" ]]; then ok "server with a callError answer: exit 5 (no fixtureCallErrors)"; else fail "server with a callError answer: ${got}, want exit 5"; fi
+        if [[ "${got}" == "exit 5" ]]; then ok "${role} with a callError answer: exit 5 (no fixtureCallErrors)"; else fail "${role} with a callError answer: ${got}, want exit 5"; fi
     fi
 
     # ---- SEND (OCPP 2.1): without the send feature it is never sent as a CALL ----
@@ -196,7 +213,10 @@ version_checks() {
         then ok "connect failure: exit 3 and a result document"; else fail "connect failure: exit ${code}, ${doc}"; fi
     fi
 
-    has_role server || return 0
+    if ! has_role server; then
+        has_role client && station_checks
+        return 0
+    fi
 
     # ---- server: readiness, events, identity, clean stop ----
     srv="srv-${RUN_ID}"
@@ -266,9 +286,57 @@ version_checks() {
     stop_container "${srv}"
 
     has_role client || return 0
+    client_run_checks "${ADAPTER}"
+}
 
+# station_checks: the station checks of an adapter without a server, against
+# the server of ${PEER}; the checks of the image itself run on its client run.
+station_checks() {
+    srv="srv-${RUN_ID}"
+    start "${srv}" "${PEER}" -- server --version "${V}"
+    wait_ready "${srv}" || { fail "${PEER} server did not become ready"; return 0; }
+    doc=$(run_client "${ADAPTER}" Heartbeat --version "${V}" --url "ws://${srv}:9000/ocpp"); code=$?
+    if [[ "${code}" == 0 ]] && jq -e --arg a "${ADAPTER}" --arg v "${V}" "${JQ_LIB}"'
+            .schemaVersion == "1.0" and .adapter == $a and .version == $v and .operation == "Heartbeat"
+            and .ok == true and .error == null and .callError == null and .request == {}
+            and (.response.currentTime | isdate) and (.elapsedMs | type == "number")' <<<"${doc}" >/dev/null 2>&1
+    then ok "client result document, \${now} is a date-time"; else fail "Heartbeat: exit ${code}, ${doc}"; fi
+    if [[ $(wc -l <<<"${doc}") -eq 1 ]]; then ok "client result is one line"; else fail "client printed more than one line on stdout"; fi
+    if has_feature messageIds; then
+        id=$(jq -r '.messageId // empty' <<<"${doc}")
+        if [[ -n "${id}" ]] && wait_event "${srv}" '.event == "call-received" and .messageId == $id' --arg id "${id}" >/dev/null
+        then ok "messageIds: the result's messageId is the one the server received"; else fail "messageIds: ${doc}"; fi
+    elif jq -e 'has("messageId")' <<<"${doc}" >/dev/null 2>&1; then
+        fail "messageIds is not declared, but the result has a messageId"
+    else
+        ok "no messageId, as declared"
+    fi
+    doc=$(run_client "${ADAPTER}" Heartbeat --version "${V}" --url "ws://${srv}:9000/ocpp" --station NOT-IN-THE-FIXTURE); code=$?
+    if [[ "${code}" == 3 ]] && jq -e '.error.code == "connect-failed"' <<<"${doc}" >/dev/null 2>&1
+    then ok "unknown station identity: connect-failed, exit 3"; else fail "unknown station identity: exit ${code}, ${doc}"; fi
+
+    sta="sta-${RUN_ID}"
+    start "${sta}" "${ADAPTER}" -- client run --version "${V}" --url "ws://${srv}:9000/ocpp"
+    if wait_ready "${sta}"; then ok "client run becomes ready"; else fail "client run did not become ready"; fi
+    health=$(docker inspect --format '{{if .State.Health}}yes{{else}}no{{end}}' "${sta}")
+    if [[ "${health}" == yes ]]; then ok "image has a health check"; else fail "image has no health check"; fi
+    user=$(docker exec "${sta}" id -u 2>/dev/null)
+    if [[ "${user}" == 10001 ]]; then ok "runs as uid 10001"; else fail "runs as uid ${user}, want 10001"; fi
+    if docker exec "${sta}" sh -c 'test -s /licenses/ocpp-interop/LICENSE && test -s /licenses/THIRD_PARTY_NOTICES.md' 2>/dev/null
+    then ok "/licenses has this repository's licence and the notices"; else fail "/licenses is incomplete"; fi
+    labels=$(docker image inspect --format '{{json .Config.Labels}}' "${IMAGE}")
+    if jq -e '.["org.opencontainers.image.source"] and .["org.opencontainers.image.licenses"] and .["org.opencontainers.image.title"]' <<<"${labels}" >/dev/null 2>&1
+    then ok "OCI labels"; else fail "OCI labels missing: ${labels}"; fi
+    stop_container "${sta}"; stop_container "${srv}"
+    client_run_checks "${PEER}"
+}
+
+# client_run_checks <server adapter>: client run of ${ADAPTER} against a
+# server of <server adapter>.
+client_run_checks() {
+    local server_adapter="$1"
     # ---- client run: hold, control socket, lost connection, timeouts ----
-    start "${srv}" "${ADAPTER}" -- server --version "${V}"
+    start "${srv}" "${server_adapter}" -- server --version "${V}"
     wait_ready "${srv}" || { fail "server did not become ready"; return 0; }
     sta="sta-${RUN_ID}"
     start "${sta}" "${ADAPTER}" -- client run --version "${V}" --url "ws://${srv}:9000/ocpp"
@@ -315,7 +383,7 @@ version_checks() {
     stop_container "${sta}"; stop_container "${srv}"
 
     # --hold-ms: disconnect and exit 0.
-    start "${srv}" "${ADAPTER}" -- server --version "${V}"
+    start "${srv}" "${server_adapter}" -- server --version "${V}"
     wait_ready "${srv}" || { fail "server did not become ready"; return 0; }
     start "${sta}" "${ADAPTER}" -- client run --version "${V}" --url "ws://${srv}:9000/ocpp" --hold-ms 1500
     for _ in $(seq 1 100); do [[ "$(docker inspect -f '{{.State.Running}}' "${sta}")" == "true" ]] || break; sleep 0.2; done

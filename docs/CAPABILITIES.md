@@ -20,8 +20,9 @@ reports the rest as `SKIP_UNSUPPORTED`.
 
 ## Declared now
 
-All three adapters declare OCPP 1.6 and 2.0.1 in both roles, and
-`mobilityhouse` also OCPP 2.1, exactly what
+`mobilityhouse`, `chargetime` and `lorenzodonini` declare OCPP 1.6 and
+2.0.1 in both roles, `mobilityhouse` also OCPP 2.1, and `everest` OCPP 1.6,
+2.0.1 and 2.1 as a station only, exactly what
 [scripts/smoke.sh](../scripts/smoke.sh) and
 [scripts/interop.sh](../scripts/interop.sh) exercise. For 1.6 and 2.0.1 the
 action lists are the same for every adapter:
@@ -37,8 +38,8 @@ The actions the other end does not handle are listed as sent because the
 self-tests send them and check that the other end answers `NotImplemented`
 (the baseline fixtures have no answer for them).
 
-OCPP 2.1 (`mobilityhouse` only: the pinned releases of the other upstreams
-have no 2.1):
+OCPP 2.1 (`mobilityhouse` in both roles, `everest` as a station: the pinned
+releases of the other upstreams have no 2.1):
 
 | | OCPP 2.1 |
 |---|---|
@@ -47,7 +48,14 @@ have no 2.1):
 | CSMS sends | the station's handled actions, and CancelReservation |
 | CSMS handles | the station's sent actions except ReservationStatusUpdate |
 
-BatterySwap is not declared: ocpp 2.1.0 cannot send it (it writes the
+`everest` (EVerest libocpp) is a station only: it declares `client` for
+1.6, 2.0.1 and 2.1 with the station lists above; its `server` is
+`supported: false` with empty lists. It can send BatterySwap (libocpp
+writes the battery fields `soC` and `soH` as the schema names them, and the
+mobilityhouse CSMS accepts the request), but does not declare it: no
+CSMS declares that it handles BatterySwap, so no self-test runs it.
+
+BatterySwap is not declared by `mobilityhouse`: ocpp 2.1.0 cannot send it (it writes the
 battery fields `soC` and `soH` as `SoC` and `soh`), so no self-test reaches
 a CSMS with it. NotifyPeriodicEventStream is a SEND and is not declared
 either ([CONTAINER_CONTRACT.md](CONTAINER_CONTRACT.md#ocpp-21-send-and-callresulterror)).
@@ -55,12 +63,12 @@ either ([CONTAINER_CONTRACT.md](CONTAINER_CONTRACT.md#ocpp-21-send-and-callresul
 The features differ per adapter; they are the same in every version it
 declares:
 
-| | mobilityhouse | chargetime | lorenzodonini |
-|---|---|---|---|
-| `securityProfiles` | 0, 1 | 0, 1 | 0, 1 |
-| `fixtureCallErrors` | true | false | true |
-| `messageIds` | true | false | true |
-| `compression`, `send`, `callResultError` | false | false | false |
+| | mobilityhouse | chargetime | lorenzodonini | everest |
+|---|---|---|---|---|
+| `securityProfiles` | 0, 1 | 0, 1 | 0, 1 | 0, 1 |
+| `fixtureCallErrors` | true | false | true | true |
+| `messageIds` | true | false | true | true |
+| `compression`, `send`, `callResultError` | false | false | false | false |
 
 Each adapter explains its limitations in `notes`, per version. Known
 upstream defects that the self-tests show are in

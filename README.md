@@ -11,7 +11,9 @@ of request flow, without owning any of that code.
 > **Status: Phase 6 (OCPP 2.1).** `mobilityhouse`, `chargetime` and
 > `lorenzodonini` implement the container contract, draft 0.4, for OCPP 1.6J
 > and 2.0.1 in both roles, and `mobilityhouse` also for OCPP 2.1 (the pinned
-> releases of the other two upstreams have no 2.1). They are self-tested
+> releases of the other two upstreams have no 2.1). `everest` (EVerest
+> libocpp) is a station for OCPP 1.6J, 2.0.1 and 2.1: the second
+> independent OCPP 2.1 implementation. They are self-tested
 > against each other in both directions of request flow, with the upstream
 > defects that shows recorded ([results](docs/COMPATIBILITY.md)). No pinned
 > upstream release implements the OCPP 2.1 SEND and CALLRESULTERROR frames
@@ -54,6 +56,7 @@ to the specification. Neither does it establish OCA certification.
 | `mobilityhouse` | [mobilityhouse/ocpp](https://github.com/mobilityhouse/ocpp) 2.1.0 | Python | 1.6J, 2.0.1, 2.1 | **built: 1.6J, 2.0.1 and 2.1, both roles**, security profiles 0 and 1 |
 | `chargetime` | [ChargeTimeEU/Java-OCA-OCPP](https://github.com/ChargeTimeEU/Java-OCA-OCPP) v2.0 | Java | 1.6J, 2.0.1 (2.1 on master only, unreleased) | **built: 1.6J and 2.0.1, both roles**, security profiles 0 and 1 |
 | `lorenzodonini` | [lorenzodonini/ocpp-go](https://github.com/lorenzodonini/ocpp-go) v0.19.0 | Go | 1.6J, 2.0.1 | **built: 1.6J and 2.0.1, both roles**, security profiles 0 and 1 |
+| `everest` | [EVerest libocpp](https://github.com/EVerest/everest-core/tree/2026.02.1/lib/everest/ocpp), everest-core 2026.02.1 | C++ | 1.6J, 2.0.1, 2.1 (station only) | **built: 1.6J, 2.0.1 and 2.1, station (`client`) only**, security profiles 0 and 1 |
 
 The versions listed are what each upstream advertises. A version or feature
 becomes a capability only when a self-test exercises it
@@ -90,14 +93,17 @@ docker exec csms ocpp-interop call --station OT-FABRIC-TEST-001 Reset --payload 
 
 The same works with `--version 2.0.1` and the 2.0.1 fixture
 (`print-fixture --version 2.0.1`), and, with the `mobilityhouse` image, with
-`--version 2.1`.
+`--version 2.1`. The `everest` image is a station only (`client run`,
+`client <Action>`), for 1.6, 2.0.1 and 2.1.
 
 `docker compose up -d --wait` runs the three reference CSMSs on
 127.0.0.1:9000 (mobilityhouse), 127.0.0.1:9001 (chargetime) and
 127.0.0.1:9002 (lorenzodonini), for OCPP 1.6 unless
 `OCPP_INTEROP_OCPP=2.0.1 OCPP_INTEROP_FIXTURE_DIR=v201` is set. For OCPP 2.1
 (`OCPP_INTEROP_OCPP=2.1 OCPP_INTEROP_FIXTURE_DIR=v21`), start the
-`mobilityhouse` service only: the other two exit 5.
+`mobilityhouse` service only: the other two exit 5. `everest` has no CSMS;
+`docker compose --profile station up -d --wait mobilityhouse everest` runs
+it as a station connected to the mobilityhouse CSMS.
 
 ## Repository layout
 
