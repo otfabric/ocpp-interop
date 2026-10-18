@@ -114,7 +114,9 @@ a substitute for the OCA Compliance Testing Tool (OCTT).
   [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 - R8.2 OCA specification documents and schemas are CC BY-ND 4.0. They are
   not committed here. Fixtures are written for this repository and are not
-  taken from the specification.
+  taken from the specification. An upstream package that ships the OCA
+  schemas (The Mobility House ocpp) is put into its image unmodified, and
+  THIRD_PARTY_NOTICES.md says so.
 
 ## R9 - Scope discipline
 

@@ -5,10 +5,9 @@
     scripts/release-manifest.py <version> <commit> <digests file> <manifest out> <body out>
 
 The digests file holds one "<adapter> <sha256:...>" line per published
-multi-arch image (make digests). It may be empty while no adapter is built
-(PLAN.md, before Phase 4): the release then publishes the contract, schemas
-and fixtures only, and says so. Upstream pins are read from the adapter
-Dockerfiles, the contract and fixture versions from versions.yaml.
+multi-arch image (make digests); the release workflow refuses an empty one.
+Upstream pins are read from the adapter Dockerfiles, the contract and fixture
+versions from versions.yaml.
 """
 
 import json

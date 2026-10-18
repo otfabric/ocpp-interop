@@ -3,12 +3,12 @@
 # The Dockerfiles are the source of truth for a build:
 # scripts/check-versions.sh fails when this file disagrees with them.
 #
-# Phase 1: no adapter is built yet. The entries below record the candidates
-# as of 2026-10-18; `version` and `revision` are filled in, and verified,
-# when an adapter is implemented (PLAN.md, Phase 4).
+# Phase 4: mobilityhouse and chargetime are built for OCPP 1.6J, both roles.
+# lorenzodonini and citrineos are candidates (status `planned`): their
+# `latest` is what the upstream released as of 2026-10-18, unverified.
 
 interop_version: "0.0.1"
-contract_version: "0.1"        # docs/CONTAINER_CONTRACT.md (draft until 1.0); documents carry schemaVersion "1.0"
+contract_version: "0.2"        # docs/CONTAINER_CONTRACT.md (draft until 1.0); documents carry schemaVersion "1.0"
 fixture_schema: "1.0"          # fixtures/schema/ocpp-fixture.schema.json
 
 protocol:
@@ -21,36 +21,46 @@ protocol:
 implementations:
   mobilityhouse:
     priority: P0
-    status: planned
+    status: built
     upstream: "The Mobility House ocpp"
     repository: "https://github.com/mobilityhouse/ocpp"
     artifact: "pypi:ocpp"
-    latest: "2.1.0"              # 2025-07-16; master has commits after it (last seen 2026-10-04)
-    license: "MIT"               # the specification documents in its docs/ are CC BY-ND 4.0 and are not used
+    version: "2.1.0"             # 2025-07-16; the PyPI wheel is the tree of git tag 2.1.0
+    revision: "91f4f89140a2198dc5a300cfea88d947ac91ae28"
+    lock: "adapters/mobilityhouse/requirements.txt"   # every package by version and sha256
+    transport: "websockets 17.2"   # the ocpp package has no transport of its own
+    latest: "2.1.0"              # master has commits after it (last seen 2026-10-04)
+    license: "MIT"               # its bundled OCA JSON schemas are CC BY-ND 4.0, used unmodified
     language: "Python"
     independent_engine: true
     roles: [server, client]
+    versions_verified: ["1.6"]   # by the self-tests (scripts/smoke.sh, scripts/interop.sh)
     versions_claimed: ["1.6", "2.0.1", "2.1"]
     note: >-
       The README names 1.6 and 2.0.1 only; an ocpp/v21 package exists since
-      2.1.0. 2.1 is a candidate until a self-test exercises it.
+      2.1.0. 2.0.1 and 2.1 are candidates until a self-test exercises them
+      (PLAN.md, Phases 5 and 6).
 
   chargetime:
     priority: P0
-    status: planned
+    status: built
     upstream: "ChargeTimeEU Java-OCA-OCPP"
     repository: "https://github.com/ChargeTimeEU/Java-OCA-OCPP"
-    artifact: "maven:eu.chargetime.ocpp"
-    latest: "v2.0"               # 2025-12-12
+    artifact: "maven:eu.chargetime.ocpp:ocpp16j:2.0"   # Maven Central; its -sources jars are the tree of the tag
+    version: "v2.0"              # 2025-12-12, git tag
+    revision: "f27fe5bfb03e01491100597d6859080f5ae07545"
+    lock: "adapters/chargetime/dependencies.sha256"   # every jar of the runtime class path by sha256
+    latest: "v2.0"
     license: "MIT"
     language: "Java"
     independent_engine: true
     roles: [server, client]
+    versions_verified: ["1.6"]   # by the self-tests (scripts/smoke.sh, scripts/interop.sh)
     versions_claimed: ["1.6", "2.0.1", "2.1"]
     note: >-
-      1.6J in ocpp-v1_6 and ocpp-v1_6-json; 2.0.1 and 2.1 in the
-      multi-protocol ocpp-v2 module (packages eu.chargetime.ocpp.v201 and
-      eu.chargetime.ocpp.v21). Feature coverage of 2.1 is unverified.
+      1.6J in ocpp-v1_6 and ocpp-v1_6-json (artifacts ocpp16, ocpp16j); 2.0.1
+      and 2.1 in the multi-protocol ocpp-v2 module (artifact ocpp2, packages
+      eu.chargetime.ocpp.v201 and eu.chargetime.ocpp.v21), not used yet.
 
   lorenzodonini:
     priority: P1
@@ -81,7 +91,21 @@ implementations:
       A complete CSMS; needs PostgreSQL and a message broker. A later
       integration target, not a lightweight reference.
 
-base_images: {}                # filled with digests when the first Dockerfile lands
+base_images:
+  # Multi-arch index digests (linux/amd64 and linux/arm64). Each adapter
+  # Dockerfile names them as *_DIGEST build arguments.
+  python:
+    image: "docker.io/library/python:3.14.8-slim-trixie"
+    digest: "sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170"
+    used_by: [mobilityhouse]
+  maven:
+    image: "docker.io/library/maven:3.9.16-eclipse-temurin-25-noble"
+    digest: "sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976"
+    used_by: [chargetime]          # build stage only
+  jre:
+    image: "docker.io/library/eclipse-temurin:25.0.4.1_1-jre-noble"
+    digest: "sha256:3f2223fe04b750aa5a8179e29b5c9a1ddf7665fc9bb08bfe11ad01d143bc13a5"
+    used_by: [chargetime]
 
 images:
   mobilityhouse: "ghcr.io/otfabric/ocpp-interop-mobilityhouse"

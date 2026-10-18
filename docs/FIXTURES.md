@@ -32,8 +32,11 @@ cross-field rules (scripts/validate-fixtures.py):
 - every sample is sent by the role that sends that action;
 - a derived answer names a table that fits the action and is not empty.
 
-The adapters apply the same rules when they load a fixture, and exit 4 on a
-violation.
+The adapters check a fixture when they load it, and exit 4 on a violation:
+`mobilityhouse` with the schema and the code of scripts/validate-fixtures.py
+itself, `chargetime` with a hand-written equivalent of the rules for the
+versions it supports. A fixture with an answer the adapter cannot give
+(`callError` without the `fixtureCallErrors` capability) exits 5.
 
 ## Answers
 
@@ -45,14 +48,18 @@ takes one of three forms:
 |---|---|
 | `{"payload": {...}}` | Answer with this payload |
 | `{"derived": "idTokens"}` | Authorize, StartTransaction: `idTagInfo` (1.6) or `idTokenInfo` (2.x) with the status the `idTokens` table gives. An unknown token is `Invalid`. A `payload` alongside it is merged in |
-| `{"derived": "configuration"}` | GetConfiguration: the requested keys from `configuration`. Unknown keys go in `unknownKey` |
+| `{"derived": "configuration"}` | GetConfiguration: the requested keys from `configuration`, or every key when none is requested. Keys compare case-insensitively (CiString50Type). Unknown keys go in `unknownKey`, which is left out when empty |
 | `{"derived": "variables"}` | GetVariables and SetVariables: the result for each requested component and variable from `variables`. Writing a `ReadOnly` variable is `Rejected`. Values change only for the lifetime of the process |
 | `{"callError": {"code": ..., "description": ...}}` | Answer with this CALLERROR |
 
 An action without an entry is answered with the CALLERROR `NotImplemented`.
 
 The string `"${now}"` in a payload is replaced with the current UTC time in
-RFC 3339 format. It is the only placeholder.
+RFC 3339 format, in whole seconds (`2026-10-18T10:00:00Z`). It is the only
+placeholder. An upstream may write it with milliseconds on the wire.
+
+ChangeConfiguration does not change what GetConfiguration reports: 1.6
+answers are fixed, apart from the derived ones.
 
 ## Baseline fixtures
 
@@ -64,6 +71,16 @@ provisioning, authorization, the transaction lifecycle, meter values,
 remote start and stop, configuration or the device model, reset, triggers
 and a TxDefault charging profile.
 
-The station password (`OTFabricTestPassword01`) is a public test value. It
+The 1.6 fixture has a sample for every action it answers, in both
+directions, and two for actions it does not answer, so that a test can
+check the `NotImplemented` CALLERROR from both ends:
+`securityEvent`/`securityEventMinimal` (SecurityEventNotification, with and
+without the optional `techInfo`) and `extendedTriggerHeartbeat`
+(ExtendedTriggerMessage). Every 1.6 sample and every answer validates
+against the OCA JSON schemas of OCPP 1.6 (including the Security Whitepaper
+messages), as bundled with The Mobility House ocpp 2.1.0.
+
+The station password (`OTFabricTestPass0001`) is a public test value. It
 exists so that security profile 1 and 2 scenarios can run, and must never be
-used anywhere else.
+used anywhere else. It has 20 characters: Java-OCA-OCPP's 1.6 server accepts
+Basic passwords of 16 to 20 bytes only.

@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: MIT
+# The upstream pin of this adapter and its whole runtime dependency tree, each
+# by version and by the sha256 of its wheels on PyPI (pip refuses anything
+# else: --require-hashes). Keep ocpp in step with ARG UPSTREAM_VERSION in the
+# Dockerfile and with versions.yaml.
+#
+#   ocpp        the upstream (MIT); its only dependency is jsonschema
+#   websockets  the transport (BSD-3-Clause): the ocpp package has none of its
+#               own, and its documentation and examples use websockets
+#   the rest    jsonschema and its dependencies
+#
+# Only the wheels the image can use are listed: pure Python ones, and CPython
+# 3.14 manylinux wheels for x86_64 and aarch64.
+attrs==26.1.0 \
+    --hash=sha256:c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309
+jsonschema==4.26.0 \
+    --hash=sha256:d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce
+jsonschema-specifications==2025.9.1 \
+    --hash=sha256:98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe
+ocpp==2.1.0 \
+    --hash=sha256:0e452c14c21e2995431334ce1513d5ad8246ecb5c8fb90ed4143e2ecdd9e2845
+referencing==0.37.0 \
+    --hash=sha256:381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231
+rpds-py==2026.9.1 \
+    --hash=sha256:07deecbfce94c78473018bc7d10b337cc651d12df87a1eb2cb3e4024bc9c33d0 \
+    --hash=sha256:eac2f5dbafd585dfe31f86a23ebf0d3ba480a9d49ebc87947267b5608d4ea0cd
+websockets==17.2 \
+    --hash=sha256:42cbca10f82a8b2fb1536e8a0830ca6ceeb6bb3d8d64b766e0795369135654a8 \
+    --hash=sha256:c63ff5a21f26bd0e6a8464b53fadbe174825c8718ac14180df45665eaacdb6af \
+    --hash=sha256:6aa59f0ef92e796b2db6f5f26550c4713c0e4036899fadf02f55e2ed4db0b7ae

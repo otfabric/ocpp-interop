@@ -38,8 +38,29 @@ schema for that version before committing.
 
 ## Adding an adapter
 
-To be written with the first adapter (PLAN.md, Phase 4). The adapters of
-iec104-interop and modbus-interop show the expected structure.
+`adapters/mobilityhouse` (Python) and `adapters/chargetime` (Java) show the
+expected structure.
+
+1. Read the upstream's source for what it really supports; its README is a
+   candidate list, not a fact.
+2. `adapters/<name>/`: the adapter, a `Dockerfile` in the style of the
+   others (multi-stage, `ARG BASE_REGISTRY`, every base image as
+   `ARG <NAME>_DIGEST=sha256:...`, `ARG UPSTREAM_VERSION` and
+   `ARG UPSTREAM_SHA`, uid 10001, `/licenses`, OCI labels, `EXPOSE 9000`,
+   the health check, `ENTRYPOINT ["/usr/local/bin/ocpp-interop"]`), a lock
+   file that pins every dependency by hash, and a README that says how the
+   upstream is used and what it cannot do.
+3. Raw JSON becomes the upstream's types through the upstream's own
+   (de)serialisation, and the upstream's engine sends and answers. Glue may
+   parse arguments, load fixtures and write JSON; it may not implement
+   OCPP.
+4. Declare in `print-capabilities` only what `scripts/smoke.sh` and
+   `scripts/interop.sh` exercise and pass.
+5. Add the adapter to `versions.yaml` (status `built`), to `ADAPTERS` in the
+   Makefile, to compose.yaml, and to THIRD_PARTY_NOTICES.md. Then
+   `make ci`.
+6. Record real upstream defects in `tests/known-bugs.tsv` with a link to the
+   evidence (a permanent link to the upstream source or an issue).
 
 ## Style
 

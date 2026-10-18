@@ -41,8 +41,6 @@ jobs:
         id: resolve
         run: scripts/latest-upstream.py "${{ matrix.adapter }}" | tee -a "$GITHUB_OUTPUT"
 
-      # From Phase 4: 'make images' and 'make candidate-<adapter>' exist once
-      # the first adapter does.
       - name: Build and self-test at the latest release
         id: test
         if: steps.resolve.outputs.update == 'yes' && steps.resolve.outputs.built == 'yes'
@@ -59,7 +57,7 @@ jobs:
         id: known
         run: |
           known=$(awk -F'\t' -v a="${{ matrix.adapter }}" -v v="${{ steps.resolve.outputs.latest }}" \
-            '!/^#/ && $1 == a && $2 == v { printf "%s%s", sep, $4; sep = "; " }' tests/known-bugs.tsv)
+            '!/^#/ { split($1, who, ":") } !/^#/ && who[1] == a && $2 == v { printf "%s%s", sep, $4; sep = "; " }' tests/known-bugs.tsv)
           echo "known=${known}" >> "$GITHUB_OUTPUT"
 
       - name: Write the table row

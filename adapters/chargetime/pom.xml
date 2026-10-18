@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: MIT -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.otfabric</groupId>
+  <artifactId>ocpp-interop-chargetime</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+  <description>ocpp-interop adapter for ChargeTimeEU Java-OCA-OCPP</description>
+
+  <properties>
+    <maven.compiler.release>25</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.build.outputTimestamp>2026-01-01T00:00:00Z</project.build.outputTimestamp>
+
+    <!-- The upstream pin: eu.chargetime.ocpp:ocpp16j on Maven Central. The Dockerfile passes
+         -Docpp.version=${UPSTREAM_VERSION}, so a candidate build replaces it without touching this
+         file. ocpp16, ocpp-common, ocpp-json, Gson, Java-WebSocket, jaxb-api and slf4j-api are not
+         pinned here on purpose: they come, at exact versions, from the POMs of the pinned upstream
+         release, which is what an application using the library gets. The adapter uses the
+         upstream's Gson for its own JSON as well. dependencies.sha256 pins every jar by hash. -->
+    <ocpp.version>2.0</ocpp.version>
+    <slf4j-simple.version>2.0.17</slf4j-simple.version>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>eu.chargetime.ocpp</groupId>
+      <artifactId>ocpp16j</artifactId>
+      <version>${ocpp.version}</version>
+    </dependency>
+    <!-- Sends the library's logging to stderr. Same version as the upstream's slf4j-api. -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>${slf4j-simple.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>ocpp-interop-chargetime</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-clean-plugin</artifactId>
+        <version>3.5.0</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>3.5.0</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.6.0</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-install-plugin</artifactId>
+        <version>3.2.0</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-deploy-plugin</artifactId>
+        <version>3.2.0</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-site-plugin</artifactId>
+        <version>3.22.0</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.16.0</version>
+        <configuration>
+          <compilerArgs>
+            <arg>-Xlint:all,-options</arg>
+          </compilerArgs>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.5.1</version>
+        <configuration>
+          <archive>
+            <manifest>
+              <mainClass>org.otfabric.ocppinterop.chargetime.Main</mainClass>
+            </manifest>
+            <manifestEntries>
+              <Upstream-Version>${ocpp.version}</Upstream-Version>
+            </manifestEntries>
+          </archive>
+        </configuration>
+      </plugin>
+      <!-- The runtime class path, one unmodified jar per dependency, in target/lib. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.11.0</version>
+        <executions>
+          <execution>
+            <id>runtime-classpath</id>
+            <phase>package</phase>
+            <goals>
+              <goal>copy-dependencies</goal>
+            </goals>
+            <configuration>
+              <includeScope>runtime</includeScope>
+              <outputDirectory>${project.build.directory}/lib</outputDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

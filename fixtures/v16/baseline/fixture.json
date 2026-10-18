@@ -10,7 +10,7 @@
       "model": "TestStation",
       "serialNumber": "OTF-0001",
       "firmwareVersion": "1.0.0",
-      "password": "OTFabricTestPassword01",
+      "password": "OTFabricTestPass0001",
       "connectors": 2
     }
   ],
@@ -78,12 +78,40 @@
         {"value": "7360", "measurand": "Power.Active.Import", "unit": "W"}]}]}},
     "stopTransaction": {"action": "StopTransaction", "from": "station", "payload": {
       "transactionId": 1001, "meterStop": 5000, "timestamp": "2026-01-01T10:30:00Z", "reason": "Local"}},
+    "dataTransfer": {"action": "DataTransfer", "from": "station", "payload": {
+      "vendorId": "org.otfabric", "messageId": "Ping", "data": "hello"}},
+    "diagnosticsStatus": {"action": "DiagnosticsStatusNotification", "from": "station", "payload": {"status": "Idle"}},
+    "firmwareStatus": {"action": "FirmwareStatusNotification", "from": "station", "payload": {"status": "Idle"}},
+    "securityEvent": {"action": "SecurityEventNotification", "from": "station", "payload": {
+      "type": "SettingSystemTime", "timestamp": "2026-01-01T10:00:00Z", "techInfo": "clock set by test"}},
+    "securityEventMinimal": {"action": "SecurityEventNotification", "from": "station", "payload": {
+      "type": "SettingSystemTime", "timestamp": "2026-01-01T10:00:00Z"}},
     "remoteStart": {"action": "RemoteStartTransaction", "from": "csms", "payload": {"connectorId": 1, "idTag": "04A1B2C3D4E5F6"}},
     "remoteStop": {"action": "RemoteStopTransaction", "from": "csms", "payload": {"transactionId": 1001}},
     "getConfiguration": {"action": "GetConfiguration", "from": "csms", "payload": {"key": ["HeartbeatInterval"]}},
     "changeConfiguration": {"action": "ChangeConfiguration", "from": "csms", "payload": {"key": "HeartbeatInterval", "value": "120"}},
     "resetSoft": {"action": "Reset", "from": "csms", "payload": {"type": "Soft"}},
     "triggerHeartbeat": {"action": "TriggerMessage", "from": "csms", "payload": {"requestedMessage": "Heartbeat"}},
+    "changeAvailability": {"action": "ChangeAvailability", "from": "csms", "payload": {"connectorId": 1, "type": "Inoperative"}},
+    "clearCache": {"action": "ClearCache", "from": "csms", "payload": {}},
+    "unlockConnector": {"action": "UnlockConnector", "from": "csms", "payload": {"connectorId": 1}},
+    "dataTransferFromCsms": {"action": "DataTransfer", "from": "csms", "payload": {
+      "vendorId": "org.otfabric", "messageId": "Ping", "data": "hello"}},
+    "getLocalListVersion": {"action": "GetLocalListVersion", "from": "csms", "payload": {}},
+    "sendLocalList": {"action": "SendLocalList", "from": "csms", "payload": {
+      "listVersion": 1, "updateType": "Full",
+      "localAuthorizationList": [{"idTag": "04A1B2C3D4E5F6", "idTagInfo": {"status": "Accepted"}}]}},
+    "reserveNow": {"action": "ReserveNow", "from": "csms", "payload": {
+      "connectorId": 1, "expiryDate": "2026-01-01T12:00:00Z", "idTag": "04A1B2C3D4E5F6", "reservationId": 7}},
+    "cancelReservation": {"action": "CancelReservation", "from": "csms", "payload": {"reservationId": 7}},
+    "clearChargingProfile": {"action": "ClearChargingProfile", "from": "csms", "payload": {"id": 1}},
+    "getCompositeSchedule": {"action": "GetCompositeSchedule", "from": "csms", "payload": {
+      "connectorId": 1, "duration": 3600, "chargingRateUnit": "W"}},
+    "updateFirmware": {"action": "UpdateFirmware", "from": "csms", "payload": {
+      "location": "https://firmware.example.invalid/otf-1.0.1.bin", "retrieveDate": "2026-01-01T12:00:00Z"}},
+    "getDiagnostics": {"action": "GetDiagnostics", "from": "csms", "payload": {
+      "location": "ftp://diagnostics.example.invalid/upload/"}},
+    "extendedTriggerHeartbeat": {"action": "ExtendedTriggerMessage", "from": "csms", "payload": {"requestedMessage": "Heartbeat"}},
     "setTxDefaultProfile": {"action": "SetChargingProfile", "from": "csms", "payload": {
       "connectorId": 0,
       "csChargingProfiles": {

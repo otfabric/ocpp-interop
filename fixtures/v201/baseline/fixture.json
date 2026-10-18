@@ -10,7 +10,7 @@
       "model": "TestStation",
       "serialNumber": "OTF-0001",
       "firmwareVersion": "1.0.0",
-      "password": "OTFabricTestPassword01",
+      "password": "OTFabricTestPass0001",
       "evses": [
         {"id": 1, "connectors": [1]},
         {"id": 2, "connectors": [1]}

@@ -1,4 +1,7 @@
 # Known upstream defects (REQUIREMENTS.md R4.4). Tab-separated:
-# adapter	upstream_version	test_id_regex	evidence_url	summary
-# A failing test that matches an entry is reported as KNOWN_ISSUE. An entry
-# that no longer reproduces fails the run, so that this list cannot go stale.
+# adapter[:role]	upstream_version	test_id_regex	evidence_url	summary
+# role is client or server: the bug is in that role of the adapter only; without
+# it, in either role. A failing test that matches an entry is reported as
+# KNOWN_ISSUE. An entry that no longer reproduces fails the run, so that this
+# list cannot go stale.
+mobilityhouse:client	2.1.0	^v16\.from-station\.security-event-minimal$	https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/v16/call.py#L232-L236	ocpp.v16.call.SecurityEventNotification declares tech_info without a default, so a SecurityEventNotification without the optional techInfo cannot be built (TypeError) although the bundled OCA schema makes techInfo optional
