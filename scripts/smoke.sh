@@ -218,6 +218,7 @@ if [[ "${code}" != 0 ]]; then ok "second server on a busy port fails (exit ${cod
 
 docker stop -t 15 "${srv}" >/dev/null
 code=$(docker inspect --format '{{.State.ExitCode}}' "${srv}")
+exited "${srv}"
 last=$(events "${srv}" | tail -1)
 if [[ "${code}" == 0 ]]; then ok "SIGTERM: exit 0"; else fail "SIGTERM: exit ${code}"; fi
 if jq -e '.event == "stopped"' <<<"${last}" >/dev/null 2>&1; then ok "stopped event"; else fail "last stdout line is not the stopped event: ${last}"; fi
@@ -264,6 +265,7 @@ then ok "silent CSMS: timeout, exit 1"; else fail "silent CSMS: exit ${code}, ${
 docker stop -t 15 "${srv}" >/dev/null
 for _ in $(seq 1 100); do [[ "$(docker inspect -f '{{.State.Running}}' "${sta}")" == "true" ]] || break; sleep 0.2; done
 code=$(docker inspect --format '{{.State.ExitCode}}' "${sta}")
+exited "${sta}"
 if [[ "${code}" == 1 ]]; then ok "client run: lost connection, exit 1"; else fail "client run after the server stopped: exit ${code} (running: $(docker inspect -f '{{.State.Running}}' "${sta}"))"; fi
 if events "${sta}" | tail -2 | jq -s -e '.[0].event == "connection-closed" and .[1].event == "stopped"' >/dev/null 2>&1
 then ok "client run: connection-closed and stopped events"; else fail "client run: last events are $(events "${sta}" | tail -2 | tr '\n' ' ')"; fi
@@ -275,6 +277,7 @@ wait_ready "${srv}" || { fail "server did not become ready"; finish; exit 1; }
 start "${sta}" "${ADAPTER}" -- client run --version 1.6 --url "ws://${srv}:9000/ocpp" --hold-ms 1500
 for _ in $(seq 1 100); do [[ "$(docker inspect -f '{{.State.Running}}' "${sta}")" == "true" ]] || break; sleep 0.2; done
 code=$(docker inspect --format '{{.State.ExitCode}}' "${sta}")
+exited "${sta}"
 if [[ "${code}" == 0 ]] && events "${sta}" | tail -1 | jq -e '.event == "stopped"' >/dev/null 2>&1
 then ok "client run --hold-ms: stopped, exit 0"; else fail "client run --hold-ms: exit ${code}"; fi
 if wait_event "${srv}" '.event == "connection-closed" and .station == $s' --arg s "${STATION}" >/dev/null
@@ -286,6 +289,7 @@ start "${sta}" "${ADAPTER}" -- client run --version 1.6 --url "ws://${srv}:9000/
 wait_ready "${sta}" || fail "client run did not become ready"
 docker stop -t 15 "${sta}" >/dev/null
 code=$(docker inspect --format '{{.State.ExitCode}}' "${sta}")
+exited "${sta}"
 if [[ "${code}" == 0 ]] && events "${sta}" | tail -1 | jq -e '.event == "stopped"' >/dev/null 2>&1
 then ok "client run SIGTERM: stopped, exit 0"; else fail "client run SIGTERM: exit ${code}"; fi
 if events "${sta}" | grep -v '^{' | grep -q .; then fail "client run stdout has lines that are not JSON"; else ok "client run stdout is JSON Lines only"; fi
@@ -295,8 +299,9 @@ stop_container "${sta}"; stop_container "${srv}"
 start "${sta}" "${ADAPTER}" -- client run --version 1.6 --url "ws://no-such-host-${RUN_ID}:9000/ocpp" --connect-timeout-ms 1500
 for _ in $(seq 1 100); do [[ "$(docker inspect -f '{{.State.Running}}' "${sta}")" == "true" ]] || break; sleep 0.2; done
 code=$(docker inspect --format '{{.State.ExitCode}}' "${sta}")
+exited "${sta}"
 if [[ "${code}" == 3 ]] && events "${sta}" | head -1 | jq -e '.event == "connection-failed"' >/dev/null 2>&1
-then ok "client run that cannot connect: connection-failed, exit 3"; else fail "client run that cannot connect: exit ${code}"; fi
+then ok "client run that cannot connect: connection-failed, exit 3"; else fail "client run that cannot connect: exit ${code}, events: $(events "${sta}" | tr '\n' ' ')"; fi
 stop_container "${sta}"
 
 finish

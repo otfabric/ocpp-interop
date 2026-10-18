@@ -87,6 +87,12 @@ wait_event() {
     return 1
 }
 
+# exited <container>: waits (up to 5 s) until the stopped event, the last
+# line an adapter writes, has reached the container's log. Docker can report
+# a container as exited before its log copier has written the last lines, so
+# reading the log right after the exit may miss them.
+exited() { wait_event "$1" '.event == "stopped"' >/dev/null || true; }
+
 # run_client <adapter> [docker run options --] <client args...>: prints the
 # result document of a one-shot client and returns the adapter's exit code.
 run_client() {
