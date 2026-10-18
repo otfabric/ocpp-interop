@@ -62,3 +62,21 @@ modules in it, as `go version -m` reports them.
 | leodido/go-urn | v1.1.0 | MIT (the module has no licence file; the text in `/licenses` is the one the project added with v1.2.0) | https://github.com/leodido/go-urn |
 | relvacode/iso8601 | v1.6.0 | MIT | https://github.com/relvacode/iso8601 |
 | Go standard library and runtime | 1.27.2 | BSD-3-Clause | https://go.dev |
+
+## `ocpp-interop-everest`
+
+Base image `debian:trixie-slim` (Debian trixie), whose OpenSSL 3, SQLite 3,
+zlib, zstd and C++ runtime the executable links dynamically. One executable
+built from source, and libwebsockets as a shared library;
+`/licenses/BUNDLED.txt` lists every source by tag and commit.
+
+| Component | Version | Licence | Source |
+|---|---|---|---|
+| libocpp (EVerest, `lib/everest/ocpp` of everest-core) | everest-core 2026.02.1 (libocpp 0.31.1) | Apache-2.0 | https://github.com/EVerest/everest-core |
+| EVerest liblog, libtimer, everest-sqlite, libevse-security (`lib/everest/log`, `timer`, `sqlite`, `evse_security`) | everest-core 2026.02.1 | Apache-2.0 | https://github.com/EVerest/everest-core |
+| WebSocket++ `uri.hpp` and `base64.hpp` (bundled in libocpp's `3rd_party/websocketpp_utils`) | as bundled | BSD-3-Clause (the licence is in the headers) | https://github.com/zaphoyd/websocketpp |
+| libwebsockets | 4.5.2 | MIT (some bundled sources BSD-3-Clause, BSD-2-Clause; see its LICENSE) | https://github.com/warmcat/libwebsockets |
+| nlohmann/json | 3.12.0 | MIT | https://github.com/nlohmann/json |
+| json-schema-validator (pboettch) | 2.4.0 | MIT | https://github.com/pboettch/json-schema-validator |
+| date (Howard Hinnant) | 3.0.4 | MIT | https://github.com/HowardHinnant/date |
+| Boost (log and the libraries it uses: thread, filesystem, regex, chrono, atomic; Debian's static libraries) | 1.83 | BSL-1.0 | https://www.boost.org |

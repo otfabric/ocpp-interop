@@ -21,6 +21,48 @@ The `Upstream candidates` workflow runs every Monday. It compares each pin
 with the latest upstream release and keeps an issue open while a pin is
 behind. It never changes a pin.
 
+## v0.3.1
+
+**Date:** 2026-10-18
+**Previous release:** v0.3.0
+
+### Summary
+
+A fourth reference: `everest`, a station built on EVerest libocpp (C++) for
+OCPP 1.6J, 2.0.1 and 2.1, the second independent OCPP 2.1 implementation,
+with security profiles 0 to 3 (contract 0.5).
+
+### Added
+
+- `everest` adapter (C++): a station built on EVerest libocpp, pinned to
+  everest-core release 2026.02.1 (`b61bb12b8cb89ee9d0fab037b05c3bb8cea9b13e`,
+  libocpp 0.31.1 in `lib/everest/ocpp`; the standalone EVerest/libocpp
+  repository is archived). OCPP 1.6J, 2.0.1 and 2.1, `client` only (libocpp
+  has no CSMS; `server` exits 5), security profiles 0 to 3. It is
+  the second independent OCPP 2.1 implementation in the self-tests. The
+  adapter uses libocpp's protocol layer (`ocpp::Websocket` on libwebsockets,
+  `ocpp::MessageQueue`, and libocpp's message structs for every payload),
+  not its `ChargePoint`, which sends BootNotification and StatusNotification
+  by itself; see adapters/everest/README.md. Security profiles 2 and 3 use
+  libocpp's TLS with the files of `--tls-dir` (contract 0.5);
+  `--compression` exits 5 (libocpp cannot offer permessage-deflate)
+- `scripts/smoke.sh`: an adapter without a server runs its fixture checks
+  with `client run` and its station checks against the server of
+  `SMOKE_PEER` (default `mobilityhouse`); `server` and `client run` of an
+  undeclared version are checked separately
+- `scripts/latest-upstream.py everest` (git tags of everest-core), and
+  `everest` in the candidate workflow
+- `compose.yaml`: the `everest` station, profile `station`
+- `tests/known-bugs.tsv`: libocpp's `ocpp::v2::MessageType` has no
+  ReportDERControl (nor GetCertificateChainStatus, NotifyWebPaymentStarted),
+  so its message queue cannot send it (`v21.from-station.report-dercontrol`)
+
+### Changed
+
+- CI: the self-test job may take 75 minutes (libocpp is compiled)
+
+---
+
 ## v0.3.0
 
 **Date:** 2026-10-18
