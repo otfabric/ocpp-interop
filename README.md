@@ -57,7 +57,7 @@ to the specification. Neither does it establish OCA certification.
 | `mobilityhouse` | [mobilityhouse/ocpp](https://github.com/mobilityhouse/ocpp) 2.1.0 | Python | 1.6J, 2.0.1, 2.1 | **built: 1.6J, 2.0.1 and 2.1, both roles**, security profiles 0 to 3, compression |
 | `chargetime` | [ChargeTimeEU/Java-OCA-OCPP](https://github.com/ChargeTimeEU/Java-OCA-OCPP) v2.0 | Java | 1.6J, 2.0.1 (2.1 on master only, unreleased) | **built: 1.6J and 2.0.1, both roles**, security profiles 0 to 3, compression in 2.0.1 (known upstream defects) |
 | `lorenzodonini` | [lorenzodonini/ocpp-go](https://github.com/lorenzodonini/ocpp-go) v0.19.0 | Go | 1.6J, 2.0.1 | **built: 1.6J and 2.0.1, both roles**, security profiles 0 to 3; no compression (its CSMS cannot accept it) |
-| `everest` | [EVerest libocpp](https://github.com/EVerest/everest-core/tree/2026.02.1/lib/everest/ocpp), everest-core 2026.02.1 | C++ | 1.6J, 2.0.1, 2.1 (station only) | **built: 1.6J, 2.0.1 and 2.1, station (`client`) only**, security profiles 0 and 1 |
+| `everest` | [EVerest libocpp](https://github.com/EVerest/everest-core/tree/2026.02.1/lib/everest/ocpp), everest-core 2026.02.1 | C++ | 1.6J, 2.0.1, 2.1 (station only) | **built: 1.6J, 2.0.1 and 2.1, station (`client`) only**, security profiles 0 to 3; no compression (libocpp cannot offer it) |
 
 The versions listed are what each upstream advertises. A version or feature
 becomes a capability only when a self-test exercises it

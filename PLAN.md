@@ -95,8 +95,8 @@ interoperability. First slice: OCPP 1.6J only (2026-10-18).
       queue and message types; the second independent 2.1 implementation.
       `scripts/smoke.sh` runs the station checks of an adapter without a
       server against `SMOKE_PEER` (default mobilityhouse)
-- [ ] `everest`: declare security profiles 2 and 3 (implemented with
-      libocpp's TLS) once the self-tests exercise TLS (contract 0.5)
+- [x] `everest`: security profiles 2 and 3 with libocpp's TLS
+      (contract 0.5)
 - [ ] 2.1 in `chargetime`: Java-OCA-OCPP has 2.1 (with SEND and
       CALLRESULTERROR) on master since 2025-12-13, after its v2.0 release,
       the latest on Maven Central. Waits for a release (R2.2)

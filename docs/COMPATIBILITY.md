@@ -12,12 +12,12 @@ Run: 2026-10-18, images built from this repository on linux/arm64
 `scripts/interop.sh` on images tagged `coverage`. The linux/amd64 images have not been
 self-tested locally; CI does that natively.
 
-`everest` (EVerest libocpp, everest-core 2026.02.1) is a station only. Its
-rows were added by a run on 2026-10-18 (linux/arm64, `scripts/smoke.sh
-everest` and `scripts/interop.sh mobilityhouse chargetime lorenzodonini
-everest`: 1099 PASS, 45 KNOWN_ISSUE, 44 SKIP_UNSUPPORTED, 0 FAIL); the other
-cells of that run are the ones below. Every pairing with `everest` as the
-CSMS is one `pairing` SKIP_UNSUPPORTED (not in the tables).
+`everest` (EVerest libocpp, everest-core 2026.02.1) is a station only.
+Every pairing with `everest` as the CSMS is one `pairing` SKIP_UNSUPPORTED
+(not in the tables). Its rows below are from a run before contract 0.5 and
+the widened fixtures (contract 0.4: 1099 PASS, 45 KNOWN_ISSUE, 44
+SKIP_UNSUPPORTED, 0 FAIL with four adapters); the tables are rerun with all
+four adapters on contract 0.5 for the next update of this file.
 
 Each cell: results of the CALLs and checks initiated by the station / by
 the CSMS. The baseline fixtures have a sample of every action of their

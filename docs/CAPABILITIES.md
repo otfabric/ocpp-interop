@@ -75,7 +75,7 @@ declares, except `compression` for chargetime:
 
 | | mobilityhouse | chargetime | lorenzodonini | everest |
 |---|---|---|---|---|
-| `securityProfiles` | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1 |
+| `securityProfiles` | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 |
 | `compression` | true (1.6, 2.0.1, 2.1) | 2.0.1: true, with known upstream defects in both roles; 1.6: false | false: the CSMS cannot accept it | false: libocpp cannot offer it |
 | `fixtureCallErrors` | true | false | true | true |
 | `messageIds` | true | false | true | true |

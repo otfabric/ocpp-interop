@@ -15,7 +15,7 @@ behind the [container contract](../../docs/CONTAINER_CONTRACT.md).
 | Build tool only | [everest-cmake](https://github.com/EVerest/everest-cmake) v0.6.0 (commit `e378100829014ad4c3a721a7aa1c02ef56736c61`), the release current when everest-core 2026.02.1 was tagged |
 | Licences | libocpp and the EVerest libraries Apache-2.0; two WebSocket++ headers bundled in libocpp BSD-3-Clause; nlohmann/json, json-schema-validator, date and libwebsockets MIT; Boost BSL-1.0 |
 | Base image | `debian:trixie-slim` (build and runtime), pinned by digest in the [Dockerfile](Dockerfile) |
-| OCPP | 1.6J, 2.0.1 and 2.1, **station (`client`) only**; security profiles 0 and 1 declared, 2 and 3 implemented |
+| OCPP | 1.6J, 2.0.1 and 2.1, **station (`client`) only**; security profiles 0 to 3 |
 
 The adapter code is MIT. `/licenses` in the image holds the licence of
 everything in the executable (`/licenses/BUNDLED.txt` lists the sources by
@@ -94,14 +94,13 @@ station sends in the version are sent (others `unsupported`, exit 5).
 
 ## Security profiles and compression
 
-Profiles 0 and 1 are declared. Profiles 2 and 3 are implemented with
+Profiles 0 to 3 are declared. Profiles 2 and 3 use
 libocpp's own TLS (OpenSSL through libwebsockets), fed with the files of
 `--tls-dir` through a small `ocpp::EvseSecurity` implementation:
 `ca.crt` is the only trust anchor for the CSMS (`use_ssl_default_verify_paths`
 off), the CSMS's certificate must name the host of `--url`
 (`verify_csms_common_name`, no wildcards), and in profile 3 `client.crt` and
-`client.key` are the station's certificate. They are not declared until the
-self-tests exercise them (contract 0.5). The URL must be `wss://` with
+`client.key` are the station's certificate (contract 0.5). The URL must be `wss://` with
 profiles 2 and 3 and `ws://` otherwise (usage error).
 
 `--compression` exits 5: libocpp creates its libwebsockets client context
