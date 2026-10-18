@@ -18,12 +18,16 @@ The `Upstream candidates` workflow runs every Monday. It compares each pin
 with the latest upstream release and keeps an issue open while a pin is
 behind. It never changes a pin.
 
-## Unreleased
+## v0.0.1
+
+**Date:** 2026-10-18
 
 ### Summary
 
-Phases 0, 1 and the first slice of Phase 4: design, foundations, and the
-first two adapters for OCPP 1.6J. Nothing is released yet.
+The first release: design, foundations, and the first two adapters for
+OCPP 1.6J (Phases 0, 1 and the first slice of Phase 4). The container
+contract is still a draft (0.2), so consumers should expect it to change
+before 1.0.
 
 ### Added
 
