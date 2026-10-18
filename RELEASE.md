@@ -44,6 +44,11 @@ behind. It never changes a pin.
 - `scripts/latest-upstream.py everest` (git tags of everest-core), and
   `everest` in the candidate workflow
 - `compose.yaml`: the `everest` station, profile `station`
+- `tests/known-bugs.tsv`: libocpp's `ocpp::v2::MessageType` has no
+  ReportDERControl (nor GetCertificateChainStatus, NotifyWebPaymentStarted),
+  so its message queue cannot send it (`v21.from-station.report-dercontrol`)
+- Self-tests with everest (linux/arm64): smoke 146 checks; interop of the
+  four adapters 1099 PASS, 45 KNOWN_ISSUE, 44 SKIP_UNSUPPORTED, 0 FAIL
 
 ### Changed
 
