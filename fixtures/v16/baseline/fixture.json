@@ -1,0 +1,95 @@
+{
+  "schemaVersion": "1.0",
+  "name": "baseline",
+  "ocppVersion": "1.6",
+  "description": "Two-connector AC station and a CSMS that accepts it. Covers the Core profile, smart charging, reservations and local list answers.",
+  "stations": [
+    {
+      "id": "OT-FABRIC-TEST-001",
+      "vendor": "OTFabric",
+      "model": "TestStation",
+      "serialNumber": "OTF-0001",
+      "firmwareVersion": "1.0.0",
+      "password": "OTFabricTestPassword01",
+      "connectors": 2
+    }
+  ],
+  "idTokens": [
+    {"idToken": "04A1B2C3D4E5F6", "status": "Accepted"},
+    {"idToken": "04BLOCKED00001", "status": "Blocked"},
+    {"idToken": "04EXPIRED00001", "status": "Expired"}
+  ],
+  "configuration": [
+    {"key": "HeartbeatInterval", "value": "300", "readonly": false},
+    {"key": "MeterValueSampleInterval", "value": "60", "readonly": false},
+    {"key": "AuthorizeRemoteTxRequests", "value": "true", "readonly": false},
+    {"key": "NumberOfConnectors", "value": "2", "readonly": true}
+  ],
+  "answers": {
+    "csms": {
+      "BootNotification": {"payload": {"status": "Accepted", "currentTime": "${now}", "interval": 300}},
+      "Heartbeat": {"payload": {"currentTime": "${now}"}},
+      "Authorize": {"derived": "idTokens"},
+      "StartTransaction": {"derived": "idTokens", "payload": {"transactionId": 1001}},
+      "StopTransaction": {"payload": {}},
+      "StatusNotification": {"payload": {}},
+      "MeterValues": {"payload": {}},
+      "DataTransfer": {"payload": {"status": "UnknownVendorId"}},
+      "DiagnosticsStatusNotification": {"payload": {}},
+      "FirmwareStatusNotification": {"payload": {}}
+    },
+    "station": {
+      "RemoteStartTransaction": {"payload": {"status": "Accepted"}},
+      "RemoteStopTransaction": {"payload": {"status": "Accepted"}},
+      "ChangeAvailability": {"payload": {"status": "Accepted"}},
+      "ChangeConfiguration": {"payload": {"status": "Accepted"}},
+      "GetConfiguration": {"derived": "configuration"},
+      "ClearCache": {"payload": {"status": "Accepted"}},
+      "Reset": {"payload": {"status": "Accepted"}},
+      "UnlockConnector": {"payload": {"status": "Unlocked"}},
+      "TriggerMessage": {"payload": {"status": "Accepted"}},
+      "DataTransfer": {"payload": {"status": "UnknownVendorId"}},
+      "SetChargingProfile": {"payload": {"status": "Accepted"}},
+      "ClearChargingProfile": {"payload": {"status": "Accepted"}},
+      "GetCompositeSchedule": {"payload": {"status": "Rejected"}},
+      "ReserveNow": {"payload": {"status": "Accepted"}},
+      "CancelReservation": {"payload": {"status": "Accepted"}},
+      "GetLocalListVersion": {"payload": {"listVersion": 0}},
+      "SendLocalList": {"payload": {"status": "Accepted"}},
+      "UpdateFirmware": {"payload": {}},
+      "GetDiagnostics": {"payload": {}}
+    }
+  },
+  "samples": {
+    "boot": {"action": "BootNotification", "from": "station", "payload": {
+      "chargePointVendor": "OTFabric", "chargePointModel": "TestStation",
+      "chargePointSerialNumber": "OTF-0001", "firmwareVersion": "1.0.0"}},
+    "heartbeat": {"action": "Heartbeat", "from": "station", "payload": {}},
+    "statusAvailable": {"action": "StatusNotification", "from": "station", "payload": {
+      "connectorId": 1, "errorCode": "NoError", "status": "Available"}},
+    "authorizeAccepted": {"action": "Authorize", "from": "station", "payload": {"idTag": "04A1B2C3D4E5F6"}},
+    "authorizeBlocked": {"action": "Authorize", "from": "station", "payload": {"idTag": "04BLOCKED00001"}},
+    "startTransaction": {"action": "StartTransaction", "from": "station", "payload": {
+      "connectorId": 1, "idTag": "04A1B2C3D4E5F6", "meterStart": 0, "timestamp": "2026-01-01T10:00:00Z"}},
+    "meterValues": {"action": "MeterValues", "from": "station", "payload": {
+      "connectorId": 1, "transactionId": 1001,
+      "meterValue": [{"timestamp": "2026-01-01T10:05:00Z", "sampledValue": [
+        {"value": "1234", "measurand": "Energy.Active.Import.Register", "unit": "Wh"},
+        {"value": "7360", "measurand": "Power.Active.Import", "unit": "W"}]}]}},
+    "stopTransaction": {"action": "StopTransaction", "from": "station", "payload": {
+      "transactionId": 1001, "meterStop": 5000, "timestamp": "2026-01-01T10:30:00Z", "reason": "Local"}},
+    "remoteStart": {"action": "RemoteStartTransaction", "from": "csms", "payload": {"connectorId": 1, "idTag": "04A1B2C3D4E5F6"}},
+    "remoteStop": {"action": "RemoteStopTransaction", "from": "csms", "payload": {"transactionId": 1001}},
+    "getConfiguration": {"action": "GetConfiguration", "from": "csms", "payload": {"key": ["HeartbeatInterval"]}},
+    "changeConfiguration": {"action": "ChangeConfiguration", "from": "csms", "payload": {"key": "HeartbeatInterval", "value": "120"}},
+    "resetSoft": {"action": "Reset", "from": "csms", "payload": {"type": "Soft"}},
+    "triggerHeartbeat": {"action": "TriggerMessage", "from": "csms", "payload": {"requestedMessage": "Heartbeat"}},
+    "setTxDefaultProfile": {"action": "SetChargingProfile", "from": "csms", "payload": {
+      "connectorId": 0,
+      "csChargingProfiles": {
+        "chargingProfileId": 1, "stackLevel": 0,
+        "chargingProfilePurpose": "TxDefaultProfile", "chargingProfileKind": "Absolute",
+        "chargingSchedule": {"chargingRateUnit": "W", "startSchedule": "2026-01-01T00:00:00Z",
+          "chargingSchedulePeriod": [{"startPeriod": 0, "limit": 11000}]}}}}
+  }
+}

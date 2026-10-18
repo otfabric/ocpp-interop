@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/otfabric/ocpp-interop/schemas/client-result.schema.json",
+  "title": "ocpp-interop result document",
+  "description": "The one line `client <Action>` and `call` write. See docs/CONTAINER_CONTRACT.md.",
+  "type": "object",
+  "required": ["schemaVersion", "adapter", "version", "operation", "ok", "callError", "error", "elapsedMs"],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "adapter": {"type": "string", "pattern": "^[a-z0-9]+$"},
+    "version": {"enum": ["1.6", "2.0.1", "2.1"]},
+    "operation": {"type": "string", "pattern": "^[A-Z][A-Za-z0-9]+$"},
+    "ok": {"type": "boolean"},
+    "messageId": {"type": "string", "maxLength": 36},
+    "request": {"type": "object"},
+    "response": {"type": ["object", "null"]},
+    "callError": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["code", "description"],
+          "properties": {
+            "code": {"type": "string"},
+            "description": {"type": "string"},
+            "details": {}
+          }
+        }
+      ]
+    },
+    "error": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["code", "message"],
+          "properties": {
+            "code": {"enum": ["connect-failed", "timeout", "call-error", "invalid-response", "connection-lost", "unsupported", "failed"]},
+            "message": {"type": "string"}
+          }
+        }
+      ]
+    },
+    "elapsedMs": {"type": "integer", "minimum": 0}
+  },
+  "allOf": [
+    {"if": {"properties": {"ok": {"const": true}}}, "then": {"properties": {"error": {"type": "null"}, "callError": {"type": "null"}}}},
+    {"if": {"properties": {"ok": {"const": false}}}, "then": {"properties": {"error": {"type": "object"}}}}
+  ]
+}

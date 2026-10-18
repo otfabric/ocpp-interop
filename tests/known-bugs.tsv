@@ -1,0 +1,4 @@
+# Known upstream defects (REQUIREMENTS.md R4.4). Tab-separated:
+# adapter	upstream_version	test_id_regex	evidence_url	summary
+# A failing test that matches an entry is reported as KNOWN_ISSUE. An entry
+# that no longer reproduces fails the run, so that this list cannot go stale.

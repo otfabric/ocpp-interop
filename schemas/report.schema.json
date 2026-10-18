@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/otfabric/ocpp-interop/schemas/report.schema.json",
+  "title": "ocpp-interop test report",
+  "description": "The results of one test run, written by scripts/interop.sh. Consumers may write the same format for their own runs.",
+  "type": "object",
+  "required": ["schemaVersion", "run", "results"],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "run": {
+      "type": "object",
+      "required": ["id", "started", "finished", "producer"],
+      "properties": {
+        "id": {"type": "string"},
+        "started": {"type": "string", "format": "date-time"},
+        "finished": {"type": "string", "format": "date-time"},
+        "producer": {"type": "string", "description": "What wrote the report, e.g. ocpp-interop v0.1.0"}
+      }
+    },
+    "results": {"type": "array", "items": {"$ref": "#/$defs/result"}}
+  },
+  "$defs": {
+    "implementation": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"type": "string"},
+        "version": {"type": "string"},
+        "image": {"type": "string", "description": "Image reference with digest, for adapters"}
+      }
+    },
+    "result": {
+      "type": "object",
+      "required": ["testId", "version", "client", "server", "initiator", "feature", "status", "durationMs"],
+      "properties": {
+        "testId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$"},
+        "version": {"enum": ["1.6", "2.0.1", "2.1"]},
+        "client": {"$ref": "#/$defs/implementation"},
+        "server": {"$ref": "#/$defs/implementation"},
+        "initiator": {"enum": ["client", "server"], "description": "Which end sent the CALL under test"},
+        "feature": {"type": "string"},
+        "action": {"type": "string"},
+        "status": {"enum": ["PASS", "FAIL", "SKIP_UNSUPPORTED", "KNOWN_ISSUE", "INFRA_ERROR"]},
+        "durationMs": {"type": "integer", "minimum": 0},
+        "error": {"type": "string"},
+        "evidence": {"type": "string", "description": "Link to the upstream issue for KNOWN_ISSUE, or the reason for SKIP_UNSUPPORTED"}
+      },
+      "allOf": [
+        {"if": {"properties": {"status": {"enum": ["FAIL", "INFRA_ERROR"]}}}, "then": {"required": ["error"]}},
+        {"if": {"properties": {"status": {"enum": ["KNOWN_ISSUE", "SKIP_UNSUPPORTED"]}}}, "then": {"required": ["evidence"]}}
+      ]
+    }
+  }
+}

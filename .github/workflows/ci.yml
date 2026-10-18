@@ -1,0 +1,50 @@
+name: CI
+run-name: "CI (${{ github.event_name }}) on ${{ github.ref_name }} by @${{ github.actor }}"
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Build tooling comes from Google's mirror of Docker Hub: anonymous pulls
+  # from Docker Hub are rate limited per runner address.
+  TOOLS_REGISTRY: mirror.gcr.io
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Phase 1: there are no adapters yet. The per-architecture self-test job of
+  # iec104-interop and modbus-interop (amd64 on ubuntu-24.04, arm64 on
+  # ubuntu-24.04-arm, both native) is added with the first adapter.
+  validate:
+    name: Fixtures, schemas, versions, scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install jsonschema
+      - name: versions.yaml matches the build files
+        run: make versions
+      - name: Schemas
+        run: make schemas
+      - name: Fixtures
+        run: make fixtures
+      - name: Shellcheck and Python syntax
+        run: make lint
+      - name: No reference to a library under test
+        # REQUIREMENTS.md R1: adapters, fixtures, schemas, scripts and tests
+        # must not know any consumer. Documentation may name consumers.
+        run: |
+          if grep -rInE 'otfabric/go-|go-ocpp' adapters fixtures schemas scripts tests Makefile; then
+            echo "::error::consumer-specific reference found"; exit 1
+          fi

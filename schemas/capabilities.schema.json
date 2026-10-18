@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/otfabric/ocpp-interop/schemas/capabilities.schema.json",
+  "title": "ocpp-interop adapter capabilities",
+  "description": "The document `ocpp-interop print-capabilities` writes. See docs/CAPABILITIES.md.",
+  "type": "object",
+  "required": ["schemaVersion", "adapter", "adapterVersion", "contractVersion", "upstream", "versions"],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "adapter": {"type": "string", "pattern": "^[a-z0-9]+$"},
+    "adapterVersion": {"type": "string", "minLength": 1},
+    "contractVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$"},
+    "upstream": {
+      "type": "object",
+      "required": ["name", "repository", "version", "revision", "license", "language", "independentEngine"],
+      "properties": {
+        "name": {"type": "string"},
+        "repository": {"type": "string", "format": "uri"},
+        "version": {"type": "string"},
+        "revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "license": {"type": "string"},
+        "language": {"type": "string"},
+        "independentEngine": {"type": "boolean"}
+      }
+    },
+    "versions": {
+      "type": "object",
+      "propertyNames": {"enum": ["1.6", "2.0.1", "2.1"]},
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/version"}
+    }
+  },
+  "$defs": {
+    "action": {"type": "string", "pattern": "^[A-Z][A-Za-z0-9]+$"},
+    "role": {
+      "type": "object",
+      "description": "What the adapter does in one role for one version. Only what the self-tests exercise is listed.",
+      "required": ["supported", "sends", "handles"],
+      "properties": {
+        "supported": {"type": "boolean"},
+        "sends": {"type": "array", "items": {"$ref": "#/$defs/action"}, "uniqueItems": true},
+        "handles": {"type": "array", "items": {"$ref": "#/$defs/action"}, "uniqueItems": true}
+      }
+    },
+    "version": {
+      "type": "object",
+      "required": ["client", "server", "features"],
+      "properties": {
+        "client": {"$ref": "#/$defs/role"},
+        "server": {"$ref": "#/$defs/role"},
+        "features": {
+          "type": "object",
+          "required": ["securityProfiles", "compression", "send", "callResultError"],
+          "properties": {
+            "securityProfiles": {"type": "array", "items": {"enum": [0, 1, 2, 3]}, "uniqueItems": true},
+            "compression": {"type": "boolean", "description": "permessage-deflate (RFC 7692)"},
+            "send": {"type": "boolean", "description": "OCPP 2.1 SEND frames (message type 6)"},
+            "callResultError": {"type": "boolean", "description": "OCPP 2.1 CALLRESULTERROR frames (message type 5)"}
+          },
+          "additionalProperties": {"type": "boolean"}
+        },
+        "notes": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+# Runs the reference servers locally, on loopback only:
+#   docker compose up -d --wait
+#
+# Phase 1: there are no adapter images yet. Services are added with the
+# first adapter (PLAN.md, Phase 4), one per server adapter, each publishing
+# 9000/tcp on its own 127.0.0.1 port.
+name: ocpp-interop
+services: {}
