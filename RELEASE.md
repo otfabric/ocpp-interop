@@ -30,6 +30,11 @@ and 3 in every adapter and every version it declares, and permessage-deflate
 where the upstream can. The container contract is draft 0.5. The self-tests
 generate a CA and certificates (RSA and ECDSA P-256) for every run.
 
+Every action in a baseline sample: the adapters declare every action their
+pinned upstream can exchange, so 39 of 39 OCPP 1.6 actions, 64 of 64 2.0.1
+actions and 89 of 91 2.1 actions are now exchanged between the references
+(before: 30, 27 and 43).
+
 ### Added
 
 - Security profiles 2 (TLS and Basic authentication) and 3 (mutual TLS, the
@@ -58,6 +63,20 @@ generate a CA and certificates (RSA and ECDSA P-256) for every run.
   adapter with itself are reported as such, and fail when they do not show
 - `scripts/interop.sh`: the scenarios `<v>.tls.profile2`,
   `<v>.tls.profile3` and `<v>.compression` for every station and CSMS pair
+- Every action the pinned upstreams support, declared from the direction
+  tables in both roles (`NOT_SENT` / `notSent` for the exceptions), with an
+  answer and a sample in the baseline fixtures of 1.6, 2.0.1 and 2.1;
+  certificate data from a throwaway P-256 test PKI (no private keys)
+- `validate-fixtures.py`: a fixture named `baseline` must have a sample of
+  every action and an answer to every non-SEND action
+- `scripts/interop.sh`: NotImplemented tested from both ends
+  (`<v>.not-implemented.from-station`, `.from-csms`) with a fixture copy
+  that leaves one action per side unanswered
+- `tests/known-bugs.tsv`: ocpp-go v0.19.0 GetCompositeScheduleResponse does
+  not have the OCA structure; its SetNetworkProfileResponse sends
+  `"statusInfo": null`
+- mobilityhouse: payload keys mapped to the dataclass's own field names
+  (`iso_15118_*`), which fixes Get15118EVCertificate in 2.1
 - `tests/known-bugs.tsv`: the chargetime 2.0.1 station keeps its
   compression context although it offers `client_no_context_takeover`
   (Java-WebSocket 1.6.0)
