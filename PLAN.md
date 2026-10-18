@@ -64,8 +64,11 @@ interoperability. First slice: OCPP 1.6J only (2026-10-18).
       2.0.1, every station against every CSMS for both (3 x 3 each)
 - [x] Contract 0.3: what implementing 2.0.1 and the third adapter required
 - [x] Known bugs that show only with one peer (`adapter:role@peer`)
-- [ ] TLS scenarios (profiles 2 and 3) with keys generated at test time
-- [ ] Compression (`permessage-deflate`)
+- [x] TLS scenarios (profiles 2 and 3) with keys generated at test time:
+      contract 0.5, every adapter, smoke and cross-stack tests
+- [x] Compression (`permessage-deflate`): contract 0.5; mobilityhouse in
+      every version, chargetime in 2.0.1 (known Java-WebSocket defects);
+      lorenzodonini's CSMS cannot accept it
 
 ## Phase 6 - OCPP 2.1 (open)
 
@@ -81,6 +84,12 @@ interoperability. First slice: OCPP 1.6J only (2026-10-18).
 - [x] Contract 0.4: `--version 2.1`; SEND actions are refused without the
       `send` feature; type 5 and 6 frames an upstream cannot read are
       `protocol-error`
+- [x] Every action of 1.6 (39), 2.0.1 (64) and 2.1 (91) in a baseline
+      sample, with an answer; every adapter declares every action its
+      upstream can exchange, and the self-tests send each one. Not
+      exchangeable: 2.1 BatterySwap (upstream defect) and
+      NotifyPeriodicEventStream (SEND). NotImplemented is tested with a
+      fixture copy that leaves one action per side unanswered
 - [ ] 2.1 in `chargetime`: Java-OCA-OCPP has 2.1 (with SEND and
       CALLRESULTERROR) on master since 2025-12-13, after its v2.0 release,
       the latest on Maven Central. Waits for a release (R2.2)

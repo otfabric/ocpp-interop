@@ -21,8 +21,16 @@
 #                  both ends declare the features send and callResultError;
 #   connectivity   one-shot client, an unknown identity, the close of a session;
 #   profile 1      Basic authentication: accepted, no credentials, wrong password;
-#   errors         NotImplemented for an action without an answer, the fixture's
-#                  own CALLERROR answers.
+#   tls, compression  a station that stays connected over security profile 2
+#                  (TLS with RSA keys, Basic authentication), security profile 3
+#                  (mutual TLS with ECDSA keys) or permessage-deflate, with CALLs
+#                  from both ends; the CA and the certificates are generated for
+#                  the run. They run where both ends declare the profile or
+#                  compression;
+#   errors         NotImplemented for an action without an answer (from both
+#                  ends, with a copy of the fixture that leaves one action of
+#                  each side unanswered: the baseline answers every action), the
+#                  fixture's own CALLERROR answers.
 #
 # Every result is a report result (schemas/report.schema.json) with the
 # status PASS, FAIL, SKIP_UNSUPPORTED (a capability one side does not declare),
@@ -50,6 +58,14 @@ read -r -a VERSIONS <<<"${OCPP_VERSIONS:-1.6 2.0.1 2.1}"
 # OCPP 2.1 Part 2, 1.54; scripts/validate-fixtures.py SEND_ACTIONS.
 SEND_ACTIONS='{"1.6": [], "2.0.1": [], "2.1": ["NotifyPeriodicEventStream"]}'
 is_send() { jq -e --arg v "${OCPP}" --arg a "$1" '.[$v] | index($a) != null' <<<"${SEND_ACTIONS}" >/dev/null; }
+# The action each end sends in the NotImplemented tests, and that the other
+# end's fixture copy leaves unanswered. Not a Core profile action in 1.6:
+# Java-OCA-OCPP always registers the Core profile, and fails an unanswered
+# Core action with InternalError (docs/CONTAINER_CONTRACT.md).
+UNANSWERED='{"1.6": {"station": "DiagnosticsStatusNotification", "csms": "ClearChargingProfile"},
+ "2.0.1": {"station": "LogStatusNotification", "csms": "ClearChargingProfile"},
+ "2.1": {"station": "LogStatusNotification", "csms": "ClearChargingProfile"}}'
+unanswered() { jq -r --arg v "${OCPP}" --arg r "$1" '.[$v][$r]' <<<"${UNANSWERED}"; }
 KNOWN_BUGS="${ROOT}/tests/known-bugs.tsv"
 # Set per version by use_version: the version, its fixture directory name
 # (also the prefix of the test ids), the baseline fixture and its station.
@@ -136,7 +152,12 @@ FEATURE_OF='{
   "SetChargingProfile":"smart-charging","ClearChargingProfile":"smart-charging","GetCompositeSchedule":"smart-charging",
   "ReserveNow":"reservation","CancelReservation":"reservation",
   "GetLocalListVersion":"local-auth-list","SendLocalList":"local-auth-list",
-  "SecurityEventNotification":"security-extensions","ExtendedTriggerMessage":"security-extensions"
+  "SecurityEventNotification":"security-extensions","ExtendedTriggerMessage":"security-extensions",
+  "LogStatusNotification":"security-extensions","GetLog":"security-extensions",
+  "SignCertificate":"security-extensions","CertificateSigned":"security-extensions",
+  "InstallCertificate":"security-extensions","DeleteCertificate":"security-extensions",
+  "GetInstalledCertificateIds":"security-extensions","SignedUpdateFirmware":"security-extensions",
+  "SignedFirmwareStatusNotification":"security-extensions"
  },
  "2.0.1": {
   "BootNotification":"provisioning","Heartbeat":"provisioning","StatusNotification":"provisioning",
@@ -148,7 +169,19 @@ FEATURE_OF='{
   "RequestStartTransaction":"remote-commands","RequestStopTransaction":"remote-commands","Reset":"remote-commands",
   "UnlockConnector":"remote-commands","ChangeAvailability":"remote-commands","TriggerMessage":"remote-commands",
   "ClearCache":"remote-commands","SetChargingProfile":"smart-charging","ClearChargingProfile":"smart-charging",
-  "CancelReservation":"reservation","ReservationStatusUpdate":"reservation","GetLocalListVersion":"local-auth-list"
+  "CancelReservation":"reservation","ReservationStatusUpdate":"reservation","GetLocalListVersion":"local-auth-list",
+  "ClearedChargingLimit":"smart-charging","NotifyChargingLimit":"smart-charging","NotifyEVChargingNeeds":"smart-charging",
+  "NotifyEVChargingSchedule":"smart-charging","ReportChargingProfiles":"smart-charging","GetChargingProfiles":"smart-charging",
+  "GetCompositeSchedule":"smart-charging","ReserveNow":"reservation","SendLocalList":"local-auth-list",
+  "GetReport":"device-model","SetNetworkProfile":"device-model","GetTransactionStatus":"transactions","CostUpdated":"tariff-cost",
+  "NotifyMonitoringReport":"monitoring","GetMonitoringReport":"monitoring","SetMonitoringBase":"monitoring",
+  "SetMonitoringLevel":"monitoring","SetVariableMonitoring":"monitoring","ClearVariableMonitoring":"monitoring",
+  "NotifyCustomerInformation":"diagnostics","CustomerInformation":"diagnostics","GetLog":"firmware-diagnostics",
+  "NotifyDisplayMessages":"display","SetDisplayMessage":"display","GetDisplayMessages":"display","ClearDisplayMessage":"display",
+  "UpdateFirmware":"firmware-diagnostics","PublishFirmware":"firmware-diagnostics","UnpublishFirmware":"firmware-diagnostics",
+  "PublishFirmwareStatusNotification":"firmware-diagnostics",
+  "SignCertificate":"security","CertificateSigned":"security","InstallCertificate":"security","DeleteCertificate":"security",
+  "GetInstalledCertificateIds":"security","Get15118EVCertificate":"iso15118","GetCertificateStatus":"iso15118"
  },
  "2.1": {
   "BootNotification":"provisioning","Heartbeat":"provisioning","StatusNotification":"provisioning",
@@ -161,6 +194,22 @@ FEATURE_OF='{
   "UnlockConnector":"remote-commands","ChangeAvailability":"remote-commands","TriggerMessage":"remote-commands",
   "ClearCache":"remote-commands","SetChargingProfile":"smart-charging","ClearChargingProfile":"smart-charging",
   "CancelReservation":"reservation","ReservationStatusUpdate":"reservation","GetLocalListVersion":"local-auth-list",
+  "ClearedChargingLimit":"smart-charging","NotifyChargingLimit":"smart-charging","NotifyEVChargingNeeds":"smart-charging",
+  "NotifyEVChargingSchedule":"smart-charging","ReportChargingProfiles":"smart-charging","GetChargingProfiles":"smart-charging",
+  "GetCompositeSchedule":"smart-charging","ReserveNow":"reservation","SendLocalList":"local-auth-list",
+  "GetReport":"device-model","SetNetworkProfile":"device-model","GetTransactionStatus":"transactions","CostUpdated":"tariff-cost",
+  "NotifyMonitoringReport":"monitoring","GetMonitoringReport":"monitoring","SetMonitoringBase":"monitoring",
+  "SetMonitoringLevel":"monitoring","SetVariableMonitoring":"monitoring","ClearVariableMonitoring":"monitoring",
+  "NotifyCustomerInformation":"diagnostics","CustomerInformation":"diagnostics","GetLog":"firmware-diagnostics",
+  "NotifyDisplayMessages":"display","SetDisplayMessage":"display","GetDisplayMessages":"display","ClearDisplayMessage":"display",
+  "UpdateFirmware":"firmware-diagnostics","PublishFirmware":"firmware-diagnostics","UnpublishFirmware":"firmware-diagnostics",
+  "PublishFirmwareStatusNotification":"firmware-diagnostics",
+  "SignCertificate":"security","CertificateSigned":"security","InstallCertificate":"security","DeleteCertificate":"security",
+  "GetInstalledCertificateIds":"security","Get15118EVCertificate":"iso15118","GetCertificateStatus":"iso15118",
+  "GetCertificateChainStatus":"security","ChangeTransactionTariff":"tariff-cost","NotifySettlement":"payment",
+  "VatNumberValidation":"payment","NotifyWebPaymentStarted":"payment","AFRRSignal":"afrr",
+  "NotifyAllowedEnergyTransfer":"smart-charging","NotifyPriorityCharging":"smart-charging","UsePriorityCharging":"smart-charging",
+  "PullDynamicScheduleUpdate":"smart-charging","UpdateDynamicSchedule":"smart-charging",
   "SetDefaultTariff":"tariff-cost","GetTariffs":"tariff-cost","ClearTariffs":"tariff-cost",
   "SetDERControl":"der-control","GetDERControl":"der-control","ClearDERControl":"der-control",
   "NotifyDERAlarm":"der-control","NotifyDERStartStop":"der-control","ReportDERControl":"der-control",
@@ -521,6 +570,9 @@ pairing() {  # pairing <client adapter> <server adapter>
         done
     fi
 
+    # ---- transport security and compression ----
+    transport "${client}" "${server}"
+
     # ---- the fixture's own CALLERROR answers ----
     if feature "${server}" fixtureCallErrors; then
         start "${srv}" "${server}" -v "${WORK}/fixtures:/errors:ro" -- server --version "${OCPP}" --fixture /errors/callerror/${VDIR}/baseline/fixture.json
@@ -562,6 +614,115 @@ pairing() {  # pairing <client adapter> <server adapter>
         record ${VDIR}.fixture-callerror.from-csms "${client}" "${server}" server errors Reset SKIP_UNSUPPORTED 0 \
             "${client} does not declare fixtureCallErrors: its upstream cannot answer with a chosen CALLERROR"
     fi
+
+    # ---- NotImplemented for an action the fixture does not answer ----
+    not_implemented "${client}" "${server}"
+}
+
+# not_implemented <client> <server>: each end sends an action that the
+# other end's fixture copy (unanswered/) does not answer: NotImplemented.
+not_implemented() {
+    local client="$1" server="$2" srv="csms-$2-${RUN_ID}" sta="station-$1-${RUN_ID}" saved="${FIXTURE}" initiator action
+    local alt=/alt/unanswered/${VDIR}/baseline/fixture.json
+    start "${srv}" "${server}" -v "${WORK}/fixtures:/alt:ro" -- server --version "${OCPP}" --fixture "${alt}"
+    # The station connects only once the server listens.
+    wait_ready "${srv}" && start "${sta}" "${client}" -v "${WORK}/fixtures:/alt:ro" -- client run --version "${OCPP}" \
+        --url "ws://${srv}:9000/ocpp" --fixture "${alt}"
+    if wait_ready "${srv}" && wait_ready "${sta}"; then
+        # expected() reads the answers from the copy.
+        FIXTURE="${WORK}/fixtures/unanswered/${VDIR}/baseline/fixture.json"
+        action=$(unanswered station)
+        exchange "${VDIR}.not-implemented.from-station" "${client}" "${server}" client "${sta}" "${srv}" "${action}" \
+            "$(jq -c --arg a "${action}" 'first(.samples[] | select(.action == $a and .from == "station")) | .payload' "${FIXTURE}")"
+        action=$(unanswered csms)
+        exchange "${VDIR}.not-implemented.from-csms" "${client}" "${server}" server "${srv}" "${sta}" "${action}" \
+            "$(jq -c --arg a "${action}" 'first(.samples[] | select(.action == $a and .from == "csms")) | .payload' "${FIXTURE}")" \
+            --station "${STATION}"
+        FIXTURE="${saved}"
+    else
+        for initiator in client server; do
+            record "${VDIR}.not-implemented.from-$([[ ${initiator} == client ]] && echo station || echo csms)" "${client}" "${server}" \
+                "${initiator}" errors "$(unanswered "$([[ ${initiator} == client ]] && echo station || echo csms)")" INFRA_ERROR 0 \
+                "server or client run did not become ready"
+        done
+    fi
+    stop_container "${sta}"; stop_container "${srv}"
+}
+
+# session <id> <client> <server> <feature> <server flags...> -- <client run flags...>
+# A station that stays connected over the transport the flags set up (the
+# run's TLS material is mounted at /tls): two CALLs from the station, two from
+# the CSMS. The second message in each direction is the first one a broken
+# compression context cannot read. With the feature compression, neither end
+# may report that compression was not negotiated.
+session() {
+    local id="$1" client="$2" server="$3" feat="$4"; shift 4
+    local srv="csms-${server}-${RUN_ID}" sta="station-${client}-${RUN_ID}" sflags=() problems=() doc t0 ms
+    while [[ "$1" != "--" ]]; do sflags+=("$1"); shift; done
+    shift
+    start "${srv}" "${server}" -v "${WORK}/tls:/tls:ro" -- server --version "${OCPP}" ${sflags[@]+"${sflags[@]}"}
+    if ! wait_ready "${srv}"; then
+        record "${id}" "${client}" "${server}" client "${feat}" "" INFRA_ERROR 0 "the server did not become ready"
+        stop_container "${srv}"; return
+    fi
+    t0=$(now_ms)
+    start "${sta}" "${client}" -v "${WORK}/tls:/tls:ro" -- client run --version "${OCPP}" "$@"
+    if wait_ready "${sta}"; then
+        doc=$(docker exec "${sta}" ocpp-interop call BootNotification --payload "$(jq -c '.samples.boot.payload' "${FIXTURE}")" --timeout-ms 5000 2>/dev/null)
+        jq -e '.ok' <<<"${doc}" >/dev/null 2>&1 || problems+=("BootNotification: ${doc:0:200}")
+        doc=$(docker exec "${sta}" ocpp-interop call Heartbeat --timeout-ms 5000 2>/dev/null)
+        jq -e '.ok' <<<"${doc}" >/dev/null 2>&1 || problems+=("Heartbeat: ${doc:0:200}")
+        doc=$(docker exec "${srv}" ocpp-interop call --station "${STATION}" ChangeAvailability \
+            --payload "$(jq -c '.samples.changeAvailability.payload' "${FIXTURE}")" --timeout-ms 5000 2>/dev/null)
+        jq -e '.ok' <<<"${doc}" >/dev/null 2>&1 || problems+=("ChangeAvailability from the CSMS: ${doc:0:200}")
+        doc=$(docker exec "${srv}" ocpp-interop call --station "${STATION}" ClearCache --payload '{}' --timeout-ms 5000 2>/dev/null)
+        jq -e '.ok' <<<"${doc}" >/dev/null 2>&1 || problems+=("ClearCache from the CSMS: ${doc:0:200}")
+        wait_event "${srv}" '.event == "connection-opened" and .station == $s' --arg s "${STATION}" >/dev/null \
+            || problems+=("the server reported no connection-opened event")
+        if [[ "${feat}" == compression ]]; then
+            events "${sta}" | jq -e 'select(.event == "connection-opened") | .compression == false' >/dev/null 2>&1 \
+                && problems+=("the station reports that compression was not negotiated")
+            events "${srv}" | jq -e 'select(.event == "connection-opened") | .compression == false' >/dev/null 2>&1 \
+                && problems+=("the CSMS reports that compression was not negotiated")
+        fi
+    else
+        problems+=("client run did not connect: $(events "${sta}" | jq -r 'select(.event == "connection-failed") | .detail' 2>/dev/null | sed -n 1p)")
+    fi
+    ms=$(( $(now_ms) - t0 ))
+    if [[ ${#problems[@]} -eq 0 ]]; then
+        record "${id}" "${client}" "${server}" client "${feat}" "" PASS "${ms}"
+    else
+        record "${id}" "${client}" "${server}" client "${feat}" "" FAIL "${ms}" "$(IFS='; '; echo "${problems[*]}")"
+    fi
+    events "${srv}" | grep -v '^{' | grep -q . && record "${id}.events.json-lines" "${client}" "${server}" server other "" FAIL 0 "server stdout has lines that are not JSON"
+    stop_container "${sta}"; stop_container "${srv}"
+}
+
+# transport <client> <server>: security profiles 2 and 3, and compression.
+transport() {
+    local client="$1" server="$2" url="csms-$2-${RUN_ID}:9000/ocpp" tls="/tls/${VDIR}"
+    if profile "${client}" 2 && profile "${server}" 2; then
+        session "${VDIR}.tls.profile2" "${client}" "${server}" security-profile-2 \
+            --security-profile 2 --tls-dir "${tls}/rsa/server" -- \
+            --url "wss://${url}" --security-profile 2 --tls-dir "${tls}/rsa/station"
+    else
+        record "${VDIR}.tls.profile2" "${client}" "${server}" client security-profile-2 "" SKIP_UNSUPPORTED 0 \
+            "security profile 2 is not declared by both ${client} and ${server}"
+    fi
+    if profile "${client}" 3 && profile "${server}" 3; then
+        session "${VDIR}.tls.profile3" "${client}" "${server}" security-profile-3 \
+            --security-profile 3 --tls-dir "${tls}/ec/server" -- \
+            --url "wss://${url}" --security-profile 3 --tls-dir "${tls}/ec/station"
+    else
+        record "${VDIR}.tls.profile3" "${client}" "${server}" client security-profile-3 "" SKIP_UNSUPPORTED 0 \
+            "security profile 3 is not declared by both ${client} and ${server}"
+    fi
+    if feature "${client}" compression && feature "${server}" compression; then
+        session "${VDIR}.compression" "${client}" "${server}" compression -- --url "ws://${url}" --compression
+    else
+        record "${VDIR}.compression" "${client}" "${server}" client compression "" SKIP_UNSUPPORTED 0 \
+            "compression is not declared by both ${client} and ${server}"
+    fi
 }
 
 # A Reset the fixture's station answers: Hard in 1.6, Immediate in 2.x.
@@ -576,6 +737,20 @@ for v in "${VERSIONS[@]}"; do
     jq '.answers.csms.Heartbeat = {"callError": {"code": "GenericError", "description": "fixture says no"}}
         | .answers.station.Reset = {"callError": {"code": "GenericError", "description": "fixture says no"}}' "${FIXTURE}" \
         > "${WORK}/fixtures/callerror/${VDIR}/baseline/fixture.json"
+    mkdir -p "${WORK}/fixtures/unanswered/${VDIR}/baseline"
+    jq --arg s "$(unanswered station)" --arg c "$(unanswered csms)" 'del(.answers.csms[$s]) | del(.answers.station[$c])' "${FIXTURE}" \
+        > "${WORK}/fixtures/unanswered/${VDIR}/baseline/fixture.json"
+done
+# The TLS material of docs/CONTAINER_CONTRACT.md (Transport security), from
+# CAs made for this run: RSA keys for profile 2, ECDSA P-256 keys for profile
+# 3. The server certificates name every CSMS container.
+csms_names=()
+for a in "${ADAPTERS[@]}"; do csms_names+=("csms-${a}-${RUN_ID}"); done
+for v in "${VERSIONS[@]}"; do
+    use_version "${v}"
+    { make_pki "${WORK}/tls/${VDIR}/rsa" rsa "${STATION}" "${csms_names[@]}" localhost 127.0.0.1 \
+        && make_pki "${WORK}/tls/${VDIR}/ec" ec "${STATION}" "${csms_names[@]}" localhost 127.0.0.1; } \
+        || { log "cannot generate the TLS material"; exit 1; }
 done
 chmod -R a+rX "${WORK}"
 

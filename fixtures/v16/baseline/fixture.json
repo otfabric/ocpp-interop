@@ -36,7 +36,11 @@
       "MeterValues": {"payload": {}},
       "DataTransfer": {"payload": {"status": "UnknownVendorId"}},
       "DiagnosticsStatusNotification": {"payload": {}},
-      "FirmwareStatusNotification": {"payload": {}}
+      "FirmwareStatusNotification": {"payload": {}},
+      "SecurityEventNotification": {"payload": {}},
+      "LogStatusNotification": {"payload": {}},
+      "SignCertificate": {"payload": {"status": "Accepted"}},
+      "SignedFirmwareStatusNotification": {"payload": {}}
     },
     "station": {
       "RemoteStartTransaction": {"payload": {"status": "Accepted"}},
@@ -57,7 +61,14 @@
       "GetLocalListVersion": {"payload": {"listVersion": 0}},
       "SendLocalList": {"payload": {"status": "Accepted"}},
       "UpdateFirmware": {"payload": {}},
-      "GetDiagnostics": {"payload": {}}
+      "GetDiagnostics": {"payload": {}},
+      "ExtendedTriggerMessage": {"payload": {"status": "Accepted"}},
+      "CertificateSigned": {"payload": {"status": "Accepted"}},
+      "DeleteCertificate": {"payload": {"status": "Accepted"}},
+      "GetInstalledCertificateIds": {"payload": {"status": "Accepted", "certificateHashData": [{"hashAlgorithm": "SHA256", "issuerNameHash": "a7512445ebcfdf49a17e511832aaf533fce113d89b84a1f8b9fb01c9627340b7", "issuerKeyHash": "ca167f4603cc5e6efe44527fac6bbf8ebaf091f0be7773687531893f64443716", "serialNumber": "1001"}]}},
+      "GetLog": {"payload": {"status": "Accepted", "filename": "OT-FABRIC-TEST-001-security.log"}},
+      "InstallCertificate": {"payload": {"status": "Accepted"}},
+      "SignedUpdateFirmware": {"payload": {"status": "Accepted"}}
     }
   },
   "samples": {
@@ -118,6 +129,15 @@
         "chargingProfileId": 1, "stackLevel": 0,
         "chargingProfilePurpose": "TxDefaultProfile", "chargingProfileKind": "Absolute",
         "chargingSchedule": {"chargingRateUnit": "W", "startSchedule": "2026-01-01T00:00:00Z",
-          "chargingSchedulePeriod": [{"startPeriod": 0, "limit": 11000}]}}}}
+          "chargingSchedulePeriod": [{"startPeriod": 0, "limit": 11000}]}}}},
+    "logStatus": {"action": "LogStatusNotification", "from": "station", "payload": {"status": "Uploaded", "requestId": 5}},
+    "signCertificate": {"action": "SignCertificate", "from": "station", "payload": {"csr": "-----BEGIN CERTIFICATE REQUEST-----\nMIHrMIGSAgEAMDAxETAPBgNVBAoMCE9URmFicmljMRswGQYDVQQDDBJPVC1GQUJS\nSUMtVEVTVC0wMDEwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAARCqeN2WbJFGX7B\n8x0QSRCg7ujIGTSE6z3MfF0paioN4O7z2WLFT7KFuFVnxHFuYnhHlvW09hZv3f5J\niOhFVTGgoAAwCgYIKoZIzj0EAwIDSAAwRQIgT/FW6U96seKXmZKE8WTOTsAb/HmN\nEz0XDbNldyr/CHcCIQD24GRFp7feIeQT1Hf3563NAgkmyCPTbNB7cDU0OL9GFA==\n-----END CERTIFICATE REQUEST-----\n"}},
+    "signedFirmwareStatus": {"action": "SignedFirmwareStatusNotification", "from": "station", "payload": {"status": "Downloading", "requestId": 6}},
+    "certificateSigned": {"action": "CertificateSigned", "from": "csms", "payload": {"certificateChain": "-----BEGIN CERTIFICATE-----\nMIIBjjCCATOgAwIBAgICIAEwCgYIKoZIzj0EAwIwODEWMBQGA1UECgwNT1RGYWJy\naWMgVGVzdDEeMBwGA1UEAwwVT1RGYWJyaWMgVGVzdCBSb290IENBMB4XDTI2MTAx\nODE2NTYzNFoXDTM2MTAxNTE2NTYzNFowMDERMA8GA1UECgwIT1RGYWJyaWMxGzAZ\nBgNVBAMMEk9ULUZBQlJJQy1URVNULTAwMTBZMBMGByqGSM49AgEGCCqGSM49AwEH\nA0IABEKp43ZZskUZfsHzHRBJEKDu6MgZNITrPcx8XSlqKg3g7vPZYsVPsoW4VWfE\ncW5ieEeW9bT2Fm/d/kmI6EVVMaCjNTAzMAwGA1UdEwEB/wQCMAAwDgYDVR0PAQH/\nBAQDAgOIMBMGA1UdJQQMMAoGCCsGAQUFBwMCMAoGCCqGSM49BAMCA0kAMEYCIQDC\nJvuLHLFBEyNrS9agmiJ9BFURvb1DR79JqWg2zMEXVQIhAPxqwQcOoVxgvZ/DYglw\nE/AjEiFPM8ghLgKQhdzbdCUm\n-----END CERTIFICATE-----\n"}},
+    "deleteCertificate": {"action": "DeleteCertificate", "from": "csms", "payload": {"certificateHashData": {"hashAlgorithm": "SHA256", "issuerNameHash": "a7512445ebcfdf49a17e511832aaf533fce113d89b84a1f8b9fb01c9627340b7", "issuerKeyHash": "ca167f4603cc5e6efe44527fac6bbf8ebaf091f0be7773687531893f64443716", "serialNumber": "1001"}}},
+    "getInstalledCertificateIds": {"action": "GetInstalledCertificateIds", "from": "csms", "payload": {"certificateType": "CentralSystemRootCertificate"}},
+    "getLog": {"action": "GetLog", "from": "csms", "payload": {"logType": "SecurityLog", "requestId": 5, "log": {"remoteLocation": "https://logs.example.invalid/upload/", "oldestTimestamp": "2026-01-01T00:00:00Z", "latestTimestamp": "2026-01-01T10:00:00Z"}, "retries": 2, "retryInterval": 60}},
+    "installCertificate": {"action": "InstallCertificate", "from": "csms", "payload": {"certificateType": "CentralSystemRootCertificate", "certificate": "-----BEGIN CERTIFICATE-----\nMIIBojCCAUigAwIBAgICEAEwCgYIKoZIzj0EAwIwODEWMBQGA1UECgwNT1RGYWJy\naWMgVGVzdDEeMBwGA1UEAwwVT1RGYWJyaWMgVGVzdCBSb290IENBMB4XDTI2MTAx\nODE2NTYzNFoXDTM2MTAxNTE2NTYzNFowODEWMBQGA1UECgwNT1RGYWJyaWMgVGVz\ndDEeMBwGA1UEAwwVT1RGYWJyaWMgVGVzdCBSb290IENBMFkwEwYHKoZIzj0CAQYI\nKoZIzj0DAQcDQgAE4Ozs8i6ZMb8f5RUT1+f5uZu4AIGtGv6kraxYDWl7ldzcwfeG\ntjUKA7iHXlc/5yefhII/Alz9WiHTwjjAvIab9qNCMEAwHQYDVR0OBBYEFN22YdNP\nPgI3s/UhWbHswBkDHPHxMA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgGG\nMAoGCCqGSM49BAMCA0gAMEUCIQC/YGtHMMU0j1niR90ZGVF6sZYekaCa/c9UVb/6\nwtertwIgb4pJYJZVuRSBm+40Ux7og61E/ZpO1Ed3B/BHfJQxM2c=\n-----END CERTIFICATE-----\n"}},
+    "signedUpdateFirmware": {"action": "SignedUpdateFirmware", "from": "csms", "payload": {"requestId": 6, "retries": 2, "retryInterval": 60, "firmware": {"location": "https://firmware.example.invalid/otf-1.0.1.bin", "retrieveDateTime": "2026-01-01T12:00:00Z", "signingCertificate": "-----BEGIN CERTIFICATE-----\nMIIByDCCAW+gAwIBAgICMAEwCgYIKoZIzj0EAwIwQTEWMBQGA1UECgwNT1RGYWJy\naWMgVGVzdDEnMCUGA1UEAwweT1RGYWJyaWMgVGVzdCBGaXJtd2FyZSBTaWduaW5n\nMB4XDTI2MTAxODE2NTYzNFoXDTM2MTAxNTE2NTYzNFowQTEWMBQGA1UECgwNT1RG\nYWJyaWMgVGVzdDEnMCUGA1UEAwweT1RGYWJyaWMgVGVzdCBGaXJtd2FyZSBTaWdu\naW5nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEwtRoEspXozmSCs79r1nmXG1z\nDp+8gN30X1VjDYTXKoGNE/gQpoDy/zC2WlGl++ewZ2KQ6v68PIBPXJebViBeMqNX\nMFUwHQYDVR0OBBYEFCVHk9G2l2NPKH0QCt0mDSIHbHNJMA8GA1UdEwEB/wQFMAMB\nAf8wDgYDVR0PAQH/BAQDAgeAMBMGA1UdJQQMMAoGCCsGAQUFBwMDMAoGCCqGSM49\nBAMCA0cAMEQCHwn6o53+yzST9sV+EgkJ+VredXIiAlYlc+opCerch6ICIQD4c7EZ\n+ufmD8RWflt2vY8PVKJu+NyroZYIvzxI3tJoCg==\n-----END CERTIFICATE-----\n", "signature": "MEYCIQCplEcCe39OCwaHP45XsWeEl7fT0CSAxg+ao6nX+0VLXQIhALEOJqoHfHNI0hpuTGpEyi5CBX5pRdeHWpp1tr4lkJ9Y"}}}
   }
 }

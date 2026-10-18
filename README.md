@@ -9,9 +9,10 @@ against real implementation diversity, in both roles and in both directions
 of request flow, without owning any of that code.
 
 > **Status: Phase 6 (OCPP 2.1).** `mobilityhouse`, `chargetime` and
-> `lorenzodonini` implement the container contract, draft 0.4, for OCPP 1.6J
+> `lorenzodonini` implement the container contract, draft 0.5, for OCPP 1.6J
 > and 2.0.1 in both roles, and `mobilityhouse` also for OCPP 2.1 (the pinned
-> releases of the other two upstreams have no 2.1). They are self-tested
+> releases of the other two upstreams have no 2.1), with security profiles 0
+> to 3 (TLS and mutual TLS) and, where the upstream can, compression. They are self-tested
 > against each other in both directions of request flow, with the upstream
 > defects that shows recorded ([results](docs/COMPATIBILITY.md)). No pinned
 > upstream release implements the OCPP 2.1 SEND and CALLRESULTERROR frames
@@ -51,9 +52,9 @@ to the specification. Neither does it establish OCA certification.
 
 | Adapter | Upstream | Language | OCPP versions to verify | Status |
 |---|---|---|---|---|
-| `mobilityhouse` | [mobilityhouse/ocpp](https://github.com/mobilityhouse/ocpp) 2.1.0 | Python | 1.6J, 2.0.1, 2.1 | **built: 1.6J, 2.0.1 and 2.1, both roles**, security profiles 0 and 1 |
-| `chargetime` | [ChargeTimeEU/Java-OCA-OCPP](https://github.com/ChargeTimeEU/Java-OCA-OCPP) v2.0 | Java | 1.6J, 2.0.1 (2.1 on master only, unreleased) | **built: 1.6J and 2.0.1, both roles**, security profiles 0 and 1 |
-| `lorenzodonini` | [lorenzodonini/ocpp-go](https://github.com/lorenzodonini/ocpp-go) v0.19.0 | Go | 1.6J, 2.0.1 | **built: 1.6J and 2.0.1, both roles**, security profiles 0 and 1 |
+| `mobilityhouse` | [mobilityhouse/ocpp](https://github.com/mobilityhouse/ocpp) 2.1.0 | Python | 1.6J, 2.0.1, 2.1 | **built: 1.6J, 2.0.1 and 2.1, both roles**, security profiles 0 to 3, compression |
+| `chargetime` | [ChargeTimeEU/Java-OCA-OCPP](https://github.com/ChargeTimeEU/Java-OCA-OCPP) v2.0 | Java | 1.6J, 2.0.1 (2.1 on master only, unreleased) | **built: 1.6J and 2.0.1, both roles**, security profiles 0 to 3, compression in 2.0.1 (known upstream defects) |
+| `lorenzodonini` | [lorenzodonini/ocpp-go](https://github.com/lorenzodonini/ocpp-go) v0.19.0 | Go | 1.6J, 2.0.1 | **built: 1.6J and 2.0.1, both roles**, security profiles 0 to 3; no compression (its CSMS cannot accept it) |
 
 The versions listed are what each upstream advertises. A version or feature
 becomes a capability only when a self-test exercises it
@@ -92,6 +93,18 @@ The same works with `--version 2.0.1` and the 2.0.1 fixture
 (`print-fixture --version 2.0.1`), and, with the `mobilityhouse` image, with
 `--version 2.1`.
 
+Security profiles 2 and 3 run over TLS with a CA and certificates you
+generate and mount read-only (`--tls-dir`; the files are listed in
+[the contract](docs/CONTAINER_CONTRACT.md#transport-security)), and a
+station offers compression with `--compression`:
+
+```bash
+docker run -d --name csms -p 127.0.0.1:9000:9000 -v "$PWD/tls:/tls:ro" "$IMAGE" \
+  server --version 2.0.1 --security-profile 3 --tls-dir /tls/server
+# ... the library's station connects to wss://localhost:9000/ocpp/OT-FABRIC-TEST-001
+# with a client certificate whose CommonName is OT-FABRIC-TEST-001
+```
+
 `docker compose up -d --wait` runs the three reference CSMSs on
 127.0.0.1:9000 (mobilityhouse), 127.0.0.1:9001 (chargetime) and
 127.0.0.1:9002 (lorenzodonini), for OCPP 1.6 unless
@@ -127,7 +140,8 @@ make matrix      # the compatibility matrix of reports/report-interop.json
 
 `make validate` needs Python 3 with `jsonschema`. If `jsonschema` is
 missing, the target runs in a `python:3.12-slim` container instead. The
-self-tests need Docker and jq. `OCPP_VERSIONS=2.1 make interop` limits the
+self-tests need Docker, jq and OpenSSL (the TLS tests generate their CA and
+certificates with it for every run). `OCPP_VERSIONS=2.1 make interop` limits the
 cross-stack self-test to one OCPP version (default: 1.6, 2.0.1 and 2.1).
 
 ## Security

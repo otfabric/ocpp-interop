@@ -30,7 +30,7 @@ var (
 const (
 	adapterName     = "lorenzodonini"
 	schemaVersion   = "1.0"
-	contractVersion = "0.4"
+	contractVersion = "0.5"
 	readyFile       = "/run/ocpp-interop/ready"
 	controlSocket   = "/run/ocpp-interop/control.sock"
 )
@@ -44,10 +44,11 @@ const usage = `usage:
   ocpp-interop server --version V [--fixture PATH] [--bind-address ADDR] [--port N]
                       [--security-profile N] [--tls-dir DIR] [--ready-file PATH] [--control-socket PATH]
   ocpp-interop client run --version V --url URL [--station ID] [--fixture PATH] [--security-profile N]
-                      [--tls-dir DIR] [--connect-timeout-ms N] [--timeout-ms N] [--hold-ms N]
+                      [--tls-dir DIR] [--compression] [--connect-timeout-ms N] [--timeout-ms N] [--hold-ms N]
                       [--ready-file PATH] [--control-socket PATH]
   ocpp-interop client <Action> --version V --url URL [--station ID] [--fixture PATH] [--payload JSON]
-                      [--security-profile N] [--tls-dir DIR] [--connect-timeout-ms N] [--timeout-ms N]
+                      [--security-profile N] [--tls-dir DIR] [--compression] [--connect-timeout-ms N]
+                      [--timeout-ms N]
   ocpp-interop call [--station ID] <Action> [--payload JSON] [--timeout-ms N] [--control-socket PATH]
   ocpp-interop print-capabilities
   ocpp-interop print-fixture --version V [NAME]
@@ -81,6 +82,9 @@ type flagSet struct {
 	positional []string
 }
 
+// switches are the flags without a value (docs/CONTAINER_CONTRACT.md, Commands).
+var switches = map[string]bool{"compression": true}
+
 func parseFlags(args []string, known ...string) (*flagSet, error) {
 	allowed := map[string]bool{}
 	for _, k := range known {
@@ -96,6 +100,13 @@ func parseFlags(args []string, known ...string) (*flagSet, error) {
 		name := arg[2:]
 		if !allowed[name] {
 			return nil, usagef("unknown flag %q", arg)
+		}
+		if switches[name] {
+			if _, dup := f.given[name]; dup {
+				return nil, usagef("%s is given more than once", arg)
+			}
+			f.given[name] = "true"
+			continue
 		}
 		if i+1 >= len(args) {
 			return nil, usagef("%s needs a value", arg)
@@ -155,8 +166,8 @@ func securityProfileOf(f *flagSet) (int, error) {
 	if f.has("tls-dir") && p < 2 {
 		return 0, usagef("--tls-dir is for security profiles 2 and 3")
 	}
-	if p >= 2 {
-		return 0, unsupportedf("security profile %d (TLS) is not supported by this adapter yet", p)
+	if p >= 2 && !f.has("tls-dir") {
+		return 0, usagef("security profile %d needs --tls-dir", p)
 	}
 	return int(p), nil
 }
@@ -344,9 +355,9 @@ func capabilities() *object {
 }
 
 func versionCapabilities(version string) *object {
-	d := declared[version]
-	stationHandles := minus(d.csmsSends, d.unansweredByStation)
-	csmsHandles := minus(d.stationSends, d.unansweredByCSMS)
+	stationSends, csmsSends := declaredSends(version)
+	// An end handles what the other end sends.
+	stationHandles, csmsHandles := csmsSends, stationSends
 	notes := []string{
 		"The adapter uses ocpp-go's own high-level API (ocpp16.CentralSystem and ChargePoint, ocpp2.CSMS and " +
 			"ChargingStation) on its ocppj endpoints and ws transport, with the profiles ocpp-go registers by default.",
@@ -361,12 +372,22 @@ func versionCapabilities(version string) *object {
 		"The server does not see the close code of a station's connection: connection-closed has code and reason null.",
 		"Message ids are ocpp-go's (a random uint32, its default generator); the adapter reads them through " +
 			"ocppj.SetMessageIdGenerator.",
+		"Security profiles 2 and 3: ocpp-go's ws.NewTLSServer and ws.NewTLSClient with a crypto/tls configuration " +
+			"(TLS 1.2 or later). With profile 3 a client certificate that does not verify against ca.crt fails the TLS " +
+			"handshake, before an identity is known (no connection-rejected event); a verified certificate whose " +
+			"CommonName is not the identity is refused with HTTP 401 and the event.",
+		"No compression: the server cannot accept permessage-deflate, because ws.NewServer and ws.NewTLSServer " +
+			"create gorilla/websocket's Upgrader without EnableCompression and do not expose it " +
+			"(https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ws/websocket.go#L284-L320). " +
+			"The station offers it with --compression (gorilla's Dialer.EnableCompression, set through " +
+			"ws.Client.AddOption), but ws.Client does not expose whether it was negotiated (connection-opened has " +
+			"compression null).",
 	}
 	return newObject().
-		set("client", newObject().set("supported", true).set("sends", d.stationSends).set("handles", stationHandles)).
-		set("server", newObject().set("supported", true).set("sends", d.csmsSends).set("handles", csmsHandles)).
+		set("client", newObject().set("supported", true).set("sends", stationSends).set("handles", stationHandles)).
+		set("server", newObject().set("supported", true).set("sends", csmsSends).set("handles", csmsHandles)).
 		set("features", newObject().
-			set("securityProfiles", []int{0, 1}).
+			set("securityProfiles", []int{0, 1, 2, 3}).
 			set("compression", false).
 			set("send", false).
 			set("callResultError", false).
@@ -375,53 +396,24 @@ func versionCapabilities(version string) *object {
 		set("notes", notes)
 }
 
-func minus(list []string, drop string) []string {
-	out := []string{}
-	for _, a := range list {
-		if a != drop {
-			out = append(out, a)
+// declaredSends is what the self-tests exercise in one version: every action
+// of the version in the direction the specification gives it (registry.go),
+// for each of which ocpp-go has a feature, less notSent. The baseline
+// fixtures have a sample and an answer for each.
+func declaredSends(version string) (station, csms []string) {
+	list := func(actions map[string]bool) []string {
+		out := []string{}
+		for a := range actions {
+			if feature(version, a) != nil && !notSent[version][a] {
+				out = append(out, a)
+			}
 		}
+		sort.Strings(out)
+		return out
 	}
-	sort.Strings(out)
-	return out
+	return list(versions[version].fromStation), list(versions[version].fromCSMS)
 }
 
-// declaredActions is what the self-tests exercise in one version.
-type declaredActions struct {
-	stationSends, csmsSends               []string
-	unansweredByCSMS, unansweredByStation string
-}
-
-var declared = map[string]declaredActions{
-	"1.6": {
-		stationSends: []string{
-			"Authorize", "BootNotification", "DataTransfer", "DiagnosticsStatusNotification",
-			"FirmwareStatusNotification", "Heartbeat", "MeterValues", "SecurityEventNotification",
-			"StartTransaction", "StatusNotification", "StopTransaction",
-		},
-		csmsSends: []string{
-			"CancelReservation", "ChangeAvailability", "ChangeConfiguration", "ClearCache",
-			"ClearChargingProfile", "DataTransfer", "ExtendedTriggerMessage", "GetCompositeSchedule",
-			"GetConfiguration", "GetDiagnostics", "GetLocalListVersion", "RemoteStartTransaction",
-			"RemoteStopTransaction", "ReserveNow", "Reset", "SendLocalList", "SetChargingProfile",
-			"TriggerMessage", "UnlockConnector", "UpdateFirmware",
-		},
-		unansweredByCSMS:    "SecurityEventNotification",
-		unansweredByStation: "ExtendedTriggerMessage",
-	},
-	"2.0.1": {
-		stationSends: []string{
-			"Authorize", "BootNotification", "DataTransfer", "FirmwareStatusNotification", "Heartbeat",
-			"LogStatusNotification", "MeterValues", "NotifyEvent", "NotifyReport", "ReservationStatusUpdate",
-			"SecurityEventNotification", "StatusNotification", "TransactionEvent",
-		},
-		csmsSends: []string{
-			"CancelReservation", "ChangeAvailability", "ClearCache", "ClearChargingProfile", "DataTransfer",
-			"GetBaseReport", "GetLocalListVersion", "GetVariables", "RequestStartTransaction",
-			"RequestStopTransaction", "Reset", "SetChargingProfile", "SetVariables", "TriggerMessage",
-			"UnlockConnector",
-		},
-		unansweredByCSMS:    "ReservationStatusUpdate",
-		unansweredByStation: "CancelReservation",
-	},
-}
+// notSent: actions of a version that ocpp-go has a feature for but cannot
+// send as the fixture's sample asks, with the reason (README.md). None.
+var notSent = map[string]map[string]bool{}

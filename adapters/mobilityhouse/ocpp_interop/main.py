@@ -12,6 +12,7 @@ import sys
 
 from . import ADAPTER, CONTRACT_VERSION, SCHEMA_VERSION, output
 from .fixture import FIXTURES_DIR, VERSION_DIRS, FixtureError, default_path, load
+from .tls import TlsError, client_context, server_context
 
 BUILD_INFO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "build-info.json")
 READY_FILE = "/run/ocpp-interop/ready"
@@ -24,66 +25,42 @@ USAGE = """usage:
   ocpp-interop server --version V [--fixture PATH] [--bind-address ADDR] [--port N]
                       [--security-profile N] [--tls-dir DIR] [--ready-file PATH] [--control-socket PATH]
   ocpp-interop client run --version V --url URL [--station ID] [--fixture PATH] [--security-profile N]
-                      [--tls-dir DIR] [--connect-timeout-ms N] [--timeout-ms N] [--hold-ms N]
+                      [--tls-dir DIR] [--compression] [--connect-timeout-ms N] [--timeout-ms N] [--hold-ms N]
                       [--ready-file PATH] [--control-socket PATH]
   ocpp-interop client <Action> --version V --url URL [--station ID] [--fixture PATH] [--payload JSON]
-                      [--security-profile N] [--tls-dir DIR] [--connect-timeout-ms N] [--timeout-ms N]
+                      [--security-profile N] [--tls-dir DIR] [--compression] [--connect-timeout-ms N]
+                      [--timeout-ms N]
   ocpp-interop call [--station ID] <Action> [--payload JSON] [--timeout-ms N] [--control-socket PATH]
   ocpp-interop print-capabilities
   ocpp-interop print-fixture --version V [NAME]
   ocpp-interop version"""
 
 # What the self-tests exercise (scripts/smoke.sh, scripts/interop.sh), per
-# version. Nothing else is declared (REQUIREMENTS.md R4.2).
-STATION_SENDS = {
-    "1.6": [
-        "Authorize", "BootNotification", "DataTransfer", "DiagnosticsStatusNotification",
-        "FirmwareStatusNotification", "Heartbeat", "MeterValues", "SecurityEventNotification",
-        "StartTransaction", "StatusNotification", "StopTransaction",
-    ],
-    "2.0.1": [
-        "Authorize", "BootNotification", "DataTransfer", "FirmwareStatusNotification", "Heartbeat",
-        "LogStatusNotification", "MeterValues", "NotifyEvent", "NotifyReport", "ReservationStatusUpdate",
-        "SecurityEventNotification", "StatusNotification", "TransactionEvent",
-    ],
-    "2.1": [
-        "Authorize", "BootNotification", "ClosePeriodicEventStream", "DataTransfer",
-        "FirmwareStatusNotification", "Heartbeat", "LogStatusNotification", "MeterValues", "NotifyDERAlarm",
-        "NotifyDERStartStop", "NotifyEvent", "NotifyReport", "OpenPeriodicEventStream", "ReportDERControl",
-        "ReservationStatusUpdate", "SecurityEventNotification", "StatusNotification", "TransactionEvent",
-    ],
-}
-CSMS_SENDS = {
-    "1.6": [
-        "CancelReservation", "ChangeAvailability", "ChangeConfiguration", "ClearCache",
-        "ClearChargingProfile", "DataTransfer", "ExtendedTriggerMessage", "GetCompositeSchedule",
-        "GetConfiguration", "GetDiagnostics", "GetLocalListVersion", "RemoteStartTransaction",
-        "RemoteStopTransaction", "ReserveNow", "Reset", "SendLocalList", "SetChargingProfile",
-        "TriggerMessage", "UnlockConnector", "UpdateFirmware",
-    ],
-    "2.0.1": [
-        "CancelReservation", "ChangeAvailability", "ClearCache", "ClearChargingProfile", "DataTransfer",
-        "GetBaseReport", "GetLocalListVersion", "GetVariables", "RequestStartTransaction",
-        "RequestStopTransaction", "Reset", "SetChargingProfile", "SetVariables", "TriggerMessage",
-        "UnlockConnector",
-    ],
-    "2.1": [
-        "AdjustPeriodicEventStream", "CancelReservation", "ChangeAvailability", "ClearCache",
-        "ClearChargingProfile", "ClearDERControl", "ClearTariffs", "DataTransfer", "GetBaseReport",
-        "GetDERControl", "GetLocalListVersion", "GetPeriodicEventStream", "GetTariffs", "GetVariables",
-        "RequestBatterySwap", "RequestStartTransaction", "RequestStopTransaction", "Reset", "SetChargingProfile",
-        "SetDERControl", "SetDefaultTariff", "SetVariables", "TriggerMessage", "UnlockConnector",
-    ],
-}
-# Sent by the self-tests, and answered NotImplemented: the baseline fixtures
-# have no answer for them.
-UNANSWERED = {
-    "1.6": {"station": "SecurityEventNotification", "csms": "ExtendedTriggerMessage"},
-    "2.0.1": {"station": "ReservationStatusUpdate", "csms": "CancelReservation"},
-    "2.1": {"station": "ReservationStatusUpdate", "csms": "CancelReservation"},
-}
-STATION_HANDLES = {v: sorted(set(a) - {UNANSWERED[v]["csms"]}) for v, a in CSMS_SENDS.items()}
-CSMS_HANDLES = {v: sorted(set(a) - {UNANSWERED[v]["station"]}) for v, a in STATION_SENDS.items()}
+# version: every action of the version, in the direction the specification
+# gives it (validate_fixtures.ACTIONS, scripts/validate-fixtures.py), less
+# what ocpp 2.1.0 cannot exchange. The baseline fixtures have a sample and an
+# answer for each. Nothing else is declared (REQUIREMENTS.md R4.2).
+#
+# Not sent, by the station of OCPP 2.1:
+# - BatterySwap: ocpp 2.1.0 writes the battery fields soC and soH as SoC and
+#   soh (charge_point.snake_to_camel_case), which its own validation refuses;
+# - NotifyPeriodicEventStream: a SEND, which ocpp 2.1.0 has no frame for.
+NOT_SENT = {"1.6": {"station": set(), "csms": set()},
+            "2.0.1": {"station": set(), "csms": set()},
+            "2.1": {"station": {"BatterySwap", "NotifyPeriodicEventStream"}, "csms": set()}}
+
+
+def declared(version: str) -> dict:
+    """{"station"|"csms": {"sends": [...], "handles": [...]}} for a version.
+
+    An end handles what the other end sends: an action that no adapter sends
+    (BatterySwap) is not exercised, so it is not declared as handled either.
+    """
+    from validate_fixtures import ACTIONS  # pylint: disable=import-outside-toplevel
+
+    sends = {role: sorted(ACTIONS[version][role] - NOT_SENT[version][role]) for role in ("station", "csms")}
+    return {"station": {"sends": sends["station"], "handles": sends["csms"]},
+            "csms": {"sends": sends["csms"], "handles": sends["station"]}}
 
 
 class UsageError(Exception):
@@ -94,9 +71,13 @@ class Unsupported(Exception):
     """Exit 5: a version, role, profile or action this adapter does not support."""
 
 
+# Flags without a value (docs/CONTAINER_CONTRACT.md, Commands).
+SWITCHES = {"compression"}
+
+
 def flags(args: list[str], known: set[str]) -> tuple[dict[str, str], list[str]]:
-    """`--name value` pairs and the positional arguments. An unknown flag or a
-    flag given twice is a usage error."""
+    """`--name value` pairs, switches and the positional arguments. An unknown
+    flag or a flag given twice is a usage error."""
     given: dict[str, str] = {}
     positional: list[str] = []
     i = 0
@@ -109,6 +90,12 @@ def flags(args: list[str], known: set[str]) -> tuple[dict[str, str], list[str]]:
         name = arg[2:]
         if name not in known:
             raise UsageError(f"unknown flag {arg!r}")
+        if name in SWITCHES:
+            if name in given:
+                raise UsageError(f"{arg} is given more than once")
+            given[name] = "true"
+            i += 1
+            continue
         if i + 1 >= len(args):
             raise UsageError(f"{arg} needs a value")
         if name in given:
@@ -143,8 +130,8 @@ def security_profile_of(given: dict) -> int:
     profile = number(given, "security-profile", 0, 0, 3)
     if "tls-dir" in given and profile < 2:
         raise UsageError("--tls-dir is for security profiles 2 and 3")
-    if profile >= 2:
-        raise Unsupported(f"security profile {profile} (TLS) is not supported by this adapter yet")
+    if profile >= 2 and "tls-dir" not in given:
+        raise UsageError(f"security profile {profile} needs --tls-dir")
     return profile
 
 
@@ -219,6 +206,12 @@ def version_capabilities(version: str) -> dict:
         f"and an action that is not part of OCPP {version} with NotSupported (upstream behaviour).",
         f"The server refuses a handshake that does not offer the subprotocol {subprotocol} (HTTP 400, "
         "websockets).",
+        "Security profiles 2 and 3: websockets over Python's ssl module (TLS 1.2 or later). With profile 3 a "
+        "client certificate that does not verify against ca.crt fails the TLS handshake, before an identity is "
+        "known (no connection-rejected event); a verified certificate whose CommonName is not the identity is "
+        "refused with HTTP 401 and the event.",
+        "Compression: websockets' permessage-deflate. The server accepts it whenever a station offers it; the "
+        "station offers it with --compression only. connection-opened reports whether it was negotiated.",
     ]
     if version == "2.1":
         notes[1] = (
@@ -232,12 +225,13 @@ def version_capabilities(version: str) -> dict:
             "BatterySwap is not sent: ocpp 2.1.0 writes the battery fields soC and soH as SoC and soh "
             "(charge_point.snake_to_camel_case), which its own schema validation refuses.",
         ]
+    actions = declared(version)
     return {
-        "client": {"supported": True, "sends": STATION_SENDS[version], "handles": STATION_HANDLES[version]},
-        "server": {"supported": True, "sends": CSMS_SENDS[version], "handles": CSMS_HANDLES[version]},
+        "client": {"supported": True, "sends": actions["station"]["sends"], "handles": actions["station"]["handles"]},
+        "server": {"supported": True, "sends": actions["csms"]["sends"], "handles": actions["csms"]["handles"]},
         "features": {
-            "securityProfiles": [0, 1],
-            "compression": False,
+            "securityProfiles": [0, 1, 2, 3],
+            "compression": True,
             "send": False,
             "callResultError": False,
             "fixtureCallErrors": True,
@@ -255,11 +249,12 @@ def command_server(args: list[str]) -> int:
     port = number(given, "port", 9000, 1, 65535)
     version = version_of(given)
     profile = security_profile_of(given)
+    ssl_context = server_context(given["tls-dir"], profile) if profile >= 2 else None
     fixture = fixture_of(given, version)
     from . import server  # pylint: disable=import-outside-toplevel
 
     return asyncio.run(server.run(version, fixture, given.get("bind-address", "0.0.0.0"), port, profile,
-                                  given.get("ready-file", READY_FILE),
+                                  ssl_context, given.get("ready-file", READY_FILE),
                                   given.get("control-socket", CONTROL_SOCKET)))
 
 
@@ -267,7 +262,7 @@ def command_client(args: list[str]) -> int:
     if not args or args[0].startswith("--"):
         raise UsageError("client needs 'run' or an action")
     mode, rest = args[0], args[1:]
-    known = {"version", "url", "station", "fixture", "security-profile", "tls-dir",
+    known = {"version", "url", "station", "fixture", "security-profile", "tls-dir", "compression",
              "connect-timeout-ms", "timeout-ms"}
     known |= {"hold-ms", "ready-file", "control-socket"} if mode == "run" else {"payload"}
     given, positional = flags(rest, known)
@@ -285,25 +280,28 @@ def command_client(args: list[str]) -> int:
     payload = payload_of(given) if action else {}
     version = version_of(given)
     profile = security_profile_of(given)
-    if url.startswith("wss://"):
-        raise Unsupported("wss:// (security profiles 2 and 3) is not supported by this adapter yet")
+    if url.startswith("wss://") != (profile >= 2):
+        raise UsageError("--url must be wss:// with security profiles 2 and 3, and ws:// otherwise")
+    ssl_context = client_context(given["tls-dir"], profile) if profile >= 2 else None
+    compression = "compression" in given
     fixture = fixture_of(given, version)
     station = given.get("station", fixture.first_station)
-    if profile == 1 and station not in fixture.stations:
-        raise UsageError(f"--station {station!r} is not in the fixture: security profile 1 needs its password")
+    if profile in (1, 2) and station not in fixture.stations:
+        raise UsageError(f"--station {station!r} is not in the fixture: security profiles 1 and 2 need its password")
     from . import client  # pylint: disable=import-outside-toplevel
     from .endpoint import request_type  # pylint: disable=import-outside-toplevel
 
     if action is None:
-        return asyncio.run(client.run(version, url, station, fixture, profile, connect_timeout_s, hold_ms,
+        return asyncio.run(client.run(version, url, station, fixture, profile, ssl_context, compression,
+                                      connect_timeout_s, hold_ms,
                                       given.get("ready-file", READY_FILE),
                                       given.get("control-socket", CONTROL_SOCKET)))
     if request_type(version, action) is None:
         output.write_line(output.result(version, action, ok=False, request=payload, error_code="unsupported",
                                         error_message=f"ocpp {version} has no request type for {action}"))
         return 5
-    document = asyncio.run(client.one_shot(version, url, station, fixture, profile, connect_timeout_s, timeout_s,
-                                           action, payload))
+    document = asyncio.run(client.one_shot(version, url, station, fixture, profile, ssl_context, compression,
+                                           connect_timeout_s, timeout_s, action, payload))
     output.write_line(document)
     return output.exit_code(document)
 
@@ -378,3 +376,6 @@ def main(argv: list[str]) -> int:
     except FixtureError as e:
         print(f"invalid fixture: {e}", file=sys.stderr)
         return 4
+    except TlsError as e:
+        print(f"usage error: {e}", file=sys.stderr)
+        return 2

@@ -8,7 +8,8 @@
 # baked fixtures, fixture validation, readiness, the event stream, the control
 # socket, timeouts and a clean stop on SIGTERM. The checks that run a server
 # or a station, and the fixture checks, run for every OCPP version the image
-# declares. Where a check needs a peer, the image talks to itself;
+# declares, and so do the transport checks: security profiles 2 and 3 (TLS,
+# with CAs and certificates generated for the run) and compression. Where a check needs a peer, the image talks to itself;
 # scripts/interop.sh pairs different adapters.
 #
 # Environment: REGISTRY, VERSION (image tag, default dev), VERBOSE=1,
@@ -100,6 +101,13 @@ expect_exit 2 "client with an action that is not an action name" "${IMAGE}" clie
 expect_exit 2 "client run with --payload" "${IMAGE}" client run --version 1.6 --url ws://nowhere:9000/ocpp --payload '{}'
 expect_exit 2 "call without an action" "${IMAGE}" call --payload '{}'
 expect_exit 2 "--tls-dir with security profile 0" "${IMAGE}" server --version 1.6 --tls-dir /tmp
+expect_exit 2 "server with security profile 2 without --tls-dir" "${IMAGE}" server --version 1.6 --security-profile 2
+expect_exit 2 "server with a --tls-dir without the keys" "${IMAGE}" server --version 1.6 --security-profile 2 --tls-dir /no/such/dir
+expect_exit 2 "server with --compression (a client flag)" "${IMAGE}" server --version 1.6 --compression
+expect_exit 2 "client with wss:// and security profile 0" "${IMAGE}" client Heartbeat --version 1.6 --url wss://nowhere:9000/ocpp
+expect_exit 2 "client with ws:// and security profile 3" "${IMAGE}" client Heartbeat --version 1.6 --url ws://nowhere:9000/ocpp --security-profile 3 --tls-dir /tmp
+expect_exit 2 "client with --compression twice" "${IMAGE}" client Heartbeat --version 1.6 --url ws://nowhere:9000/ocpp --compression --compression
+expect_exit 2 "client with a value after --compression" "${IMAGE}" client Heartbeat --version 1.6 --url ws://nowhere:9000/ocpp --compression yes
 for v in 2.0.1 2.1; do
     jq -e --arg v "${v}" '.versions[$v].server.supported == true' <<<"${caps}" >/dev/null 2>&1 && continue
     expect_exit 5 "server --version ${v} (not declared)" "${IMAGE}" server --version "${v}"
@@ -107,7 +115,7 @@ for v in 2.0.1 2.1; do
 done
 for p in 2 3; do
     has_profile "${p}" && continue
-    expect_exit 5 "server with security profile ${p} (not declared)" "${IMAGE}" server --version 1.6 --security-profile "${p}"
+    expect_exit 5 "server with security profile ${p} (not declared)" "${IMAGE}" server --version 1.6 --security-profile "${p}" --tls-dir /tmp
 done
 doc=$(run_client "${ADAPTER}" FrobnicateThing --version 1.6 --url ws://nowhere:9000/ocpp); code=$?
 if [[ "${code}" == 5 ]] && jq -e '.ok == false and .error.code == "unsupported" and .operation == "FrobnicateThing"' <<<"${doc}" >/dev/null 2>&1
@@ -348,10 +356,203 @@ version_checks() {
     stop_container "${sta}"
 }
 
+# ---- transport: security profiles 2 and 3, compression ----
+
+# known_bug <test id>: the evidence of a known upstream bug of this adapter
+# (tests/known-bugs.tsv) that explains a failure of that test when the
+# adapter is its own peer, as scripts/interop.sh reports it (KNOWN_ISSUE).
+known_bug() {
+    local who version regex evidence _ adapter peer upstream
+    upstream=$(jq -r '.upstream.version' <<<"${caps}")
+    while IFS=$'\t' read -r who version regex evidence _; do
+        [[ -z "${who}" || "${who}" == \#* ]] && continue
+        adapter="${who%%[:@]*}"; peer=""
+        [[ "${who}" == *@* ]] && peer="${who#*@}"
+        if [[ "${adapter}" == "${ADAPTER}" && "${version}" == "${upstream}" && ( -z "${peer}" || "${peer}" == "${ADAPTER}" ) \
+              && "$1" =~ ${regex} ]]; then
+            echo "${evidence}"; return 0
+        fi
+    done < "${ROOT}/tests/known-bugs.tsv"
+    return 1
+}
+
+# verdict <test id> <label> <problem>: ok, fail, or a known upstream bug. A
+# known bug that does not show any more fails, so that the list cannot go stale.
+verdict() {
+    local evidence
+    if evidence=$(known_bug "$1"); then
+        if [[ -n "$3" ]]; then KNOWN=$((KNOWN + 1)); log "known upstream bug: ${CHECK_PREFIX}$2: $3 (${evidence})"
+        else fail "$2: passes, but tests/known-bugs.tsv lists a bug for $1 (${evidence}): remove the entry"; fi
+    elif [[ -n "$3" ]]; then fail "$2: $3"
+    else ok "$2"; fi
+}
+
+# tls_client <want: ok|connect-failed> <label> [client flags...]: a one-shot
+# Heartbeat with the run's TLS material mounted at /tls.
+tls_client() {
+    local want="$1" label="$2"; shift 2
+    local doc code
+    doc=$(run_client "${ADAPTER}" -v "${WORK}/tls:/tls:ro" -v "${WORK}/wrong:/wrong:ro" -- Heartbeat --version "${V}" \
+        --connect-timeout-ms 5000 "$@"); code=$?
+    if [[ "${want}" == ok ]]; then
+        if [[ "${code}" == 0 ]] && jq -e '.ok == true' <<<"${doc}" >/dev/null 2>&1; then ok "${label}"; else fail "${label}: exit ${code}, ${doc}"; fi
+    elif [[ "${code}" == 3 ]] && jq -e '.ok == false and .error.code == "connect-failed"' <<<"${doc}" >/dev/null 2>&1; then
+        ok "${label}: connect-failed"
+    else
+        fail "${label}: exit ${code}, want 3 connect-failed: ${doc}"
+    fi
+}
+
+# rejected <server> <n>: the server reported at least n connection-rejected
+# events with reason authentication for the station.
+rejected() {
+    local i
+    for i in $(seq 1 50); do
+        [[ $(events "$1" | jq -c --arg s "${STATION}" 'select(.event == "connection-rejected" and .station == $s and .reason == "authentication")' 2>/dev/null | wc -l) -ge "$2" ]] && return 0
+        sleep 0.1
+    done
+    return 1
+}
+
+# A station that stays connected over the transport the flags set up: two
+# CALLs from the station, two from the CSMS (the second message in each
+# direction is the one a broken compression context fails on). Prints the
+# problems, nothing when every CALL is answered.
+session_problems() {  # session_problems <server container> <station container>
+    local srv="$1" sta="$2" doc
+    doc=$(docker exec "${sta}" ocpp-interop call BootNotification --payload "$(jq -c '.samples.boot.payload' "${FIXTURE}")" --timeout-ms 5000 2>/dev/null)
+    jq -e '.ok' <<<"${doc}" >/dev/null 2>&1 || echo "BootNotification: ${doc:0:200}"
+    doc=$(docker exec "${sta}" ocpp-interop call Heartbeat --timeout-ms 5000 2>/dev/null)
+    jq -e '.ok' <<<"${doc}" >/dev/null 2>&1 || echo "Heartbeat: ${doc:0:200}"
+    doc=$(docker exec "${srv}" ocpp-interop call --station "${STATION}" ChangeAvailability \
+        --payload "$(jq -c '.samples.changeAvailability.payload' "${FIXTURE}")" --timeout-ms 5000 2>/dev/null)
+    jq -e '.ok' <<<"${doc}" >/dev/null 2>&1 || echo "ChangeAvailability from the CSMS: ${doc:0:200}"
+    doc=$(docker exec "${srv}" ocpp-interop call --station "${STATION}" ClearCache --payload '{}' --timeout-ms 5000 2>/dev/null)
+    jq -e '.ok' <<<"${doc}" >/dev/null 2>&1 || echo "ClearCache from the CSMS: ${doc:0:200}"
+}
+
+tls_checks() {
+    has_role server && has_role client || return 0
+    local srv="tls-${RUN_ID}" sta="tlssta-${RUN_ID}" alias="unlisted-${RUN_ID}" p type dir problems
+    local url="wss://tls-${RUN_ID}:9000/ocpp"
+    dir="${WORK}/tls/${VDIR}"
+    if [[ ! -d "${dir}" ]]; then
+        { make_pki "${dir}/rsa" rsa "${STATION}" "${srv}" localhost 127.0.0.1 \
+            && make_pki "${dir}/ec" ec "${STATION}" "${srv}" localhost 127.0.0.1; } || { fail "cannot generate the TLS material"; return 0; }
+        mkdir -p "${WORK}/wrong/${VDIR}/baseline"
+        jq '.stations[0].password = "NotThePassword000001"' "${FIXTURE}" > "${WORK}/wrong/${VDIR}/baseline/fixture.json"
+        chmod -R a+rX "${WORK}/wrong"
+    fi
+    for p in 2 3; do
+        has_profile "${p}" || continue
+        for type in rsa ec; do
+            local tls="/tls/${VDIR}/${type}"
+            start "${srv}" "${ADAPTER}" -v "${WORK}/tls:/tls:ro" --network-alias "${alias}" -- \
+                server --version "${V}" --security-profile "${p}" --tls-dir "${tls}/server"
+            if ! wait_ready "${srv}"; then fail "profile ${p} (${type}): the server did not become ready"; stop_container "${srv}"; continue; fi
+            if wait_event "${srv}" '.event == "ready" and .securityProfile == $p' --argjson p "${p}" >/dev/null
+            then ok "profile ${p} (${type}): ready event"; else fail "profile ${p} (${type}): no ready event with securityProfile ${p}"; fi
+            tls_client ok "profile ${p} (${type}): accepted" --url "${url}" --security-profile "${p}" --tls-dir "${tls}/station"
+            if wait_event "${srv}" '.event == "connection-opened" and .station == $s' --arg s "${STATION}" >/dev/null
+            then ok "profile ${p} (${type}): connection-opened"; else fail "profile ${p} (${type}): no connection-opened event"; fi
+            if [[ "${type}" == rsa ]]; then
+                # What must not connect.
+                tls_client connect-failed "profile ${p}: plain ws:// to the TLS server" --url "ws://${srv}:9000/ocpp"
+                tls_client connect-failed "profile ${p}: a server certificate from another CA" \
+                    --url "${url}" --security-profile "${p}" --tls-dir "${tls}/untrusted"
+                tls_client connect-failed "profile ${p}: a host name the server certificate does not name" \
+                    --url "wss://${alias}:9000/ocpp" --security-profile "${p}" --tls-dir "${tls}/station"
+                if [[ "${p}" == 2 ]]; then
+                    tls_client connect-failed "profile 2: wrong password" --url "${url}" --security-profile 2 \
+                        --tls-dir "${tls}/station" --fixture "/wrong/${VDIR}/baseline/fixture.json"
+                    if rejected "${srv}" 1; then ok "profile 2: connection-rejected authentication"; else fail "profile 2: no connection-rejected event for a wrong password"; fi
+                else
+                    tls_client connect-failed "profile 3: a client certificate of another identity" \
+                        --url "${url}" --security-profile 3 --tls-dir "${tls}/other-cn"
+                    if rejected "${srv}" 1; then ok "profile 3: connection-rejected authentication"; else fail "profile 3: no connection-rejected event for a certificate of another identity"; fi
+                    tls_client connect-failed "profile 3: a client certificate from another CA" \
+                        --url "${url}" --security-profile 3 --tls-dir "${tls}/other-ca"
+                    tls_client connect-failed "profile 3: no client certificate" \
+                        --url "${url}" --security-profile 2 --tls-dir "${tls}/station"
+                fi
+                # A station that stays connected, CALLs from both ends.
+                start "${sta}" "${ADAPTER}" -v "${WORK}/tls:/tls:ro" -- client run --version "${V}" --url "${url}" \
+                    --security-profile "${p}" --tls-dir "${tls}/station"
+                if wait_ready "${sta}"; then
+                    problems=$(session_problems "${srv}" "${sta}")
+                    if [[ -z "${problems}" ]]; then ok "profile ${p}: client run, CALLs from both ends"; else fail "profile ${p}: client run: ${problems}"; fi
+                else
+                    fail "profile ${p}: client run did not connect"
+                fi
+                stop_container "${sta}"
+            fi
+            stop_container "${srv}"
+        done
+    done
+}
+
+# The handshake response of the server to a request that offers
+# permessage-deflate, read with bash inside the server's own container.
+offer_deflate() {  # offer_deflate <server container>
+    docker exec "$1" bash -c 'exec 3<>/dev/tcp/127.0.0.1/9000 || exit 1
+        printf "GET /ocpp/%s HTTP/1.1\r\nHost: localhost:9000\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Protocol: %s\r\nSec-WebSocket-Extensions: permessage-deflate; client_max_window_bits\r\n\r\n" "$1" "$2" >&3
+        timeout 2 cat <&3; exit 0' _ "${STATION}" "$(jq -rn --arg v "${V}" '{"1.6": "ocpp1.6", "2.0.1": "ocpp2.0.1", "2.1": "ocpp2.1"}[$v]')" 2>/dev/null | tr -d '\r'
+}
+
+compression_checks() {
+    has_role server && has_role client || return 0
+    local srv="cmp-${RUN_ID}" sta="cmpsta-${RUN_ID}" url problems doc code
+    url="ws://cmp-${RUN_ID}:9000/ocpp"
+    start "${srv}" "${ADAPTER}" -- server --version "${V}"
+    if ! wait_ready "${srv}"; then fail "compression: the server did not become ready"; stop_container "${srv}"; return 0; fi
+    if ! has_feature compression; then
+        doc=$(run_client "${ADAPTER}" Heartbeat --version "${V}" --url "${url}" --compression); code=$?
+        if [[ "${code}" == 5 ]]; then
+            ok "compression not declared: client --compression exits 5"
+        elif [[ "${code}" == 0 ]] && ! events "${srv}" | jq -e 'select(.event == "connection-opened" and .compression == true)' >/dev/null 2>&1; then
+            ok "compression not declared: client --compression connects, not negotiated"
+        else
+            fail "compression not declared: client --compression: exit ${code}, ${doc}"
+        fi
+        stop_container "${srv}"; return 0
+    fi
+    # The CSMS accepts permessage-deflate whenever it is offered.
+    if offer_deflate "${srv}" | grep -qi '^sec-websocket-extensions:.*permessage-deflate'
+    then ok "compression: the CSMS accepts permessage-deflate"; else fail "compression: the CSMS does not accept permessage-deflate: $(offer_deflate "${srv}" | head -12 | tr '\n' '|')"; fi
+    stop_container "${srv}"
+
+    # Without --compression the station does not offer it.
+    start "${srv}" "${ADAPTER}" -- server --version "${V}"
+    wait_ready "${srv}" || { fail "compression: the server did not become ready"; stop_container "${srv}"; return 0; }
+    start "${sta}" "${ADAPTER}" -- client run --version "${V}" --url "${url}"
+    if wait_ready "${sta}" && wait_event "${sta}" '.event == "connection-opened" and .compression == false' >/dev/null \
+        && wait_event "${srv}" '.event == "connection-opened" and .compression != true' >/dev/null
+    then ok "compression: not offered without --compression"; else fail "compression: without --compression: $(events "${sta}" | sed -n 1p) $(events "${srv}" | jq -c 'select(.event == "connection-opened")')"; fi
+    stop_container "${sta}"; stop_container "${srv}"
+
+    # With --compression: offered, negotiated, and every message is read.
+    start "${srv}" "${ADAPTER}" -- server --version "${V}"
+    wait_ready "${srv}" || { fail "compression: the server did not become ready"; stop_container "${srv}"; return 0; }
+    start "${sta}" "${ADAPTER}" -- client run --version "${V}" --url "${url}" --compression
+    if wait_ready "${sta}"; then
+        problems=$(session_problems "${srv}" "${sta}" | tr '\n' ' ')
+        events "${sta}" | jq -e 'select(.event == "connection-opened") | .compression == false' >/dev/null 2>&1 \
+            && problems+="the station reports compression false; "
+        events "${srv}" | jq -e 'select(.event == "connection-opened") | .compression == false' >/dev/null 2>&1 \
+            && problems+="the CSMS reports compression false; "
+    else
+        problems="client run --compression did not connect"
+    fi
+    verdict "${VDIR}.compression" "compression: client run --compression, CALLs from both ends" "${problems}"
+    stop_container "${sta}"; stop_container "${srv}"
+}
+
 for v in ${DECLARED}; do
     use_version "${v}"
     log "OCPP ${V}"; CHECK_PREFIX="[${V}] "
     version_checks
+    tls_checks
+    compression_checks
 done
 
 finish

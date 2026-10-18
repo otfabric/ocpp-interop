@@ -6,6 +6,7 @@ package main
 // ocppj.Client over ocpp-go's ws.Client.
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"os"
@@ -28,8 +29,8 @@ func commandClient(args []string) error {
 		return usagef("client needs 'run' or an action")
 	}
 	mode, run := args[0], args[0] == "run"
-	known := []string{"version", "url", "station", "fixture", "security-profile", "tls-dir", "connect-timeout-ms",
-		"timeout-ms"}
+	known := []string{"version", "url", "station", "fixture", "security-profile", "tls-dir", "compression",
+		"connect-timeout-ms", "timeout-ms"}
 	if run {
 		known = append(known, "hold-ms", "ready-file", "control-socket")
 	} else {
@@ -83,16 +84,22 @@ func commandClient(args []string) error {
 	if err != nil {
 		return err
 	}
-	if strings.HasPrefix(url, "wss://") {
-		return unsupportedf("wss:// (security profiles 2 and 3) is not supported by this adapter yet")
+	if strings.HasPrefix(url, "wss://") != (profile >= 2) {
+		return usagef("--url must be wss:// with security profiles 2 and 3, and ws:// otherwise")
+	}
+	opts := connectOptions{profile: profile, compression: f.has("compression")}
+	if profile >= 2 {
+		if opts.tls, err = clientTLS(f.get("tls-dir", ""), profile); err != nil {
+			return err
+		}
 	}
 	fx, err := fixtureOf(f, version)
 	if err != nil {
 		return err
 	}
 	station := f.get("station", fx.firstStation)
-	if _, ok := fx.stations[station]; profile == 1 && !ok {
-		return usagef("--station %q is not in the fixture: security profile 1 needs its password", station)
+	if _, ok := fx.stations[station]; (profile == 1 || profile == 2) && !ok {
+		return usagef("--station %q is not in the fixture: security profiles 1 and 2 need its password", station)
 	}
 	base := strings.TrimRight(url, "/")
 	fullURL := base
@@ -101,7 +108,7 @@ func commandClient(args []string) error {
 	}
 	connectTimeout := time.Duration(connectTimeoutMs) * time.Millisecond
 	if run {
-		return exitCode(clientRun(version, base, fullURL, station, fx, profile, connectTimeout, holdMs,
+		return exitCode(clientRun(version, base, fullURL, station, fx, opts, connectTimeout, holdMs,
 			f.get("ready-file", readyFile), f.get("control-socket", controlSocket)))
 	}
 
@@ -117,7 +124,7 @@ func commandClient(args []string) error {
 			errMsg: unsupported}.object())
 		return exitCode(5)
 	}
-	conn, err := connectStation(version, base, station, fx, profile, connectTimeout, false)
+	conn, err := connectStation(version, base, station, fx, opts, connectTimeout, false)
 	var doc resultDoc
 	if err != nil {
 		doc = resultDoc{version: version, operation: action, request: payload, errCode: "connect-failed",
@@ -142,17 +149,32 @@ type stationConn struct {
 	reason any
 }
 
+// connectOptions are the transport settings of a station.
+type connectOptions struct {
+	profile     int
+	tls         *tls.Config // profiles 2 and 3
+	compression bool        // offer permessage-deflate
+}
+
 // connectStation connects with ocpp-go; the error says why it could not.
-func connectStation(version, base, station string, fx *fixture, profile int, connectTimeout time.Duration,
+func connectStation(version, base, station string, fx *fixture, opts connectOptions, connectTimeout time.Duration,
 	emit bool) (*stationConn, error) {
 	info := versions[version]
 	tr := newTracker(emit)
-	wsClient := ws.NewClient()
+	var wsClient *ws.Client
+	if opts.tls != nil {
+		wsClient = ws.NewTLSClient(opts.tls)
+	} else {
+		wsClient = ws.NewClient()
+	}
 	timeouts := ws.NewClientTimeoutConfig()
 	timeouts.HandshakeTimeout = connectTimeout
 	wsClient.SetTimeoutConfig(timeouts)
-	if profile == 1 {
+	if opts.profile == 1 || opts.profile == 2 {
 		wsClient.SetBasicAuth(station, fx.password(station))
+	}
+	if opts.compression {
+		wsClient.AddOption(func(dialer *websocket.Dialer) { dialer.EnableCompression = true })
 	}
 	observed := &observedClient{WsClient: wsClient, t: tr, station: station}
 	dispatcher := ocppj.NewDefaultClientDispatcher(ocppj.NewFIFOClientQueue(0))
@@ -223,18 +245,23 @@ func connectStation(version, base, station string, fx *fixture, profile int, con
 	return conn, nil
 }
 
-func clientRun(version, base, fullURL, station string, fx *fixture, profile int, connectTimeout time.Duration,
+func clientRun(version, base, fullURL, station string, fx *fixture, opts connectOptions, connectTimeout time.Duration,
 	holdMs int64, ready, controlPath string) int {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
-	conn, err := connectStation(version, base, station, fx, profile, connectTimeout, true)
+	conn, err := connectStation(version, base, station, fx, opts, connectTimeout, true)
 	if err != nil {
 		event("connection-failed", station, "url", fullURL, "detail", err.Error())
 		event("stopped", "")
 		return 3
 	}
-	// ws.Client does not expose the negotiated subprotocol.
-	event("connection-opened", station, "subprotocol", nil, "remote", fullURL)
+	// ws.Client exposes neither the negotiated subprotocol nor whether
+	// permessage-deflate was negotiated.
+	var compression any
+	if !opts.compression {
+		compression = false
+	}
+	event("connection-opened", station, "subprotocol", nil, "remote", fullURL, "compression", compression)
 	control, err := serveControl(controlPath, func(wanted *string, action string, payload map[string]any,
 		timeoutMs int64) resultDoc {
 		select {

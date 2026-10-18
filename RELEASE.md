@@ -21,6 +21,86 @@ The `Upstream candidates` workflow runs every Monday. It compares each pin
 with the latest upstream release and keeps an issue open while a pin is
 behind. It never changes a pin.
 
+## v0.3.0
+
+**Date:** 2026-10-18
+**Previous release:** v0.2.0
+
+### Summary
+
+Transport security and compression (PLAN.md, Phase 5): security profiles 2
+and 3 in every adapter and every version it declares, and permessage-deflate
+where the upstream can. The container contract is draft 0.5. The self-tests
+generate a CA and certificates (RSA and ECDSA P-256) for every run.
+
+Every action in a baseline sample: the adapters declare every action their
+pinned upstream can exchange, so 39 of 39 OCPP 1.6 actions, 64 of 64 2.0.1
+actions and 89 of 91 2.1 actions are now exchanged between the references
+(before: 30, 27 and 43).
+
+### Added
+
+- Security profiles 2 (TLS and Basic authentication) and 3 (mutual TLS, the
+  identity is the client certificate's CommonName) in `mobilityhouse`
+  (websockets over Python's ssl), `chargetime` (the upstream's `enableWSS`,
+  Java-WebSocket's `SSLParametersWebSocketServerFactory`) and
+  `lorenzodonini` (ocpp-go's `ws.NewTLSServer` and `ws.NewTLSClient`), in
+  both roles
+- Compression: the client switch `--compression`; a CSMS accepts
+  permessage-deflate whenever it is offered. Declared by `mobilityhouse`
+  (1.6, 2.0.1, 2.1) and `chargetime` (2.0.1); `lorenzodonini`'s CSMS cannot
+  accept it (ocpp-go does not expose its upgrader), and the chargetime 1.6
+  classes have no extensions
+- `connection-opened` reports `compression` (true, false, or null where the
+  upstream does not expose it)
+- `scripts/lib.sh`: `make_pki`, a throwaway CA, server and client
+  certificates and the wrong ones (another identity, another CA) with
+  OpenSSL; nothing is committed or baked into an image
+- `scripts/smoke.sh`: per adapter and version, profiles 2 and 3 with RSA and
+  ECDSA keys, what must not connect (wrong password, a client certificate of
+  another identity or from another CA, none, a server certificate from
+  another CA or for another host name, `ws://` to a TLS server), `client
+  run` over TLS with CALLs from both ends, the CSMS's answer to a
+  permessage-deflate offer, and a compressed session; usage errors of
+  `--tls-dir`, `wss://` and `--compression`. Known upstream bugs of an
+  adapter with itself are reported as such, and fail when they do not show
+- `scripts/interop.sh`: the scenarios `<v>.tls.profile2`,
+  `<v>.tls.profile3` and `<v>.compression` for every station and CSMS pair
+- Every action the pinned upstreams support, declared from the direction
+  tables in both roles (`NOT_SENT` / `notSent` for the exceptions), with an
+  answer and a sample in the baseline fixtures of 1.6, 2.0.1 and 2.1;
+  certificate data from a throwaway P-256 test PKI (no private keys)
+- `validate-fixtures.py`: a fixture named `baseline` must have a sample of
+  every action and an answer to every non-SEND action
+- `scripts/interop.sh`: NotImplemented tested from both ends
+  (`<v>.not-implemented.from-station`, `.from-csms`) with a fixture copy
+  that leaves one action per side unanswered
+- `tests/known-bugs.tsv`: ocpp-go v0.19.0 GetCompositeScheduleResponse does
+  not have the OCA structure; its SetNetworkProfileResponse sends
+  `"statusInfo": null`
+- mobilityhouse: payload keys mapped to the dataclass's own field names
+  (`iso_15118_*`), which fixes Get15118EVCertificate in 2.1
+- `tests/known-bugs.tsv`: the chargetime 2.0.1 station keeps its
+  compression context although it offers `client_no_context_takeover`
+  (Java-WebSocket 1.6.0)
+
+### Changed
+
+- Container contract 0.5: the sections "Transport security" and
+  "Compression"; `--tls-dir` is required with profiles 2 and 3; `wss://`
+  with profiles 2 and 3 only; flags other than `--compression` keep the
+  form `--name value`; the gaps before 1.0 for compression and for
+  chargetime's HTTP 404 on refused handshakes
+- The mobilityhouse station no longer offers permessage-deflate unless
+  asked (`--compression`), so the chargetime 2.0.1 CSMS's context takeover
+  defect now shows in `v201.compression` only, with any station that offers
+  compression; its tests/known-bugs.tsv entry is no longer limited to the
+  mobilityhouse station
+- versions.yaml: `interop_version` 0.3.0, the next planned release;
+  `contract_version` 0.5
+
+---
+
 ## v0.2.0
 
 **Date:** 2026-10-18

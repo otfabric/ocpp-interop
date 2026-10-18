@@ -43,11 +43,14 @@ final class ServerCommand {
     Endpoint.Sender sender(UUID session);
   }
 
-  private static Upstream upstream(String version, Endpoint endpoint) {
+  private static Upstream upstream(String version, Endpoint endpoint, Tls.Server tls) {
     if (version.equals("1.6")) {
       JSONServer server =
           new JSONServer(new ServerCoreProfile(endpoint.handler(ServerCoreEventHandler.class)), JSONConfiguration.get());
       server.addFeatureProfile(endpoint.profile());
+      if (tls != null) {
+        server.enableWSS(tls);
+      }
       return new Upstream() {
         public void open(String host, int port, ServerEvents events) {
           server.open(host, port, events);
@@ -62,9 +65,14 @@ final class ServerCommand {
         }
       };
     }
+    // JSONConfiguration.WEBSOCKET_COMPRESSION_SUPPORT is true by default: the
+    // server accepts permessage-deflate whenever a station offers it.
     MultiProtocolJSONServer server =
         new MultiProtocolJSONServer(List.of(ProtocolVersion.OCPP2_0_1), JSONConfiguration.get());
     server.addFunction(ProtocolVersion.OCPP2_0_1, endpoint.function());
+    if (tls != null) {
+      server.enableWSS(tls);
+    }
     return new Upstream() {
       public void open(String host, int port, ServerEvents events) {
         server.open(host, port, events);
@@ -107,6 +115,7 @@ final class ServerCommand {
     int port = (int) flags.number("port", 9000, 1, 65535);
     String version = Main.version(flags);
     int profile = Main.securityProfile(flags);
+    Tls.Server tls = profile >= 2 ? Tls.server(Path.of(flags.get("tls-dir", "")), profile) : null;
     Fixture fixture = Main.fixture(flags, version);
     String bindAddress = flags.get("bind-address", "0.0.0.0");
     Path readyFile = Path.of(flags.get("ready-file", Main.READY_FILE));
@@ -117,7 +126,7 @@ final class ServerCommand {
     Map<UUID, CompletableFuture<Void>> closedBySession = new ConcurrentHashMap<>();
 
     Endpoint endpoint = new Endpoint(version, fixture, "csms", stationBySession::get, true);
-    Upstream server = upstream(version, endpoint);
+    Upstream server = upstream(version, endpoint, tls);
 
     ServerEvents events =
         new ServerEvents() {
@@ -130,7 +139,14 @@ final class ServerCommand {
               Out.event("connection-rejected", station, "reason", "unknown-station", "remote", from);
               throw new AuthenticationException(404, "Unknown station");
             }
-            if (profile == 1) {
+            String commonName = tls == null ? null : tls.peerCommonName(from);
+            if (profile == 3 && !station.equals(commonName)) {
+              // The handshake verified the certificate against ca.crt; its
+              // subject must name this station.
+              Out.event("connection-rejected", station, "reason", "authentication", "remote", from);
+              throw new AuthenticationException(401, "Unauthorized");
+            }
+            if (profile == 1 || profile == 2) {
               String expected = fixture.password(station);
               boolean ok = station.equals(username) && password != null
                   && expected.equals(new String(password, StandardCharsets.UTF_8));
@@ -147,7 +163,10 @@ final class ServerCommand {
             stationBySession.put(session, station);
             sessionByStation.put(station, session);
             closedBySession.put(session, new CompletableFuture<>());
-            Out.event("connection-opened", station, "subprotocol", null, "remote", remote(information.getAddress()));
+            // The 1.6 JSONServer never negotiates permessage-deflate; the 2.0.1
+            // server does when offered, but does not expose it.
+            Out.event("connection-opened", station, "subprotocol", null, "remote", remote(information.getAddress()),
+                "compression", version.equals("1.6") ? Boolean.FALSE : null);
           }
 
           @Override

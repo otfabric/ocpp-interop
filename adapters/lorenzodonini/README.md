@@ -12,7 +12,7 @@ OCPP 1.6J and 2.0.1 reference CSMS and station built on
 | Other modules in the binary | go-playground/validator.v9 9.30.0 (ocpp-go's message validation) with go-playground/locales 0.12.1, go-playground/universal-translator 0.16.0 and leodido/go-urn 1.1.0; relvacode/iso8601 1.6.0 (date-time parsing). These are the versions ocpp-go's go.mod requires |
 | Licences | ocpp-go MIT; gorilla/websocket BSD-2-Clause; gorilla/mux BSD-3-Clause; the go-playground modules, go-urn and iso8601 MIT; the Go standard library BSD-3-Clause |
 | Base images | `golang:1.27.2-trixie` (build), `debian:trixie-slim` (runtime), pinned by digest in the [Dockerfile](Dockerfile) |
-| OCPP | 1.6J and 2.0.1, both roles, security profiles 0 and 1. ocpp-go v0.19.0 has no OCPP 2.1 (`--version 2.1` exits 5) |
+| OCPP | 1.6J and 2.0.1, both roles, security profiles 0 to 3. No compression (see below). ocpp-go v0.19.0 has no OCPP 2.1 (`--version 2.1` exits 5) |
 
 The adapter code is MIT. `/licenses` in the image holds the licence files of
 every module in the binary (listed in `/licenses/BUNDLED-MODULES.txt`), Go's
@@ -68,8 +68,44 @@ written back with `encoding/json`.
 Server: `ws.Server` on the port, serving every path; ocpp-go takes the
 station identity from the last path segment. The adapter's
 `CheckClientHandler` refuses identities the fixture does not list and, with
-profile 1, wrong Basic credentials. Client: `ws.Client` with the handshake
-timeout of `--connect-timeout-ms`; ocpp-go appends the identity to the URL.
+profiles 1 and 2, wrong Basic credentials. Client: `ws.Client` with the
+handshake timeout of `--connect-timeout-ms`; ocpp-go appends the identity to
+the URL.
+
+## Transport security and compression
+
+Security profiles 2 and 3: `ws.NewTLSServer` and `ws.NewTLSClient`, with a
+`crypto/tls` configuration ([tls.go](tls.go)), TLS 1.2 or later. The server
+serves `server.crt` and `server.key` and, with profile 3, requires a client
+certificate that verifies against `ca.crt` (`RequireAndVerifyClientCert`);
+the connection check compares its subject CommonName with the identity (401
+when it differs). The station trusts `ca.crt` only and presents
+`client.crt` with profile 3; gorilla/websocket's dialer sets the server name
+from the URL, so Go checks the server's host name. A client certificate that
+does not verify fails in the TLS handshake, before ocpp-go sees a request:
+no `connection-rejected` event.
+
+Compression: the station offers permessage-deflate with `--compression`
+(gorilla/websocket's `Dialer.EnableCompression`, set with
+`ws.Client.AddOption`), but the CSMS cannot accept it: `ws.NewServer` and
+`ws.NewTLSServer` create gorilla's `Upgrader` without `EnableCompression`
+and keep it unexported
+([source](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ws/websocket.go#L284-L320)).
+So the adapter does not declare `compression`, and the cross-stack tests do
+not run its station with it. `ws.Client` does not expose whether compression
+was negotiated: the station's `connection-opened` has `compression` `null`
+with `--compression` (`false` without); the server's is always `false`.
+
+## Actions
+
+ocpp-go v0.19.0 has a feature, with request and response types, for every
+OCPP 1.6 action (39: Core, Firmware Management, Local Auth List, Remote
+Trigger, Reservation, Smart Charging and the Security Whitepaper profiles
+logging, security, extendedtriggermessage, certificates and securefirmware)
+and every OCPP 2.0.1 action (64, in 16 functional blocks), and the adapter
+registers a handler for each. It therefore declares every action of both
+versions in the direction the specification gives it, both roles; the
+baseline fixtures have a sample and an answer for each.
 
 ## Limitations of the upstream
 
@@ -88,16 +124,29 @@ These are listed in the `notes` of the capabilities and in
   closes.
 - After a lost connection the station would reconnect by itself; the
   contract's `client run` reports the loss and exits 1 instead.
+- No compression at the CSMS (above).
 
 ## Known upstream defects
 
 Recorded in [tests/known-bugs.tsv](../../tests/known-bugs.tsv), with the
 evidence:
 
-- OCPP 2.0.1 `ResetResponse` (and `SetNetworkProfileResponse`) declare
+- OCPP 2.0.1 `ResetResponse` and `SetNetworkProfileResponse` declare
   `statusInfo` without `omitempty`, so the station sends
   `"statusInfo": null`, which the OCA schema does not allow: a CSMS that
   validates responses (mobilityhouse) rejects the answer.
+- OCPP 2.0.1 `GetCompositeScheduleResponse` does not have the OCA structure
+  ([source](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/smartcharging/get_composite_schedule.go#L31-L50)):
+  a top-level `evseId`, always written, which the schema does not allow; no
+  `statusInfo`; and a `schedule` of `{startDateTime, chargingSchedule}`
+  where the schema has `CompositeScheduleType` `{evseId, duration,
+  scheduleStart, chargingRateUnit, chargingSchedulePeriod}`. The station
+  cannot answer with a schedule (mobilityhouse rejects the answer, the
+  chargetime CSMS never completes the CALL, which times out, and ocpp-go
+  reads an empty schedule), and the CSMS
+  drops the schedule of a correct answer. GetCompositeSchedule stays
+  declared: the request goes out and an answer comes back; the test is
+  KNOWN_ISSUE with every peer.
 - OCPP 2.0.1 `NotifyReportRequest` declares `tbc` as a `bool` with
   `omitempty`, so the station cannot send an explicit `"tbc": false`; the
   field is left out (false is its default).

@@ -9,6 +9,7 @@ import eu.chargetime.ocpp.MultiProtocolJSONClient;
 import eu.chargetime.ocpp.ProtocolVersion;
 import eu.chargetime.ocpp.feature.profile.ClientCoreEventHandler;
 import eu.chargetime.ocpp.feature.profile.ClientCoreProfile;
+import eu.chargetime.ocpp.wss.WssSocketBuilder;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -45,7 +46,7 @@ final class ClientCommand {
     boolean run = mode.equals("run");
     Set<String> known =
         new HashSet<>(Set.of("version", "url", "station", "fixture", "security-profile", "tls-dir",
-            "connect-timeout-ms", "timeout-ms"));
+            "compression", "connect-timeout-ms", "timeout-ms"));
     known.addAll(run ? Set.of("hold-ms", "ready-file", "control-socket") : Set.of("payload"));
     Main.Flags flags = Main.flags(args.subList(1, args.size()), known);
     if (!flags.positional.isEmpty()) {
@@ -65,19 +66,27 @@ final class ClientCommand {
     JsonObject payload = run ? new JsonObject() : Main.payload(flags);
     String version = Main.version(flags);
     int profile = Main.securityProfile(flags);
-    if (url.startsWith("wss://")) {
-      throw new Main.UnsupportedException("wss:// (security profiles 2 and 3) is not supported by this adapter yet");
+    if (url.startsWith("wss://") != (profile >= 2)) {
+      throw new Main.UsageException("--url must be wss:// with security profiles 2 and 3, and ws:// otherwise");
     }
+    boolean compression = flags.has("compression");
+    if (compression && version.equals("1.6")) {
+      throw new Main.UnsupportedException(
+          "--compression: the OCPP 1.6 JSONClient of Java-OCA-OCPP cannot offer permessage-deflate");
+    }
+    WssSocketBuilder wss =
+        profile >= 2 ? Tls.client(Path.of(flags.get("tls-dir", "")), profile, (int) connectTimeoutMs) : null;
     Fixture fixture = Main.fixture(flags, version);
     String station = flags.get("station", fixture.firstStation);
-    if (profile == 1 && !fixture.stations.containsKey(station)) {
+    if ((profile == 1 || profile == 2) && !fixture.stations.containsKey(station)) {
       throw new Main.UsageException(
-          "--station '" + station + "' is not in the fixture: security profile 1 needs its password");
+          "--station '" + station + "' is not in the fixture: security profiles 1 and 2 need its password");
     }
+    Transport transport = new Transport(profile, wss, compression);
     String fullUrl = station.isEmpty() ? url : url.replaceAll("/+$", "") + "/" + station;
 
     if (run) {
-      return clientRun(version, url, fullUrl, station, fixture, profile, connectTimeoutMs, holdMs,
+      return clientRun(version, url, fullUrl, station, fixture, transport, connectTimeoutMs, holdMs,
           Path.of(flags.get("ready-file", Main.READY_FILE)),
           Path.of(flags.get("control-socket", Main.CONTROL_SOCKET)));
     }
@@ -88,7 +97,7 @@ final class ClientCommand {
     }
     long started = System.nanoTime();
     Endpoint endpoint = new Endpoint(version, fixture, "station", session -> station, false);
-    Connection connection = connect(endpoint, url, station, fixture, profile, connectTimeoutMs);
+    Connection connection = connect(endpoint, url, station, fixture, transport, connectTimeoutMs);
     JsonObject document;
     if (!connection.opened.isDone()) {
       document = Out.result(version, action, false, payload, null, null, "connect-failed",
@@ -103,13 +112,19 @@ final class ClientCommand {
     return Out.exitCode(document);
   }
 
+  /** The transport settings of a station: the security profile, WSS, compression. */
+  private record Transport(int profile, WssSocketBuilder wss, boolean compression) {}
+
   /** Connects with the upstream; {@code opened} tells whether it worked. */
   private static Connection connect(
-      Endpoint endpoint, String url, String station, Fixture fixture, int profile, long connectTimeoutMs)
+      Endpoint endpoint, String url, String station, Fixture fixture, Transport transport, long connectTimeoutMs)
       throws InterruptedException {
     JSONConfiguration configuration =
         JSONConfiguration.get().setParameter(JSONConfiguration.CONNECT_TIMEOUT_IN_MS_PARAMETER, (int) connectTimeoutMs);
-    if (profile == 1) {
+    // Offer permessage-deflate (OCPP 2.0.1 MultiProtocolJSONClient only).
+    configuration.setParameter(JSONConfiguration.WEBSOCKET_COMPRESSION_SUPPORT, transport.compression());
+    int profile = transport.profile();
+    if (profile == 1 || profile == 2) {
       configuration
           .setParameter(JSONConfiguration.USERNAME_PARAMETER, station)
           .setParameter(JSONConfiguration.PASSWORD_PARAMETER, fixture.password(station));
@@ -133,6 +148,9 @@ final class ClientCommand {
       JSONClient client =
           new JSONClient(new ClientCoreProfile(endpoint.handler(ClientCoreEventHandler.class)), identity, configuration);
       client.addFeatureProfile(endpoint.profile());
+      if (transport.wss() != null) {
+        client.enableWSS(transport.wss());
+      }
       connection.connect = () -> client.connect(base, events);
       connection.disconnect = client::disconnect;
       connection.sender = client::send;
@@ -140,6 +158,9 @@ final class ClientCommand {
       MultiProtocolJSONClient client =
           new MultiProtocolJSONClient(List.of(ProtocolVersion.OCPP2_0_1), identity, configuration);
       client.addFunction(ProtocolVersion.OCPP2_0_1, endpoint.function());
+      if (transport.wss() != null) {
+        client.enableWSS(transport.wss());
+      }
       connection.connect = () -> client.connect(base, events);
       connection.disconnect = client::disconnect;
       connection.sender = client::send;
@@ -167,18 +188,21 @@ final class ClientCommand {
   }
 
   private static int clientRun(
-      String version, String url, String fullUrl, String station, Fixture fixture, int profile,
+      String version, String url, String fullUrl, String station, Fixture fixture, Transport transport,
       long connectTimeoutMs, long holdMs, Path readyFile, Path controlPath) throws Exception {
     CountDownLatch stop = Signals.onTermination();
     Endpoint endpoint = new Endpoint(version, fixture, "station", session -> station, true);
-    Connection connection = connect(endpoint, url, station, fixture, profile, connectTimeoutMs);
+    Connection connection = connect(endpoint, url, station, fixture, transport, connectTimeoutMs);
     if (!connection.opened.isDone()) {
       Out.event("connection-failed", station, "url", fullUrl,
           "detail", "the WebSocket handshake failed or was refused (the upstream logs why on stderr)");
       Out.event("stopped", null);
       return 3;
     }
-    Out.event("connection-opened", station, "subprotocol", null, "remote", fullUrl);
+    // Whether permessage-deflate was negotiated is not exposed; without
+    // --compression it was not offered.
+    Out.event("connection-opened", station, "subprotocol", null, "remote", fullUrl,
+        "compression", transport.compression() ? null : Boolean.FALSE);
     connection.closed.thenRun(stop::countDown);
 
     Control control;

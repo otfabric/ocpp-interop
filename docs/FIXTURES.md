@@ -32,7 +32,10 @@ cross-field rules (scripts/validate-fixtures.py):
   an action the version sends as a SEND (2.1: NotifyPeriodicEventStream) has
   no answer;
 - every sample is sent by the role that sends that action;
-- a derived answer names a table that fits the action and is not empty.
+- a derived answer names a table that fits the action and is not empty;
+- a `baseline` fixture has a sample of every action of its version and an
+  answer to every action that is not a SEND (a rule for this repository's
+  baselines, which the adapters do not apply to the fixtures they load).
 
 The adapters check a fixture when they load it, and exit 4 on a violation:
 `mobilityhouse` with the schema and the code of scripts/validate-fixtures.py
@@ -96,13 +99,27 @@ provisioning, authorization, the transaction lifecycle, meter values,
 remote start and stop, configuration or the device model, reset, triggers
 and a TxDefault charging profile.
 
-Each baseline fixture has a sample for every action it answers, in both
-directions, and samples for actions it does not answer, so that a test can
-check the `NotImplemented` CALLERROR from both ends. In 1.6:
+Each baseline fixture answers every action of its version that the
+receiving role receives (the direction tables of
+scripts/validate-fixtures.py), except a SEND, and has at least one sample of
+every action, sent by the role that sends it: 39 actions in 1.6 (with the
+Security Whitepaper messages), 64 in 2.0.1, 91 in 2.1 (one of them,
+NotifyPeriodicEventStream, a SEND). Two actions have two samples in 1.6:
 `securityEvent`/`securityEventMinimal` (SecurityEventNotification, with and
-without the optional `techInfo`) and `extendedTriggerHeartbeat`
-(ExtendedTriggerMessage). In 2.0.1 and 2.1: `reservationStatusUpdate`
-(ReservationStatusUpdate) and `cancelReservation` (CancelReservation).
+without the optional `techInfo`). To check the `NotImplemented` CALLERROR
+from both ends, the self-tests use a copy of the baseline without one answer
+on each side ([scripts/interop.sh](../scripts/interop.sh), `not_implemented`).
+
+The certificate data is a throwaway test PKI, made once for these fixtures
+with OpenSSL (EC P-256): a root CA `OTFabric Test Root CA` (serial 1001), a
+station certificate `OT-FABRIC-TEST-001` it signed (serial 2001) and its
+certificate signing request, a self-signed firmware signing certificate
+(serial 3001), the base64 ECDSA signature of a test firmware image, an OCSP
+response of the root CA for the station certificate (`good`), and the
+`certificateHashData` of the certificates (SHA-256 of the issuer's name and
+of its public key). The private keys were deleted after use and are in no
+fixture. The EXI streams of Get15118EVCertificate are opaque base64 test
+bytes, not ISO 15118 messages.
 
 Every sample, every fixed answer and every derived answer for a sample
 validates against the OCA JSON schemas of its version (1.6 including the
@@ -120,17 +137,20 @@ schemas="$(/tmp/oca/bin/python -c 'import ocpp, os; print(os.path.dirname(ocpp._
 /tmp/oca/bin/python scripts/validate-payloads.py "$schemas/v21/schemas" fixtures/v21/baseline/fixture.json
 ```
 
-The 2.0.1 samples cover provisioning (BootNotification, Heartbeat,
-StatusNotification), authorization, the TransactionEvent lifecycle (Started,
-Updated, Ended), MeterValues, the device model (NotifyReport, NotifyEvent,
-GetBaseReport, GetVariables, SetVariables), SecurityEventNotification,
-FirmwareStatusNotification, LogStatusNotification, DataTransfer from both
-ends, RequestStart/StopTransaction, Reset, TriggerMessage, ChangeAvailability,
-ClearCache, UnlockConnector, SetChargingProfile (TxDefaultProfile),
-ClearChargingProfile and GetLocalListVersion.
+The 2.0.1 samples cover every action of the version: provisioning
+(BootNotification, Heartbeat, StatusNotification, SetNetworkProfile),
+authorization and the local list, the TransactionEvent lifecycle (Started,
+Updated, Ended) and GetTransactionStatus, MeterValues, the device model
+(NotifyReport, NotifyEvent, GetBaseReport, GetReport, GetVariables,
+SetVariables) and monitoring, smart charging (including the EV's charging
+needs and schedule, charging limits and reported profiles), reservations,
+display messages, customer information, firmware and logs (including
+publishing firmware), certificates (security and ISO 15118), CostUpdated,
+DataTransfer from both ends and the remote commands.
 
-The 2.1 baseline has every 2.0.1 sample and answer (all of them are valid
-2.1 payloads), and these OCPP 2.1 additions:
+The 2.1 baseline has every 2.0.1 sample and answer (all of them valid 2.1
+payloads, except that a 2.1 monitor of NotifyMonitoringReport also has the
+required `eventNotificationType`), and these OCPP 2.1 additions:
 
 | Area | Station sends (CSMS answers) | CSMS sends (station answers) |
 |---|---|---|
@@ -138,6 +158,9 @@ The 2.1 baseline has every 2.0.1 sample and answer (all of them are valid
 | DER control | NotifyDERAlarm, NotifyDERStartStop, ReportDERControl | SetDERControl, GetDERControl, ClearDERControl |
 | Periodic event streams | OpenPeriodicEventStream, ClosePeriodicEventStream; NotifyPeriodicEventStream as a SEND (no answer) | GetPeriodicEventStream, AdjustPeriodicEventStream |
 | Battery swap | BatterySwap | RequestBatterySwap |
+| Payment and settlement | NotifySettlement, VatNumberValidation | NotifyWebPaymentStarted, ChangeTransactionTariff |
+| Smart charging | NotifyPriorityCharging, PullDynamicScheduleUpdate | UsePriorityCharging, UpdateDynamicSchedule, NotifyAllowedEnergyTransfer, AFRRSignal |
+| Certificates | GetCertificateChainStatus | — |
 
 The answers are fixed: GetTariffs reports the tariff that SetDefaultTariff
 installs, and GetPeriodicEventStream the stream that OpenPeriodicEventStream

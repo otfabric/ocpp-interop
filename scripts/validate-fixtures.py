@@ -15,8 +15,10 @@ Two layers, both required:
        that version, and every sample is sent by the role that sends it;
      - an action that is sent as a SEND (OCPP 2.1) has no answer;
      - a derived answer names a table that fits the action.
+  3. For the baseline fixtures only: a sample of every action of the version,
+     and an answer to every action that is not a SEND.
 
-The adapters apply the same rules when they load a fixture. This script makes
+The adapters apply the rules of 1 and 2 when they load a fixture. This script makes
 a broken fixture fail before any image is built.
 
 Usage: validate-fixtures.py [--require-schema] [fixture.json ...]
@@ -166,6 +168,26 @@ def semantic_errors(fx, path):
     return errors
 
 
+def coverage_errors(fx):
+    """The baseline fixtures of this repository cover every action of their
+    version: a sample of each, sent by the role that sends it, and an answer
+    from the role that receives it (except a SEND). Not a rule of fixtures in
+    general, so not part of semantic_errors, which the adapters apply."""
+    version = fx.get("ocppVersion")
+    if fx.get("name") != "baseline" or version not in ACTIONS:
+        return []
+    errors = []
+    for sender, receiver in (("station", "csms"), ("csms", "station")):
+        sampled = {s.get("action") for s in fx.get("samples", {}).values() if s.get("from") == sender}
+        answered = set(fx.get("answers", {}).get(receiver, {}))
+        for action in sorted(ACTIONS[version][sender]):
+            if action not in sampled:
+                errors.append(f"baseline: no sample of {action} from the {sender}")
+            if action not in answered and action not in SEND_ACTIONS[version]:
+                errors.append(f"baseline: answers.{receiver} has no answer for {action}")
+    return errors
+
+
 def main(argv):
     require_schema = "--require-schema" in argv
     paths = [Path(a) for a in argv if not a.startswith("--")]
@@ -205,6 +227,7 @@ def main(argv):
         # Messages of `not` and `oneOf` quote the whole instance: keep them short.
         errors = [e if len(e) <= 200 else e[:197] + "..." for e in errors]
         errors += semantic_errors(fx, path)
+        errors += coverage_errors(fx)
         rel = path.relative_to(ROOT)
         if errors:
             failed += 1
