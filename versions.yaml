@@ -5,9 +5,8 @@
 #
 # Phase 6: mobilityhouse, chargetime and lorenzodonini are built for OCPP
 # 1.6J and 2.0.1, both roles; mobilityhouse also for OCPP 2.1. everest
-# (EVerest libocpp) is a station for OCPP 1.6J, 2.0.1 and 2.1. citrineos is a
-# candidate (status `planned`): its entry records what the upstream says,
-# unverified.
+# (EVerest libocpp) is a station for OCPP 1.6J, 2.0.1 and 2.1, and citrineos
+# (CitrineOS) a CSMS for the same three.
 
 interop_version: "0.3.1"
 contract_version: "0.5"        # docs/CONTAINER_CONTRACT.md (draft until 1.0); documents carry schemaVersion "1.0"
@@ -122,16 +121,31 @@ implementations:
 
   citrineos:
     priority: P2
-    status: planned
+    status: built
     upstream: "CitrineOS core"
     repository: "https://github.com/citrineos/citrineos-core"
+    artifact: "git:https://github.com/citrineos/citrineos-core@v2.0.1 (apps/ocpp-server and the packages it deploys)"
+    version: "v2.0.1"            # 2026-10-06, git tag (lightweight)
+    revision: "1a83638c31eebdb1dd8d6cdb0f5b8a9f142a1372"
+    lock: "pnpm-lock.yaml of the release"   # every npm package by version and integrity hash; pnpm 10.19.0 (packageManager)
+    runtime: "PostgreSQL 15 with PostGIS 3 and RabbitMQ, Debian bookworm's, inside the container"
+    transport: "ws 8.21.3 (through CitrineOS's WebsocketNetworkConnection)"
+    latest: "v2.0.1"
     license: "Apache-2.0"
     language: "TypeScript"
     independent_engine: true
-    roles: [server]
+    roles: [server]              # a CSMS: CitrineOS has no charging station
+    versions_verified: ["1.6", "2.0.1", "2.1"]   # by the self-tests (scripts/smoke.sh, scripts/interop.sh)
+    versions_claimed: ["1.6", "2.0.1", "2.1"]
     note: >-
-      A complete CSMS; needs PostgreSQL and a message broker. A later
-      integration target, not a lightweight reference.
+      A complete CSMS (an application, not a library): it answers every
+      CALL itself, from its database and configuration, which the adapter
+      fills from the fixture (stations, Basic authentication passwords, id
+      tokens, the heartbeat interval). It needs PostgreSQL (PostGIS) and
+      RabbitMQ; the image runs both next to it. CSMS CALLs go through its
+      REST message API, which has no endpoint for most of the actions OCPP
+      2.1 adds. It knows the OCPP-J message types 2 to 4 only: no SEND, no
+      CALLRESULTERROR.
 
 base_images:
   # Multi-arch index digests (linux/amd64 and linux/arm64). Each adapter
@@ -156,11 +170,20 @@ base_images:
     image: "docker.io/library/debian:trixie-slim"
     digest: "sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f"
     used_by: [lorenzodonini, everest]   # everest: build stage and runtime
+  node:
+    image: "docker.io/library/node:24.16.0-bookworm"
+    digest: "sha256:40ad9f3064e67d6860b4bc3fe1880b2953934fd6320ada990e45fe0efa6badd7"
+    used_by: [citrineos]           # build stage only
+  node-slim:
+    image: "docker.io/library/node:24.16.0-bookworm-slim"
+    digest: "sha256:2c87ef9bd3c6a3bd4b472b4bec2ce9d16354b0c574f736c476489d09f560a203"
+    used_by: [citrineos]
 
 images:
   mobilityhouse: "ghcr.io/otfabric/ocpp-interop-mobilityhouse"
   chargetime: "ghcr.io/otfabric/ocpp-interop-chargetime"
   lorenzodonini: "ghcr.io/otfabric/ocpp-interop-lorenzodonini"
   everest: "ghcr.io/otfabric/ocpp-interop-everest"
+  citrineos: "ghcr.io/otfabric/ocpp-interop-citrineos"
 
 platforms: ["linux/amd64", "linux/arm64"]

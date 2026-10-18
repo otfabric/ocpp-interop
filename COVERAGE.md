@@ -3,8 +3,11 @@
 What the self-tests exercise, by category and version. Kept in step with
 [scripts/smoke.sh](scripts/smoke.sh) and [scripts/interop.sh](scripts/interop.sh);
 the results are in [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md). OCPP 2.1 is
-tested with `mobilityhouse` only, the one adapter whose pinned upstream
-release has it.
+tested with `mobilityhouse` (both roles), `everest` (a station) and
+`citrineos` (a CSMS), the adapters whose pinned upstream releases have it.
+`citrineos` answers as CitrineOS does: it takes part in a category only
+with the actions it declares
+([adapters/citrineos/README.md](adapters/citrineos/README.md)).
 
 | Category | 1.6J | 2.0.1 | 2.1 |
 |---|---|---|---|

@@ -93,11 +93,20 @@ def everest():
     return latest, tags[latest], "git tags of EVerest/everest-core"
 
 
+def citrineos():
+    # Release tags of citrineos-core are v<major>.<minor>.<patch>; pre-releases
+    # (v2.0.0-beta4) and the misnamed v.1.8.1 are not stable versions here.
+    tags = git_tags("https://github.com/citrineos/citrineos-core.git")
+    latest = newest(tags)
+    return latest, tags[latest], "git tags of citrineos/citrineos-core"
+
+
 RESOLVERS = {
     "mobilityhouse": mobilityhouse,
     "chargetime": chargetime,
     "lorenzodonini": lorenzodonini,
     "everest": everest,
+    "citrineos": citrineos,
 }
 
 

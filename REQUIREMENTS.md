@@ -45,7 +45,7 @@ a substitute for the OCA Compliance Testing Tool (OCTT).
 | `mobilityhouse` | [mobilityhouse/ocpp](https://github.com/mobilityhouse/ocpp) | Python | 1.6J, 2.0.1 (2.1 present since 2.1.0, to be verified) | P0 |
 | `chargetime` | [ChargeTimeEU/Java-OCA-OCPP](https://github.com/ChargeTimeEU/Java-OCA-OCPP) | Java | 1.6J, 2.0.1, 2.1 | P0 |
 | `lorenzodonini` | [lorenzodonini/ocpp-go](https://github.com/lorenzodonini/ocpp-go) | Go | 1.6J, 2.0.1 (upstream marks 2.0.1 as needing more real-world testing) | P1 |
-| `citrineos` | [citrineos/citrineos-core](https://github.com/citrineos/citrineos-core) | TypeScript | CSMS only | Later; needs a database and a message broker |
+| `citrineos` | [citrineos/citrineos-core](https://github.com/citrineos/citrineos-core) | TypeScript | 1.6J, 2.0.1, 2.1; CSMS only | P2; needs PostgreSQL and RabbitMQ, which its image runs |
 
 - R2.1 Support that an upstream advertises is a candidate, not a fact. A
   capability is declared only after a self-test exercises it (R4).

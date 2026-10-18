@@ -17,6 +17,9 @@
 #
 #   OCPP_INTEROP_OCPP=2.1 OCPP_INTEROP_FIXTURE_DIR=v21 docker compose up -d --wait mobilityhouse
 #
+# citrineos (CitrineOS) serves 1.6, 2.0.1 and 2.1 too; it runs PostgreSQL and
+# RabbitMQ inside its container and takes longer to become ready.
+#
 # everest (EVerest libocpp) is a station only. The `station` profile runs it
 # as `client run` against the mobilityhouse CSMS; send its CALLs with
 #   docker compose exec everest ocpp-interop call Heartbeat
@@ -53,6 +56,18 @@ services:
     image: ghcr.io/otfabric/ocpp-interop-lorenzodonini:${OCPP_INTEROP_VERSION:-dev}
     ports:
       - "127.0.0.1:9002:9000"
+
+  citrineos:
+    <<: *server
+    image: ghcr.io/otfabric/ocpp-interop-citrineos:${OCPP_INTEROP_VERSION:-dev}
+    ports:
+      - "127.0.0.1:9003:9000"
+    healthcheck:
+      test: ["CMD", "test", "-f", "/run/ocpp-interop/ready"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 60s
 
   everest:
     image: ghcr.io/otfabric/ocpp-interop-everest:${OCPP_INTEROP_VERSION:-dev}

@@ -97,6 +97,13 @@ interoperability. First slice: OCPP 1.6J only (2026-10-18).
       server against `SMOKE_PEER` (default mobilityhouse)
 - [x] `everest`: security profiles 2 and 3 with libocpp's TLS
       (contract 0.5)
+- [x] `citrineos` adapter (TypeScript, CitrineOS core v2.0.1): a CSMS for
+      1.6J, 2.0.1 and 2.1, with PostgreSQL (PostGIS) and RabbitMQ inside
+      the image; the second independent 2.1 CSMS. CitrineOS answers by
+      itself (`fixtureAnswers: false`); the fixture's stations, passwords
+      and id tokens go into its database. `scripts/smoke.sh` runs the
+      server checks of an adapter without a client with the client of
+      `SMOKE_PEER`
 - [ ] 2.1 in `chargetime`: Java-OCA-OCPP has 2.1 (with SEND and
       CALLRESULTERROR) on master since 2025-12-13, after its v2.0 release,
       the latest on Maven Central. Waits for a release (R2.2)
@@ -104,7 +111,3 @@ interoperability. First slice: OCPP 1.6J only (2026-10-18).
       `send` and `callResultError`, once a pinned upstream release
       implements them (neither ocpp 2.1.0 nor libocpp of everest-core
       2026.02.1 does)
-
-## Later
-
-- CitrineOS as a CSMS integration target

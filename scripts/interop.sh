@@ -632,8 +632,15 @@ not_implemented() {
         # expected() reads the answers from the copy.
         FIXTURE="${WORK}/fixtures/unanswered/${VDIR}/baseline/fixture.json"
         action=$(unanswered station)
-        exchange "${VDIR}.not-implemented.from-station" "${client}" "${server}" client "${sta}" "${srv}" "${action}" \
-            "$(jq -c --arg a "${action}" 'first(.samples[] | select(.action == $a and .from == "station")) | .payload' "${FIXTURE}")"
+        # A CSMS that answers by itself, not from the fixture (feature
+        # fixtureAnswers false: citrineos) cannot leave an action unanswered.
+        if declares "${server}" '.features.fixtureAnswers == false'; then
+            record "${VDIR}.not-implemented.from-station" "${client}" "${server}" client errors "${action}" SKIP_UNSUPPORTED 0 \
+                "${server} declares fixtureAnswers false: its upstream answers ${action} itself, whatever the fixture says"
+        else
+            exchange "${VDIR}.not-implemented.from-station" "${client}" "${server}" client "${sta}" "${srv}" "${action}" \
+                "$(jq -c --arg a "${action}" 'first(.samples[] | select(.action == $a and .from == "station")) | .payload' "${FIXTURE}")"
+        fi
         action=$(unanswered csms)
         exchange "${VDIR}.not-implemented.from-csms" "${client}" "${server}" server "${srv}" "${sta}" "${action}" \
             "$(jq -c --arg a "${action}" 'first(.samples[] | select(.action == $a and .from == "csms")) | .payload' "${FIXTURE}")" \

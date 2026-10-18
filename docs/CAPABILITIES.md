@@ -21,8 +21,8 @@ reports the rest as `SKIP_UNSUPPORTED`.
 ## Declared now
 
 `mobilityhouse`, `chargetime` and `lorenzodonini` declare OCPP 1.6 and
-2.0.1 in both roles, `mobilityhouse` also OCPP 2.1, and `everest` OCPP 1.6,
-2.0.1 and 2.1 as a station only, exactly what
+2.0.1 in both roles, `mobilityhouse` also OCPP 2.1, `everest` OCPP 1.6,
+2.0.1 and 2.1 as a station only, and `citrineos` the same three as a CSMS only, exactly what
 [scripts/smoke.sh](../scripts/smoke.sh) and
 [scripts/interop.sh](../scripts/interop.sh) exercise. Each role sends every
 action of the version that the specification gives to it (the direction
@@ -63,6 +63,16 @@ the adapters declared 11, 19, 20 and 10 actions in 1.6 (station sends,
 station handles, CSMS sends, CSMS handles), 13, 14, 15 and 12 in 2.0.1, and
 18, 23, 24 and 17 in 2.1.
 
+`citrineos` (CitrineOS) is a CSMS only, for 1.6, 2.0.1 and 2.1: its
+`client` is `supported: false` with empty lists. CitrineOS is an
+application that answers every CALL itself, so its lists are what the
+self-tests found, not the whole of each direction: the CSMS sends 17
+actions in 1.6, 37 in 2.0.1 and 38 in 2.1 (those its REST message API has
+an endpoint for, whose baseline sample it sends), and handles 8 in 1.6 and
+17 in 2.0.1 and 2.1 (those whose answer is the fixture's).
+[adapters/citrineos/README.md](../adapters/citrineos/README.md) says why each
+other action is left out.
+
 `everest` (EVerest libocpp) is a station only: it declares `client` for
 1.6, 2.0.1 and 2.1 with the station lists above; its `server` is
 `supported: false` with empty lists. It can send BatterySwap (libocpp
@@ -73,13 +83,14 @@ CSMS declares that it handles BatterySwap, so no self-test runs it.
 The features differ per adapter; they are the same in every version it
 declares, except `compression` for chargetime:
 
-| | mobilityhouse | chargetime | lorenzodonini | everest |
-|---|---|---|---|---|
-| `securityProfiles` | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 |
-| `compression` | true (1.6, 2.0.1, 2.1) | 2.0.1: true, with known upstream defects in both roles; 1.6: false | false: the CSMS cannot accept it | false: libocpp cannot offer it |
-| `fixtureCallErrors` | true | false | true | true |
-| `messageIds` | true | false | true | true |
-| `send`, `callResultError` | false | false | false | false |
+| | mobilityhouse | chargetime | lorenzodonini | everest | citrineos |
+|---|---|---|---|---|---|
+| `securityProfiles` | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 |
+| `compression` | true (1.6, 2.0.1, 2.1) | 2.0.1: true, with known upstream defects in both roles; 1.6: false | false: the CSMS cannot accept it | false: libocpp cannot offer it | true: the CSMS accepts it (no station role) |
+| `fixtureCallErrors` | true | false | true | true | false |
+| `fixtureAnswers` | (not declared: true) | (true) | (true) | (true) | false |
+| `messageIds` | true | false | true | true | true |
+| `send`, `callResultError` | false | false | false | false | false |
 
 Each adapter explains its limitations in `notes`, per version. Known
 upstream defects that the self-tests show are in
@@ -132,6 +143,7 @@ artifact.
 | `send` | OCPP 2.1 SEND frames (message type 6) sent and received. `false` everywhere: no pinned upstream release implements SEND |
 | `callResultError` | OCPP 2.1 CALLRESULTERROR frames (message type 5) sent and received. `false` everywhere, for the same reason |
 | `fixtureCallErrors` | The adapter answers with the CALLERROR a fixture's `callError` answer names. Without it, such a fixture exits 5 |
+| `fixtureAnswers` | Every answer is the fixture's, and an action the fixture does not answer is answered with `NotImplemented`. Not declared means `true`. `false` (citrineos): the upstream is an application that answers by itself; `handles` then lists only the actions whose answer the self-tests found equal to the fixture's, and the `NotImplemented` test against it is `SKIP_UNSUPPORTED` |
 | `messageIds` | Result documents and the `call-sent` and `call-result` events carry the message id of the CALL the upstream sent |
 
 Further boolean keys may be added in a minor version of the contract.

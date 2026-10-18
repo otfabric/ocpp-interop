@@ -21,6 +21,65 @@ The `Upstream candidates` workflow runs every Monday. It compares each pin
 with the latest upstream release and keeps an issue open while a pin is
 behind. It never changes a pin.
 
+## Unreleased
+
+### Summary
+
+A fifth reference: `citrineos`, a CSMS built on CitrineOS core
+(TypeScript) for OCPP 1.6J, 2.0.1 and 2.1, the second independent OCPP 2.1
+CSMS, with security profiles 0 to 3 and compression (contract 0.5).
+
+### Added
+
+- `citrineos` adapter (JavaScript on Node.js 24.16.0): CitrineOS core
+  pinned to release v2.0.1 (`1a83638c31eebdb1dd8d6cdb0f5b8a9f142a1372`),
+  built from the tag as its own `deploy.Dockerfile` does (pnpm 10.19.0, the
+  release's lockfile). `server` only (CitrineOS has no station; `client`
+  exits 5). The image runs PostgreSQL 15 with PostGIS 3 and RabbitMQ 3.10
+  (Debian bookworm), which CitrineOS needs, next to CitrineOS; the database
+  is migrated at build time. CitrineOS answers every CALL itself: the
+  adapter writes the fixture's stations, 1.6 connectors, Basic
+  authentication passwords and id tokens into CitrineOS's database with its
+  own repositories, and sets its heartbeat interval and boot status from the
+  fixture. CSMS CALLs go through CitrineOS's REST message API with a
+  callback URL; events come from CitrineOS's router and network connection.
+  See adapters/citrineos/README.md
+- Capability feature `fixtureAnswers` (contract 0.5): `false` for an
+  upstream that answers by itself (citrineos), whose `handles` lists only
+  the actions whose answer is the fixture's; not declared means `true`.
+  `scripts/interop.sh` reports the from-station `NotImplemented` test
+  against such a CSMS as SKIP_UNSUPPORTED
+- `scripts/smoke.sh`: an adapter without a client runs its server checks
+  (events, unknown identity, security profiles 2 and 3, compression) with the
+  client of `SMOKE_PEER`, and the CSMS's CALLs to a `client run` of it
+  (answer, `invalid-request`, `timeout`, `not-connected`)
+- `scripts/latest-upstream.py citrineos` (git tags of citrineos-core), and
+  `citrineos` in the candidate workflow (`ADAPTER_COUNT` 5)
+- `compose.yaml`: the `citrineos` CSMS on 127.0.0.1:9003
+- `tests/known-bugs.tsv`: CitrineOS's TLS server presents its certificate
+  only to a client that sends SNI, which the Java-OCA-OCPP stations do not
+  (`v16` and `v201` `tls.profile2`, `tls.profile3`, chargetime with
+  citrineos); the ocpp-go `statusInfo: null` defect also with the citrineos
+  CSMS, which validates every response
+
+### Changed
+
+- CI: the self-test job may take 120 minutes (five adapters)
+
+### Verification
+
+`make ci VERSION=citrineos` with the five adapters on contract 0.5
+(2026-10-19, linux/arm64): smoke 268 (mobilityhouse), 188 (chargetime, 1
+known upstream bug), 187 (lorenzodonini), 147 (everest) and 242 (citrineos)
+checks passed, 0 failed; interop 2196 PASS, 29 KNOWN_ISSUE, 558
+SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR. With citrineos as the CSMS: 507
+PASS, 9 KNOWN_ISSUE, 301 SKIP_UNSUPPORTED. OCPP 2.1 with citrineos: the
+mobilityhouse station 29 / 41 PASS, the everest station 22 / 19 PASS
+(station-initiated / CSMS-initiated), security profiles 2 and 3 with both.
+The linux/amd64 image has not been built locally.
+
+---
+
 ## v0.3.1
 
 **Date:** 2026-10-18

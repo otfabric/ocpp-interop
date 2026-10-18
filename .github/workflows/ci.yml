@@ -53,8 +53,9 @@ jobs:
   selftest:
     name: Build, smoke, cross-stack (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
-    # The everest image compiles libocpp (C++): about 15 minutes of the build.
-    timeout-minutes: 75
+    # The everest image compiles libocpp (C++): about 15 minutes of the build;
+    # the citrineos image about 5, and its pairings make the cross-stack test longer.
+    timeout-minutes: 120
     needs: validate
     strategy:
       fail-fast: false

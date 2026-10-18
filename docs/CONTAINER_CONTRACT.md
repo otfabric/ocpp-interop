@@ -5,7 +5,8 @@ Version: **0.5 (draft)**. `contract_version` in [versions.yaml](../versions.yaml
 > Implemented by `mobilityhouse`, `chargetime` and `lorenzodonini` for OCPP
 > 1.6J and 2.0.1, and by `mobilityhouse` for OCPP 2.1, with security
 > profiles 0 to 3 everywhere; compression as each adapter declares it; and by `everest`
-> (a station only: `client` and `call`) for OCPP 1.6J, 2.0.1 and 2.1. It stays a draft (0.x)
+> (a station only: `client` and `call`) for OCPP 1.6J, 2.0.1 and 2.1, and by
+> `citrineos` (a CSMS only: `server` and `call`) for the same three. It stays a draft (0.x)
 > until every adapter implements every part of it;
 > [Gaps before 1.0](#gaps-before-10) lists what is missing. Until 1.0 it may
 > change without a major version bump.
@@ -223,6 +224,13 @@ deserialisation, and the upstream sends it.
   invalid (exit 4).
 
 Known exceptions are listed per adapter in the `notes` of its capabilities.
+
+An upstream that is an application, not a library (citrineos: CitrineOS),
+answers every CALL itself. Its adapter gives the upstream what it takes from
+its data (stations, passwords, id tokens, configuration), declares the
+feature `fixtureAnswers: false`, and lists in `handles` only the actions
+whose answer the self-tests found equal to the fixture's
+([CAPABILITIES.md](CAPABILITIES.md#feature-keys)).
 
 ## OCPP 2.1: SEND and CALLRESULTERROR
 
@@ -447,6 +455,9 @@ from what the image serves. A fixture the image does not have exits 1.
 | `server` (a CSMS) | everest: libocpp implements the charging station only; `server` exits 5 after the usage checks |
 | Close code in `connection-closed` | everest: libocpp's websocket does not pass it to the application |
 | `--station ""` | everest: libocpp always appends the identity to the URL; exits 5 |
+| `client` (a station) | citrineos: CitrineOS is a CSMS only; `client` exits 5 after the usage checks |
+| Answers from the fixture (`fixtureAnswers`), `NotImplemented` for an action the fixture does not answer, `callError` answers (`fixtureCallErrors`) | citrineos: CitrineOS answers every CALL itself; `handles` lists the actions whose answer is the fixture's ([adapters/citrineos/README.md](../adapters/citrineos/README.md)) |
+| Every CSMS action of the version (`call`) | citrineos: CitrineOS's REST message API has no endpoint for the 1.6 reservation and Security Whitepaper messages, nor for most actions OCPP 2.1 adds; `call` exits 5 for them |
 
 ## Changes
 
@@ -460,7 +471,9 @@ from what the image serves. A fixture the image does not have exits 1.
   section [Compression](#compression): the client switch `--compression`
   (the first flag without a value), a CSMS accepts permessage-deflate
   whenever it is offered, `features.compression` needs both roles. The
-  optional field `compression` of `connection-opened`.
+  optional field `compression` of `connection-opened`. The feature
+  `fixtureAnswers` (not declared: `true`), `false` for an upstream that
+  answers by itself (citrineos).
 - **0.4** (unreleased): OCPP 2.1, in `mobilityhouse`. The section
   [OCPP 2.1: SEND and CALLRESULTERROR](#ocpp-21-send-and-callresulterror):
   without the `send` feature a SEND action is refused (exit 5), never sent as

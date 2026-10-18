@@ -33,7 +33,7 @@ BUILDER ?= ocpp-interop
 
 # Adapters with an image, in priority order. The self-tests run over all of
 # them; override to work on one: make smoke ADAPTERS=mobilityhouse
-ADAPTERS ?= mobilityhouse chargetime lorenzodonini everest
+ADAPTERS ?= mobilityhouse chargetime lorenzodonini everest citrineos
 
 image = $(REGISTRY)/ocpp-interop-$(1)
 

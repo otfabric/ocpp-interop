@@ -13,7 +13,9 @@
 # scripts/interop.sh pairs different adapters.
 #
 # An adapter without a server role (everest: libocpp is a station only) runs
-# the station checks against the server of SMOKE_PEER.
+# the station checks against the server of SMOKE_PEER, and an adapter without
+# a client role (citrineos: a CSMS only) runs the server checks with the
+# client of SMOKE_PEER.
 #
 # Environment: REGISTRY, VERSION (image tag, default dev), VERBOSE=1,
 #              REPORT_DIR (keeps the capability document when set),
@@ -190,7 +192,12 @@ version_checks() {
     [[ "${V}" == 2.1 ]] && expect_exit 4 "${role} with an answer to a SEND" "${mount[@]}" "${IMAGE}" "${endpoint[@]}" --fixture /bad/send/${VDIR}/baseline/fixture.json
     expect_exit 5 "${role} with a callError answer that is not an OCPP-J error code" "${mount[@]}" "${IMAGE}" "${endpoint[@]}" --fixture /bad/badcode/${VDIR}/baseline/fixture.json
     expect_exit 4 "${role} with a missing fixture" "${IMAGE}" "${endpoint[@]}" --fixture /no/such/fixture.json
-    expect_exit 4 "client with a missing fixture" "${IMAGE}" client Heartbeat --version "${V}" --url ws://nowhere:9000/ocpp --fixture /no/such/fixture.json
+    if has_role client; then
+        expect_exit 4 "client with a missing fixture" "${IMAGE}" client Heartbeat --version "${V}" --url ws://nowhere:9000/ocpp --fixture /no/such/fixture.json
+    else
+        # The role is checked before the fixture (exit 5 before exit 4).
+        expect_exit 5 "client of an adapter without a client role, with a missing fixture" "${IMAGE}" client Heartbeat --version "${V}" --url ws://nowhere:9000/ocpp --fixture /no/such/fixture.json
+    fi
 
     if ! has_role server; then
         # client run needs a server to become ready.
@@ -251,9 +258,13 @@ version_checks() {
     if [[ "${code}" == 1 ]] && jq -e '.ok == false and .error.code == "not-connected"' <<<"${doc}" >/dev/null 2>&1
     then ok "call to a station that is not connected: not-connected, exit 1"; else fail "call to a station that is not connected: exit ${code}, ${doc}"; fi
 
-    if has_role client; then
-        doc=$(run_client "${ADAPTER}" Heartbeat --version "${V}" --url "ws://${srv}:9000/ocpp"); code=$?
-        if [[ "${code}" == 0 ]] && jq -e --arg a "${ADAPTER}" --arg v "${V}" "${JQ_LIB}"'
+    # The station: the image itself, or the client of ${PEER} for an adapter
+    # without a client role.
+    local client="${ADAPTER}"
+    has_role client || client="${PEER}"
+    {
+        doc=$(run_client "${client}" Heartbeat --version "${V}" --url "ws://${srv}:9000/ocpp"); code=$?
+        if [[ "${code}" == 0 ]] && jq -e --arg a "${client}" --arg v "${V}" "${JQ_LIB}"'
                 .schemaVersion == "1.0" and .adapter == $a and .version == $v and .operation == "Heartbeat"
                 and .ok == true and .error == null and .callError == null and .request == {}
                 and (.response.currentTime | isdate) and (.elapsedMs | type == "number")' <<<"${doc}" >/dev/null 2>&1
@@ -276,12 +287,12 @@ version_checks() {
         do
             if wait_event "${srv}" "${want}" --arg s "${STATION}" >/dev/null; then ok "server event: ${want}"; else fail "no server event with ${want}"; fi
         done
-        doc=$(run_client "${ADAPTER}" Heartbeat --version "${V}" --url "ws://${srv}:9000/ocpp" --station NOT-IN-THE-FIXTURE); code=$?
+        doc=$(run_client "${client}" Heartbeat --version "${V}" --url "ws://${srv}:9000/ocpp" --station NOT-IN-THE-FIXTURE); code=$?
         if [[ "${code}" == 3 ]] && jq -e '.error.code == "connect-failed"' <<<"${doc}" >/dev/null 2>&1
         then ok "unknown station identity: connect-failed, exit 3"; else fail "unknown station identity: exit ${code}, ${doc}"; fi
         if wait_event "${srv}" '.event == "connection-rejected" and .station == "NOT-IN-THE-FIXTURE" and .reason == "unknown-station"' >/dev/null
         then ok "server event: connection-rejected unknown-station"; else fail "no connection-rejected event for an unknown station"; fi
-    fi
+    }
     if events "${srv}" | grep -v '^{' | grep -q .; then fail "server stdout has lines that are not JSON"; else ok "server stdout is JSON Lines only"; fi
 
     # A second server in the same container: the port is taken.
@@ -297,8 +308,43 @@ version_checks() {
     if jq -e '.event == "stopped"' <<<"${last}" >/dev/null 2>&1; then ok "stopped event"; else fail "last stdout line is not the stopped event: ${last}"; fi
     stop_container "${srv}"
 
-    has_role client || return 0
-    client_run_checks "${ADAPTER}"
+    if has_role client; then client_run_checks "${ADAPTER}"; else server_call_checks; fi
+}
+
+# server_call_checks: the CALLs of the server of an adapter without a client
+# role, to a client run of ${PEER}.
+server_call_checks() {
+    start "${srv}" "${ADAPTER}" -- server --version "${V}"
+    wait_ready "${srv}" || { fail "server did not become ready"; return 0; }
+    sta="sta-${RUN_ID}"
+    start "${sta}" "${PEER}" -- client run --version "${V}" --url "ws://${srv}:9000/ocpp"
+    if wait_ready "${sta}"; then ok "${PEER} client run connects"; else fail "${PEER} client run did not connect"; fi
+    doc=$(docker exec "${sta}" ocpp-interop call BootNotification --payload "$(jq -c '.samples.boot.payload' "${FIXTURE}")" 2>/dev/null); code=$?
+    if [[ "${code}" == 0 ]] && jq -e '.ok and .response.status == "Accepted" and .response.interval == 300' <<<"${doc}" >/dev/null 2>&1
+    then ok "BootNotification from ${PEER}: the fixture's status and interval"; else fail "BootNotification from ${PEER}: exit ${code}, ${doc}"; fi
+    doc=$(docker exec "${srv}" ocpp-interop call --station "${STATION}" Reset --payload "$(reset_payload)" 2>/dev/null); code=$?
+    if [[ "${code}" == 0 ]] && jq -e "${JQ_LIB}"'.ok and within({"status":"Accepted"}; .response)' <<<"${doc}" >/dev/null 2>&1
+    then ok "call from the server to the connected station"; else fail "call from the server: exit ${code}, ${doc}"; fi
+    if has_feature messageIds; then
+        id=$(jq -r '.messageId // empty' <<<"${doc}")
+        if [[ -n "${id}" ]] && wait_event "${srv}" '.event == "call-sent" and .messageId == $id and .action == "Reset"' --arg id "${id}" >/dev/null
+        then ok "messageIds: the result's messageId is the one of the call-sent event"; else fail "messageIds: ${doc}"; fi
+    fi
+    doc=$(docker exec "${srv}" ocpp-interop call --station "${STATION}" Reset --payload '{"type":"Sideways"}' 2>/dev/null); code=$?
+    if [[ "${code}" == 1 ]] && jq -e '.ok == false and .error.code == "invalid-request"' <<<"${doc}" >/dev/null 2>&1
+    then ok "a request the upstream refuses: invalid-request, exit 1"; else fail "invalid request: exit ${code}, ${doc}"; fi
+    docker pause "${sta}" >/dev/null
+    doc=$(docker exec "${srv}" ocpp-interop call --station "${STATION}" Reset --payload "$(reset_payload)" --timeout-ms 1000 2>/dev/null); code=$?
+    docker unpause "${sta}" >/dev/null
+    if [[ "${code}" == 1 ]] && jq -e '.ok == false and .error.code == "timeout"' <<<"${doc}" >/dev/null 2>&1
+    then ok "silent station: timeout, exit 1"; else fail "silent station: exit ${code}, ${doc}"; fi
+    docker stop -t 15 "${sta}" >/dev/null
+    if wait_event "${srv}" '.event == "connection-closed" and .station == $s' --arg s "${STATION}" >/dev/null
+    then ok "server sees the station close"; else fail "no connection-closed event when the station closes"; fi
+    doc=$(docker exec "${srv}" ocpp-interop call --station "${STATION}" Reset --payload "$(reset_payload)" 2>/dev/null); code=$?
+    if [[ "${code}" == 1 ]] && jq -e '.error.code == "not-connected"' <<<"${doc}" >/dev/null 2>&1
+    then ok "call after the station closed: not-connected"; else fail "call after the station closed: exit ${code}, ${doc}"; fi
+    stop_container "${sta}"; stop_container "${srv}"
 }
 
 # station_checks: the station checks of an adapter without a server, against
@@ -440,7 +486,7 @@ known_bug() {
         [[ -z "${who}" || "${who}" == \#* ]] && continue
         adapter="${who%%[:@]*}"; peer=""
         [[ "${who}" == *@* ]] && peer="${who#*@}"
-        if [[ "${adapter}" == "${ADAPTER}" && "${version}" == "${upstream}" && ( -z "${peer}" || "${peer}" == "${ADAPTER}" ) \
+        if [[ "${adapter}" == "${ADAPTER}" && "${version}" == "${upstream}" && ( -z "${peer}" || "${peer}" == "${STA_ADAPTER}" ) \
               && "$1" =~ ${regex} ]]; then
             echo "${evidence}"; return 0
         fi
@@ -464,7 +510,7 @@ verdict() {
 tls_client() {
     local want="$1" label="$2"; shift 2
     local doc code
-    doc=$(run_client "${ADAPTER}" -v "${WORK}/tls:/tls:ro" -v "${WORK}/wrong:/wrong:ro" -- Heartbeat --version "${V}" \
+    doc=$(run_client "${STA_ADAPTER}" -v "${WORK}/tls:/tls:ro" -v "${WORK}/wrong:/wrong:ro" -- Heartbeat --version "${V}" \
         --connect-timeout-ms 5000 "$@"); code=$?
     if [[ "${want}" == ok ]]; then
         if [[ "${code}" == 0 ]] && jq -e '.ok == true' <<<"${doc}" >/dev/null 2>&1; then ok "${label}"; else fail "${label}: exit ${code}, ${doc}"; fi
@@ -504,7 +550,7 @@ session_problems() {  # session_problems <server container> <station container>
 }
 
 tls_checks() {
-    has_role server && has_role client || return 0
+    has_role server || return 0
     local srv="tls-${RUN_ID}" sta="tlssta-${RUN_ID}" alias="unlisted-${RUN_ID}" p type dir problems
     local url="wss://tls-${RUN_ID}:9000/ocpp"
     dir="${WORK}/tls/${VDIR}"
@@ -548,7 +594,7 @@ tls_checks() {
                         --url "${url}" --security-profile 2 --tls-dir "${tls}/station"
                 fi
                 # A station that stays connected, CALLs from both ends.
-                start "${sta}" "${ADAPTER}" -v "${WORK}/tls:/tls:ro" -- client run --version "${V}" --url "${url}" \
+                start "${sta}" "${STA_ADAPTER}" -v "${WORK}/tls:/tls:ro" -- client run --version "${V}" --url "${url}" \
                     --security-profile "${p}" --tls-dir "${tls}/station"
                 if wait_ready "${sta}"; then
                     problems=$(session_problems "${srv}" "${sta}")
@@ -572,13 +618,13 @@ offer_deflate() {  # offer_deflate <server container>
 }
 
 compression_checks() {
-    has_role server && has_role client || return 0
+    has_role server || return 0
     local srv="cmp-${RUN_ID}" sta="cmpsta-${RUN_ID}" url problems doc code
     url="ws://cmp-${RUN_ID}:9000/ocpp"
     start "${srv}" "${ADAPTER}" -- server --version "${V}"
     if ! wait_ready "${srv}"; then fail "compression: the server did not become ready"; stop_container "${srv}"; return 0; fi
     if ! has_feature compression; then
-        doc=$(run_client "${ADAPTER}" Heartbeat --version "${V}" --url "${url}" --compression); code=$?
+        doc=$(run_client "${STA_ADAPTER}" Heartbeat --version "${V}" --url "${url}" --compression); code=$?
         if [[ "${code}" == 5 ]]; then
             ok "compression not declared: client --compression exits 5"
         elif [[ "${code}" == 0 ]] && ! events "${srv}" | jq -e 'select(.event == "connection-opened" and .compression == true)' >/dev/null 2>&1; then
@@ -596,7 +642,7 @@ compression_checks() {
     # Without --compression the station does not offer it.
     start "${srv}" "${ADAPTER}" -- server --version "${V}"
     wait_ready "${srv}" || { fail "compression: the server did not become ready"; stop_container "${srv}"; return 0; }
-    start "${sta}" "${ADAPTER}" -- client run --version "${V}" --url "${url}"
+    start "${sta}" "${STA_ADAPTER}" -- client run --version "${V}" --url "${url}"
     if wait_ready "${sta}" && wait_event "${sta}" '.event == "connection-opened" and .compression == false' >/dev/null \
         && wait_event "${srv}" '.event == "connection-opened" and .compression != true' >/dev/null
     then ok "compression: not offered without --compression"; else fail "compression: without --compression: $(events "${sta}" | sed -n 1p) $(events "${srv}" | jq -c 'select(.event == "connection-opened")')"; fi
@@ -605,7 +651,7 @@ compression_checks() {
     # With --compression: offered, negotiated, and every message is read.
     start "${srv}" "${ADAPTER}" -- server --version "${V}"
     wait_ready "${srv}" || { fail "compression: the server did not become ready"; stop_container "${srv}"; return 0; }
-    start "${sta}" "${ADAPTER}" -- client run --version "${V}" --url "${url}" --compression
+    start "${sta}" "${STA_ADAPTER}" -- client run --version "${V}" --url "${url}" --compression
     if wait_ready "${sta}"; then
         problems=$(session_problems "${srv}" "${sta}" | tr '\n' ' ')
         events "${sta}" | jq -e 'select(.event == "connection-opened") | .compression == false' >/dev/null 2>&1 \
@@ -621,6 +667,10 @@ compression_checks() {
 
 for v in ${DECLARED}; do
     use_version "${v}"
+    # The station of the transport checks: the image itself, or the client of
+    # ${PEER} for an adapter without a client role.
+    STA_ADAPTER="${ADAPTER}"
+    has_role client || STA_ADAPTER="${PEER}"
     log "OCPP ${V}"; CHECK_PREFIX="[${V}] "
     version_checks
     tls_checks

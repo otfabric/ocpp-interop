@@ -80,3 +80,28 @@ built from source, and libwebsockets as a shared library;
 | json-schema-validator (pboettch) | 2.4.0 | MIT | https://github.com/pboettch/json-schema-validator |
 | date (Howard Hinnant) | 3.0.4 | MIT | https://github.com/HowardHinnant/date |
 | Boost (log and the libraries it uses: thread, filesystem, regex, chrono, atomic; Debian's static libraries) | 1.83 | BSL-1.0 | https://www.boost.org |
+
+## `ocpp-interop-citrineos`
+
+Base image `node:24.16.0-bookworm-slim` (Debian bookworm, Node.js 24.16.0).
+CitrineOS is built from its release tag and deployed with its production
+npm dependencies, each installed by version and integrity hash from the
+release's `pnpm-lock.yaml`. `/licenses/BUNDLED-PACKAGES.txt` lists every npm
+package in the image; `/licenses/node_modules/<package>@<version>/` holds its
+licence files, and `/licenses/node_modules/WITHOUT-LICENSE-FILE.txt` names the
+few that ship none, with the licence their `package.json` declares. They are
+under permissive licences (MIT, ISC, Apache-2.0, BSD, 0BSD, BlueOak-1.0.0,
+Unlicense, MIT-0; three are dual-licensed BSD-3-Clause or GPL-2.0, used
+under BSD-3-Clause). PostgreSQL, PostGIS and RabbitMQ are Debian's packages;
+their copyright files are in `/licenses/debian/`, and the source of each is
+in the Debian archive (bookworm).
+
+| Component | Version | Licence | Source |
+|---|---|---|---|
+| CitrineOS core (`@citrineos/ocpp-server`, `ocpp`, `base`, `dal`, `types`) | v2.0.1 | Apache-2.0 | https://github.com/citrineos/citrineos-core |
+| npm dependencies of CitrineOS (fastify, sequelize, pg, amqplib, ws, ajv, awilix, tslog, the AWS and Google Cloud storage clients and others) | as locked by the release | their own permissive licences, listed in `/licenses` | https://www.npmjs.com |
+| Node.js | 24.16.0 | MIT (bundled third-party code under its own licences, see its LICENSE) | https://nodejs.org |
+| PostgreSQL | 15.19 (Debian 15.19-0+deb12u1) | PostgreSQL License | https://www.postgresql.org |
+| PostGIS | 3.3.2 (Debian 3.3.2+dfsg-1+b1) | GPL-2.0-or-later | https://postgis.net |
+| RabbitMQ | 3.10.8 (Debian 3.10.8-1.1+deb12u1) | MPL-2.0 | https://www.rabbitmq.com |
+| Erlang/OTP | 25.2.3 (Debian 1:25.2.3+dfsg-1+deb12u4) | Apache-2.0 | https://www.erlang.org |

@@ -41,8 +41,9 @@ The adapters check a fixture when they load it, and exit 4 on a violation:
 `mobilityhouse` with the schema and the code of scripts/validate-fixtures.py
 itself, `chargetime` and `lorenzodonini` with a hand-written equivalent of
 the rules for the versions they support (1.6 and 2.0.1; neither supports
-2.1). A fixture with an
-answer the adapter cannot give (`callError` without the `fixtureCallErrors`
+2.1), and `citrineos` with the schema (Ajv, a dependency of CitrineOS) and
+the rules of scripts/validate-fixtures.py written out in JavaScript. A
+fixture with an answer the adapter cannot give (`callError` without the `fixtureCallErrors`
 capability, or with a code that is not an OCPP-J error code) exits 5.
 
 ## Answers
@@ -60,6 +61,12 @@ takes one of three forms:
 | `{"callError": {"code": ..., "description": ...}}` | Answer with this CALLERROR |
 
 An action without an entry is answered with the CALLERROR `NotImplemented`.
+
+The `citrineos` CSMS is the exception: CitrineOS answers every CALL itself.
+It takes the stations, their passwords and 1.6 connectors, the id tokens and
+the BootNotification answer's `interval` and `status` from the fixture, and
+declares `fixtureAnswers: false`
+([CAPABILITIES.md](CAPABILITIES.md#feature-keys)).
 
 The string `"${now}"` in a payload is replaced with the current UTC time in
 RFC 3339 format, in whole seconds (`2026-10-18T10:00:00Z`). It is the only
