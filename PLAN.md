@@ -47,13 +47,23 @@ interoperability. First slice: OCPP 1.6J only (2026-10-18).
       and start for linux/amd64 under emulation, but are self-tested on
       arm64 only
 - [x] Contract 0.2: what implementing it with these upstreams showed
-- [ ] Contract 1.0, once both adapters close the gaps the contract lists
+- [ ] Contract 1.0, once the adapters close the gaps the contract lists
 - [ ] Release v0.1.0 (the maintainer decides when)
 
 ## Phase 5 - OCPP 2.0.1 and the third adapter (open)
 
-- [ ] 2.0.1 in `mobilityhouse` and `chargetime`
-- [ ] `lorenzodonini` adapter (Go), 1.6J and 2.0.1
+- [x] 2.0.1 in `mobilityhouse` (ocpp.v201) and `chargetime` (ocpp2:
+      MultiProtocolJSONServer and MultiProtocolJSONClient), both roles
+- [x] `lorenzodonini` adapter (Go, ocpp-go v0.19.0), 1.6J and 2.0.1, both
+      roles
+- [x] The 2.0.1 baseline fixture complete: a sample for every action it
+      answers in both directions, two it does not answer, `derived:
+      variables` and `idTokenInfo`; every payload valid against the OCA
+      2.0.1 schemas (scripts/validate-payloads.py)
+- [x] Self-tests per version: smoke tests of every image for 1.6 and
+      2.0.1, every station against every CSMS for both (3 x 3 each)
+- [x] Contract 0.3: what implementing 2.0.1 and the third adapter required
+- [x] Known bugs that show only with one peer (`adapter:role@peer`)
 - [ ] TLS scenarios (profiles 2 and 3) with keys generated at test time
 - [ ] Compression (`permessage-deflate`)
 

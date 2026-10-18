@@ -10,7 +10,10 @@ import eu.chargetime.ocpp.JSONCommunicator;
 import eu.chargetime.ocpp.NotConnectedException;
 import eu.chargetime.ocpp.OccurenceConstraintException;
 import eu.chargetime.ocpp.UnsupportedFeatureException;
+import eu.chargetime.ocpp.feature.Feature;
+import eu.chargetime.ocpp.feature.FunctionFeature;
 import eu.chargetime.ocpp.feature.ProfileFeature;
+import eu.chargetime.ocpp.feature.function.Function;
 import eu.chargetime.ocpp.feature.profile.Profile;
 import eu.chargetime.ocpp.model.Confirmation;
 import eu.chargetime.ocpp.model.Request;
@@ -25,18 +28,18 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
 
 /**
- * The fixture's side of a connection: an upstream {@link Profile} whose features are the upstream's
- * own feature classes, and the sending of CALLs for the contract.
+ * The fixture's side of a connection: an upstream {@link Profile} (OCPP 1.6) or {@link Function}
+ * (OCPP 2.0.1) whose features are the upstream's own feature classes, and the sending of CALLs for
+ * the contract.
  *
  * <p>Raw JSON becomes upstream request and confirmation types, and goes back to JSON, through
  * {@link JSONCommunicator#unpackPayload} and {@link JSONCommunicator#packPayload}: the Gson setup
  * the upstream uses on the wire. Validation ({@code validate()}), framing, routing and the
  * CALLERRORs the upstream sends on its own are the upstream's.
  */
-final class Endpoint implements Profile {
+final class Endpoint {
   /** Sends one request with the upstream: JSONClient.send or JSONServer.send. */
   interface Sender {
     CompletionStage<Confirmation> send(Request request)
@@ -50,16 +53,17 @@ final class Endpoint implements Profile {
   private final String version;
   private final Fixture fixture;
   private final String role;
-  private final Function<UUID, String> stationOf;
+  private final java.util.function.Function<UUID, String> stationOf;
   private final boolean emit;
   private final JSONCommunicator codec = new JSONCommunicator(null);
-  private final ProfileFeature[] features;
+  private final Feature[] features;
+  private final Object owner;
 
   /**
    * @param role the answering role: "csms" for a server, "station" for a client
    * @param stationOf the station identity of an upstream session
    */
-  Endpoint(String version, Fixture fixture, String role, Function<UUID, String> stationOf, boolean emit) {
+  Endpoint(String version, Fixture fixture, String role, java.util.function.Function<UUID, String> stationOf, boolean emit) {
     this.version = version;
     this.fixture = fixture;
     this.role = role;
@@ -70,20 +74,57 @@ final class Endpoint implements Profile {
     // NotImplemented itself.
     Set<String> actions = new LinkedHashSet<>();
     fixture.answers(role).keySet().forEach(actions::add);
-    actions.addAll(role.equals("csms") ? Registry.FROM_CSMS : Registry.FROM_STATION);
-    List<ProfileFeature> list = new ArrayList<>();
+    actions.addAll(role.equals("csms") ? Registry.fromCsms(version) : Registry.fromStation(version));
+    // The upstream's features call their owner to handle a request.
+    this.owner = version.equals("1.6") ? new ProfileView() : new FunctionView();
+    List<Feature> list = new ArrayList<>();
     for (String action : actions) {
-      ProfileFeature feature = Registry.feature(action, this);
+      Feature feature = Registry.feature(version, action, owner);
       if (feature != null) {
         list.add(feature);
       }
     }
-    this.features = list.toArray(new ProfileFeature[0]);
+    this.features = list.toArray(new Feature[0]);
   }
 
-  @Override
-  public ProfileFeature[] getFeatureList() {
-    return features;
+  /** OCPP 1.6: the endpoint as an upstream feature profile. */
+  private final class ProfileView implements Profile {
+    @Override
+    public ProfileFeature[] getFeatureList() {
+      return java.util.Arrays.stream(features).map(f -> (ProfileFeature) f).toArray(ProfileFeature[]::new);
+    }
+
+    @Override
+    public Confirmation handleRequest(UUID session, Request request) {
+      return Endpoint.this.handleRequest(session, request);
+    }
+  }
+
+  /** OCPP 2.0.1: the endpoint as an upstream function (functional block). */
+  private final class FunctionView implements Function {
+    @Override
+    public FunctionFeature[] getFeatureList() {
+      return java.util.Arrays.stream(features).map(f -> (FunctionFeature) f).toArray(FunctionFeature[]::new);
+    }
+
+    @Override
+    public Confirmation handleRequest(UUID session, Request request) {
+      return Endpoint.this.handleRequest(session, request);
+    }
+  }
+
+  String version() {
+    return version;
+  }
+
+  /** OCPP 1.6: the upstream profile to add to JSONServer or JSONClient. */
+  Profile profile() {
+    return (Profile) owner;
+  }
+
+  /** OCPP 2.0.1: the upstream function to add to MultiProtocolJSONServer or MultiProtocolJSONClient. */
+  Function function() {
+    return (Function) owner;
   }
 
   /** An upstream event handler interface (ServerCoreEventHandler, ClientCoreEventHandler) answered by this profile. */
@@ -110,7 +151,7 @@ final class Endpoint implements Profile {
   }
 
   private String actionOf(Request request) {
-    for (ProfileFeature f : features) {
+    for (Feature f : features) {
       if (f.getRequestType().isInstance(request)) {
         return f.getAction();
       }
@@ -120,7 +161,7 @@ final class Endpoint implements Profile {
   }
 
   private Class<? extends Confirmation> confirmationOf(String action) {
-    for (ProfileFeature f : features) {
+    for (Feature f : features) {
       if (f.getAction().equals(action)) {
         return f.getConfirmationType();
       }
@@ -132,8 +173,7 @@ final class Endpoint implements Profile {
     return JsonParser.parseString((String) codec.packPayload(upstreamPayload));
   }
 
-  @Override
-  public Confirmation handleRequest(UUID session, Request request) {
+  Confirmation handleRequest(UUID session, Request request) {
     String station = stationOf.apply(session);
     String action = actionOf(request);
     String messageId = request.getOcppMessageId();
@@ -178,7 +218,7 @@ final class Endpoint implements Profile {
   JsonObject execute(
       String action, JsonObject payload, long timeoutMs, String station, Sender sender, CompletableFuture<?> closed) {
     long started = System.nanoTime();
-    ProfileFeature feature = Registry.feature(action, null);
+    Feature feature = Registry.feature(version, action, null);
     if (feature == null) {
       return done(started, action, false, payload, null, null, "unsupported",
           "Java-OCA-OCPP has no OCPP " + version + " feature for " + action);

@@ -24,8 +24,8 @@ import java.util.regex.Pattern;
  * Fixture loading, validation and answers (docs/FIXTURES.md).
  *
  * <p>The checks are those of fixtures/schema/ocpp-fixture.schema.json and of
- * scripts/validate-fixtures.py that matter for OCPP 1.6, written out by hand so that the image
- * needs no JSON Schema library.
+ * scripts/validate-fixtures.py that matter for OCPP 1.6 and 2.0.1, written out by hand so that the
+ * image needs no JSON Schema library.
  */
 final class Fixture {
   static final Path FIXTURES = Path.of("/fixtures");
@@ -63,7 +63,10 @@ final class Fixture {
   final Map<String, JsonObject> stations = new LinkedHashMap<>();
   final String firstStation;
   private final Map<String, String> idTokens = new LinkedHashMap<>();
+  private final Map<String, String> typedTokens = new LinkedHashMap<>();
   private final List<JsonObject> configuration = new ArrayList<>();
+  /** 2.x device model; SetVariables changes values for the lifetime of the process. */
+  private final List<JsonObject> variables = new ArrayList<>();
 
   private Fixture(JsonObject doc) {
     this.doc = doc;
@@ -76,10 +79,19 @@ final class Fixture {
     for (JsonElement t : doc.getAsJsonArray("idTokens")) {
       JsonObject token = t.getAsJsonObject();
       idTokens.put(token.get("idToken").getAsString(), token.get("status").getAsString());
+      if (token.has("type")) {
+        typedTokens.put(token.get("idToken").getAsString() + "\u0000" + token.get("type").getAsString(),
+            token.get("status").getAsString());
+      }
     }
     if (doc.has("configuration")) {
       for (JsonElement c : doc.getAsJsonArray("configuration")) {
         configuration.add(c.getAsJsonObject());
+      }
+    }
+    if (doc.has("variables")) {
+      for (JsonElement v : doc.getAsJsonArray("variables")) {
+        variables.add(v.getAsJsonObject().deepCopy());
       }
     }
   }
@@ -98,7 +110,7 @@ final class Fixture {
   }
 
   /** The answer of {@code role} to a CALL, or null when the fixture has none. */
-  JsonObject answer(String role, String action, JsonObject request) {
+  synchronized JsonObject answer(String role, String action, JsonObject request) {
     JsonElement entry = answers(role).get(action);
     if (entry == null) {
       return null;
@@ -110,8 +122,8 @@ final class Fixture {
     }
     switch (e.get("derived").getAsString()) {
       case "idTokens":
-        {
-          // 1.6: idTagInfo with the status of the table; an unknown token is Invalid.
+        if (version.equals("1.6")) {
+          // idTagInfo with the status of the table; an unknown token is Invalid.
           JsonElement tag = request.get("idTag");
           String status =
               tag != null && tag.isJsonPrimitive() ? idTokens.getOrDefault(tag.getAsString(), "Invalid") : "Invalid";
@@ -119,10 +131,22 @@ final class Fixture {
           info.addProperty("status", status);
           answer = new JsonObject();
           answer.add("idTagInfo", info);
-          break;
+        } else {
+          // 2.x: idTokenInfo; a token matches by value and type.
+          JsonObject token = request.has("idToken") && request.get("idToken").isJsonObject()
+              ? request.getAsJsonObject("idToken") : new JsonObject();
+          String key = string(token, "idToken") + "\u0000" + string(token, "type");
+          JsonObject info = new JsonObject();
+          info.addProperty("status", typedTokens.getOrDefault(key, "Invalid"));
+          answer = new JsonObject();
+          answer.add("idTokenInfo", info);
         }
+        break;
       case "configuration":
         answer = configurationAnswer(request);
+        break;
+      case "variables":
+        answer = variablesAnswer(action, request);
         break;
       default:
         throw new IllegalStateException("derived answer " + e.get("derived") + " is not for OCPP " + version);
@@ -132,6 +156,73 @@ final class Fixture {
         answer.add(field.getKey(), field.getValue());
       }
     }
+    return answer;
+  }
+
+  private static String string(JsonObject o, String key) {
+    JsonElement value = o.get(key);
+    return value != null && value.isJsonPrimitive() ? value.getAsString() : "";
+  }
+
+  private static boolean same(JsonObject a, JsonObject b, String key) {
+    return string(a, key).equalsIgnoreCase(string(b, key));
+  }
+
+  private static JsonObject object(JsonObject o, String key) {
+    return o.has(key) && o.get(key).isJsonObject() ? o.getAsJsonObject(key) : new JsonObject();
+  }
+
+  /**
+   * GetVariables and SetVariables: a result per requested component and variable (docs/FIXTURES.md).
+   * Names and instances compare case-insensitively.
+   */
+  private JsonObject variablesAnswer(String action, JsonObject request) {
+    boolean get = action.equals("GetVariables");
+    JsonArray results = new JsonArray();
+    JsonElement data = request.get(get ? "getVariableData" : "setVariableData");
+    for (JsonElement element : data != null && data.isJsonArray() ? data.getAsJsonArray() : new JsonArray()) {
+      JsonObject item = element.getAsJsonObject();
+      JsonObject component = object(item, "component");
+      JsonObject variable = object(item, "variable");
+      String status = "UnknownComponent";
+      JsonObject entry = null;
+      for (JsonObject v : variables) {
+        if (same(v.getAsJsonObject("component"), component, "name")
+            && same(v.getAsJsonObject("component"), component, "instance")) {
+          if (status.equals("UnknownComponent")) {
+            status = "UnknownVariable";
+          }
+          if (same(v.getAsJsonObject("variable"), variable, "name")
+              && same(v.getAsJsonObject("variable"), variable, "instance")) {
+            entry = v;
+            status = null;
+            break;
+          }
+        }
+      }
+      if (status == null && item.has("attributeType") && !string(item, "attributeType").equals("Actual")) {
+        status = "NotSupportedAttributeType";
+      }
+      if (status == null && entry.get("mutability").getAsString().equals(get ? "WriteOnly" : "ReadOnly")) {
+        status = "Rejected";
+      }
+      if (status == null && !get) {
+        entry.add("value", item.get("attributeValue"));
+      }
+      JsonObject result = new JsonObject();
+      result.add("component", item.get("component"));
+      result.add("variable", item.get("variable"));
+      if (item.has("attributeType")) {
+        result.add("attributeType", item.get("attributeType"));
+      }
+      result.addProperty("attributeStatus", status == null ? "Accepted" : status);
+      if (get && status == null) {
+        result.add("attributeValue", entry.get("value"));
+      }
+      results.add(result);
+    }
+    JsonObject answer = new JsonObject();
+    answer.add(get ? "getVariableResult" : "setVariableResult", results);
     return answer;
   }
 
@@ -267,19 +358,24 @@ final class Fixture {
       errors.add("ocppVersion is " + fixtureVersion + ", but --version is " + version);
       return;
     }
-    if (!"1.6".equals(version)) {
-      errors.add("only OCPP 1.6 fixtures are checked by this adapter");
+    boolean v16 = version.equals("1.6");
+    if (!Registry.fromStation(version).iterator().hasNext()) {
+      errors.add("OCPP " + version + " fixtures cannot be checked by this adapter");
       return;
     }
     Path dir = path.toAbsolutePath().normalize().getParent();
     if (isString(doc, "name") && (dir == null || !dir.getFileName().toString().equals(doc.get("name").getAsString()))) {
       errors.add("name is not the directory name");
     }
-    if (dir == null || dir.getParent() == null || !dir.getParent().getFileName().toString().equals("v16")) {
-      errors.add("ocppVersion 1.6 does not belong in this directory");
+    if (dir == null || dir.getParent() == null
+        || !dir.getParent().getFileName().toString().equals(VERSION_DIRS.get(version))) {
+      errors.add("ocppVersion " + version + " does not belong in this directory");
     }
-    if (doc.has("variables")) {
+    if (v16 && doc.has("variables")) {
       errors.add("variables are for OCPP 2.x");
+    }
+    if (!v16 && doc.has("configuration")) {
+      errors.add("configuration is for OCPP 1.6");
     }
 
     // stations
@@ -313,11 +409,33 @@ final class Fixture {
             errors.add("stations: password must have 16 to 40 characters");
           }
         }
-        if (!isInt(st, "connectors") || st.get("connectors").getAsInt() < 1 || st.get("connectors").getAsInt() > 16) {
-          errors.add("stations: connectors must be 1..16 in OCPP 1.6");
-        }
-        if (st.has("evses")) {
-          errors.add("stations: evses are for OCPP 2.x");
+        if (v16) {
+          if (!isInt(st, "connectors") || st.get("connectors").getAsInt() < 1 || st.get("connectors").getAsInt() > 16) {
+            errors.add("stations: connectors must be 1..16 in OCPP 1.6");
+          }
+          if (st.has("evses")) {
+            errors.add("stations: evses are for OCPP 2.x");
+          }
+        } else {
+          if (st.has("connectors")) {
+            errors.add("stations: connectors are for OCPP 1.6");
+          }
+          if (!st.has("evses") || !st.get("evses").isJsonArray() || st.getAsJsonArray("evses").size() == 0) {
+            errors.add("stations: evses must be a non-empty array in OCPP 2.x");
+          } else {
+            Set<Integer> evses = new HashSet<>();
+            for (JsonElement e : st.getAsJsonArray("evses")) {
+              JsonObject evse = e.isJsonObject() ? e.getAsJsonObject() : new JsonObject();
+              if (!isInt(evse, "id") || evse.get("id").getAsInt() < 1 || !evse.has("connectors")
+                  || !evse.get("connectors").isJsonArray() || evse.getAsJsonArray("connectors").size() == 0) {
+                errors.add("stations: an EVSE needs an id of 1 or more and connectors");
+                continue;
+              }
+              if (!evses.add(evse.get("id").getAsInt())) {
+                errors.add("stations: EVSE " + evse.get("id").getAsInt() + " appears twice");
+              }
+            }
+          }
         }
       }
     }
@@ -334,8 +452,12 @@ final class Fixture {
           continue;
         }
         String id = token.get("idToken").getAsString();
-        if (id.isEmpty() || id.length() > 20) {
-          errors.add("idTokens: " + id + " must have 1 to 20 characters in OCPP 1.6");
+        int max = v16 ? 20 : 36;
+        if (id.isEmpty() || id.length() > max) {
+          errors.add("idTokens: " + id + " must have 1 to " + max + " characters in OCPP " + version);
+        }
+        if (!v16 && !isString(token, "type")) {
+          errors.add("idTokens: " + id + " has no type, which OCPP 2.x requires");
         }
         if (!seen.add(id)) {
           errors.add("idTokens: " + id + " appears twice");
@@ -346,8 +468,10 @@ final class Fixture {
       }
     }
 
-    // configuration
-    if (!doc.has("configuration") || !doc.get("configuration").isJsonArray()) {
+    // configuration (1.6) and variables (2.x)
+    if (!v16) {
+      validateVariables(doc, errors);
+    } else if (!doc.has("configuration") || !doc.get("configuration").isJsonArray()) {
       errors.add("configuration is required in OCPP 1.6");
     } else {
       Set<String> keys = new HashSet<>();
@@ -377,11 +501,11 @@ final class Fixture {
           errors.add("answers." + role + " is required");
           continue;
         }
-        Set<String> receives = role.equals("csms") ? Registry.FROM_STATION : Registry.FROM_CSMS;
+        Set<String> receives = role.equals("csms") ? Registry.fromStation(version) : Registry.fromCsms(version);
         for (Map.Entry<String, JsonElement> a : answers.getAsJsonObject(role).entrySet()) {
           String where = "answers." + role + "." + a.getKey();
           if (!receives.contains(a.getKey())) {
-            errors.add(where + ": the " + role + " does not receive " + a.getKey() + " in OCPP 1.6");
+            errors.add(where + ": the " + role + " does not receive " + a.getKey() + " in OCPP " + version);
           }
           if (!a.getValue().isJsonObject()) {
             errors.add(where + ": not an object");
@@ -407,14 +531,14 @@ final class Fixture {
             String derived = isString(e, "derived") ? e.get("derived").getAsString() : "";
             boolean fits =
                 (derived.equals("idTokens") && Set.of("Authorize", "StartTransaction").contains(a.getKey()))
-                    || (derived.equals("configuration") && a.getKey().equals("GetConfiguration"));
+                    || (derived.equals("configuration") && a.getKey().equals("GetConfiguration"))
+                    || (derived.equals("variables") && Set.of("GetVariables", "SetVariables").contains(a.getKey()));
             if (!fits) {
               errors.add(where + ": cannot be derived from " + derived);
             }
-            if (derived.equals("configuration")
-                && (!doc.has("configuration") || !doc.get("configuration").isJsonArray()
-                    || doc.getAsJsonArray("configuration").size() == 0)) {
-              errors.add(where + ": derived from configuration, which is empty");
+            if (fits
+                && (!doc.has(derived) || !doc.get(derived).isJsonArray() || doc.getAsJsonArray(derived).size() == 0)) {
+              errors.add(where + ": derived from " + derived + ", which is empty");
             }
           }
         }
@@ -433,10 +557,52 @@ final class Fixture {
           continue;
         }
         String from = sample.get("from").getAsString();
-        Set<String> sends = from.equals("station") ? Registry.FROM_STATION : from.equals("csms") ? Registry.FROM_CSMS : Set.of();
+        Set<String> sends =
+            from.equals("station") ? Registry.fromStation(version) : from.equals("csms") ? Registry.fromCsms(version) : Set.of();
         if (!sends.contains(sample.get("action").getAsString())) {
           errors.add("samples." + s.getKey() + ": the " + from + " does not send " + sample.get("action").getAsString());
         }
+      }
+    }
+  }
+
+  private static boolean named(JsonObject o, String key) {
+    if (!o.has(key) || !o.get(key).isJsonObject()) {
+      return false;
+    }
+    JsonObject n = o.getAsJsonObject(key);
+    for (String k : n.keySet()) {
+      if (!k.equals("name") && !k.equals("instance")) {
+        return false;
+      }
+    }
+    return isString(n, "name") && n.get("name").getAsString().length() <= 50
+        && (!n.has("instance") || (isString(n, "instance") && n.get("instance").getAsString().length() <= 50));
+  }
+
+  /** The 2.x device model table: required, well formed, each component and variable once. */
+  private static void validateVariables(JsonObject doc, List<String> errors) {
+    if (!doc.has("variables") || !doc.get("variables").isJsonArray()) {
+      errors.add("variables are required in OCPP 2.x");
+      return;
+    }
+    Set<String> seen = new HashSet<>();
+    for (JsonElement v : doc.getAsJsonArray("variables")) {
+      JsonObject item = v.isJsonObject() ? v.getAsJsonObject() : new JsonObject();
+      if (!named(item, "component") || !named(item, "variable") || !isString(item, "value")
+          || !isString(item, "mutability")
+          || !Set.of("ReadOnly", "WriteOnly", "ReadWrite").contains(item.get("mutability").getAsString())) {
+        errors.add("variables: component, variable, value and mutability are required");
+        continue;
+      }
+      if (item.get("value").getAsString().length() > 2500) {
+        errors.add("variables: a value is longer than 2500 characters");
+      }
+      JsonObject c = item.getAsJsonObject("component");
+      JsonObject n = item.getAsJsonObject("variable");
+      String key = String.join("\u0000", string(c, "name"), string(c, "instance"), string(n, "name"), string(n, "instance"));
+      if (!seen.add(key)) {
+        errors.add("variables: " + string(c, "name") + "/" + string(n, "name") + " appears twice");
       }
     }
   }

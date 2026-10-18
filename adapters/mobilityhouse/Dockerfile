@@ -98,7 +98,7 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
 LABEL org.opencontainers.image.title="ocpp-interop-mobilityhouse" \
-      org.opencontainers.image.description="OCPP 1.6J reference CSMS and station built on The Mobility House ocpp" \
+      org.opencontainers.image.description="OCPP 1.6J and 2.0.1 reference CSMS and station built on The Mobility House ocpp" \
       org.opencontainers.image.source="https://github.com/otfabric/ocpp-interop" \
       org.opencontainers.image.licenses="MIT AND BSD-3-Clause AND CC-BY-ND-4.0" \
       org.opencontainers.image.version="${ADAPTER_VERSION}"

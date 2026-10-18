@@ -16,9 +16,9 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.build.outputTimestamp>2026-01-01T00:00:00Z</project.build.outputTimestamp>
 
-    <!-- The upstream pin: eu.chargetime.ocpp:ocpp16j on Maven Central. The Dockerfile passes
+    <!-- The upstream pin: eu.chargetime.ocpp:ocpp16j and ocpp2 on Maven Central. The Dockerfile passes
          -Docpp.version=${UPSTREAM_VERSION}, so a candidate build replaces it without touching this
-         file. ocpp16, ocpp-common, ocpp-json, Gson, Java-WebSocket, jaxb-api and slf4j-api are not
+         file. ocpp16, ocpp-common, ocpp-json, Gson, Java-WebSocket, jaxb-api, jsr305 and slf4j-api are not
          pinned here on purpose: they come, at exact versions, from the POMs of the pinned upstream
          release, which is what an application using the library gets. The adapter uses the
          upstream's Gson for its own JSON as well. dependencies.sha256 pins every jar by hash. -->
@@ -30,6 +30,12 @@
     <dependency>
       <groupId>eu.chargetime.ocpp</groupId>
       <artifactId>ocpp16j</artifactId>
+      <version>${ocpp.version}</version>
+    </dependency>
+    <!-- OCPP 2.0.1: the multi-protocol module ocpp-v2 of the same release. -->
+    <dependency>
+      <groupId>eu.chargetime.ocpp</groupId>
+      <artifactId>ocpp2</artifactId>
       <version>${ocpp.version}</version>
     </dependency>
     <!-- Sends the library's logging to stderr. Same version as the upstream's slf4j-api. -->

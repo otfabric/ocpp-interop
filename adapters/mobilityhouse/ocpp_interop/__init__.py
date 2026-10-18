@@ -3,4 +3,4 @@
 
 ADAPTER = "mobilityhouse"
 SCHEMA_VERSION = "1.0"
-CONTRACT_VERSION = "0.2"
+CONTRACT_VERSION = "0.3"

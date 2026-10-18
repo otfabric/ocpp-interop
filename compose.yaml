@@ -7,10 +7,15 @@
 #
 # A station connects to ws://127.0.0.1:<port>/ocpp/<station identity>.
 # OCPP_INTEROP_VERSION selects the image tag (default: dev, the local build);
-# OCPP_INTEROP_FIXTURE a baked fixture (default: baseline).
+# OCPP_INTEROP_OCPP the OCPP version (default 1.6), with
+# OCPP_INTEROP_FIXTURE_DIR its fixture directory (default v16; v201 for
+# 2.0.1); OCPP_INTEROP_FIXTURE a baked fixture (default: baseline):
+#
+#   OCPP_INTEROP_OCPP=2.0.1 OCPP_INTEROP_FIXTURE_DIR=v201 docker compose up -d --wait
 
 x-server: &server
-  command: ["server", "--version", "1.6", "--fixture", "/fixtures/v16/${OCPP_INTEROP_FIXTURE:-baseline}/fixture.json"]
+  command: ["server", "--version", "${OCPP_INTEROP_OCPP:-1.6}",
+            "--fixture", "/fixtures/${OCPP_INTEROP_FIXTURE_DIR:-v16}/${OCPP_INTEROP_FIXTURE:-baseline}/fixture.json"]
   healthcheck:
     test: ["CMD", "test", "-f", "/run/ocpp-interop/ready"]
     interval: 2s
@@ -32,3 +37,9 @@ services:
     image: ghcr.io/otfabric/ocpp-interop-chargetime:${OCPP_INTEROP_VERSION:-dev}
     ports:
       - "127.0.0.1:9001:9000"
+
+  lorenzodonini:
+    <<: *server
+    image: ghcr.io/otfabric/ocpp-interop-lorenzodonini:${OCPP_INTEROP_VERSION:-dev}
+    ports:
+      - "127.0.0.1:9002:9000"

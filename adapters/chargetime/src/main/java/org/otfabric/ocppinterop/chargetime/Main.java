@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 public final class Main {
   static final String READY_FILE = "/run/ocpp-interop/ready";
   static final String CONTROL_SOCKET = "/run/ocpp-interop/control.sock";
-  static final Set<String> SUPPORTED_VERSIONS = Set.of("1.6");
+  static final Set<String> SUPPORTED_VERSIONS = Set.of("1.6", "2.0.1");
   private static final Path BUILD_INFO = Path.of("/app/build-info.json");
   private static final Pattern NAME = Pattern.compile("^[a-z0-9][a-z0-9-]*$");
   private static final Pattern ACTION = Pattern.compile("^[A-Z][A-Za-z0-9]+$");
@@ -42,20 +42,40 @@ public final class Main {
           "  ocpp-interop print-fixture --version V [NAME]",
           "  ocpp-interop version");
 
-  // What the self-tests exercise (scripts/smoke.sh, scripts/interop.sh).
-  // Nothing else is declared (REQUIREMENTS.md R4.2).
-  static final List<String> STATION_SENDS =
-      List.of(
-          "Authorize", "BootNotification", "DataTransfer", "DiagnosticsStatusNotification",
-          "FirmwareStatusNotification", "Heartbeat", "MeterValues", "SecurityEventNotification",
-          "StartTransaction", "StatusNotification", "StopTransaction");
-  static final List<String> CSMS_SENDS =
-      List.of(
-          "CancelReservation", "ChangeAvailability", "ChangeConfiguration", "ClearCache",
-          "ClearChargingProfile", "DataTransfer", "ExtendedTriggerMessage", "GetCompositeSchedule",
-          "GetConfiguration", "GetDiagnostics", "GetLocalListVersion", "RemoteStartTransaction",
-          "RemoteStopTransaction", "ReserveNow", "Reset", "SendLocalList", "SetChargingProfile",
-          "TriggerMessage", "UnlockConnector", "UpdateFirmware");
+  // What the self-tests exercise (scripts/smoke.sh, scripts/interop.sh), per
+  // version. Nothing else is declared (REQUIREMENTS.md R4.2).
+  static final Map<String, List<String>> STATION_SENDS =
+      Map.of(
+          "1.6",
+          List.of(
+              "Authorize", "BootNotification", "DataTransfer", "DiagnosticsStatusNotification",
+              "FirmwareStatusNotification", "Heartbeat", "MeterValues", "SecurityEventNotification",
+              "StartTransaction", "StatusNotification", "StopTransaction"),
+          "2.0.1",
+          List.of(
+              "Authorize", "BootNotification", "DataTransfer", "FirmwareStatusNotification", "Heartbeat",
+              "LogStatusNotification", "MeterValues", "NotifyEvent", "NotifyReport", "ReservationStatusUpdate",
+              "SecurityEventNotification", "StatusNotification", "TransactionEvent"));
+  static final Map<String, List<String>> CSMS_SENDS =
+      Map.of(
+          "1.6",
+          List.of(
+              "CancelReservation", "ChangeAvailability", "ChangeConfiguration", "ClearCache",
+              "ClearChargingProfile", "DataTransfer", "ExtendedTriggerMessage", "GetCompositeSchedule",
+              "GetConfiguration", "GetDiagnostics", "GetLocalListVersion", "RemoteStartTransaction",
+              "RemoteStopTransaction", "ReserveNow", "Reset", "SendLocalList", "SetChargingProfile",
+              "TriggerMessage", "UnlockConnector", "UpdateFirmware"),
+          "2.0.1",
+          List.of(
+              "CancelReservation", "ChangeAvailability", "ClearCache", "ClearChargingProfile", "DataTransfer",
+              "GetBaseReport", "GetLocalListVersion", "GetVariables", "RequestStartTransaction",
+              "RequestStopTransaction", "Reset", "SetChargingProfile", "SetVariables", "TriggerMessage",
+              "UnlockConnector"));
+  /** Sent by the self-tests and answered NotImplemented: the baseline fixtures have no answer. */
+  static final Map<String, String> UNANSWERED_BY_CSMS =
+      Map.of("1.6", "SecurityEventNotification", "2.0.1", "ReservationStatusUpdate");
+  static final Map<String, String> UNANSWERED_BY_STATION =
+      Map.of("1.6", "ExtendedTriggerMessage", "2.0.1", "CancelReservation");
 
   /** Exit 2: nothing was sent. */
   static final class UsageException extends Exception {
@@ -294,6 +314,69 @@ public final class Main {
     return array;
   }
 
+  private static JsonObject versionCapabilities(String version) {
+    Set<String> stationHandles = new TreeSet<>(CSMS_SENDS.get(version));
+    stationHandles.remove(UNANSWERED_BY_STATION.get(version));
+    Set<String> csmsHandles = new TreeSet<>(STATION_SENDS.get(version));
+    csmsHandles.remove(UNANSWERED_BY_CSMS.get(version));
+
+    JsonObject client = new JsonObject();
+    client.addProperty("supported", true);
+    client.add("sends", array(STATION_SENDS.get(version)));
+    client.add("handles", array(stationHandles));
+    JsonObject server = new JsonObject();
+    server.addProperty("supported", true);
+    server.add("sends", array(CSMS_SENDS.get(version)));
+    server.add("handles", array(csmsHandles));
+    JsonObject features = new JsonObject();
+    JsonArray profiles = new JsonArray();
+    profiles.add(0);
+    profiles.add(1);
+    features.add("securityProfiles", profiles);
+    features.addProperty("compression", false);
+    features.addProperty("send", false);
+    features.addProperty("callResultError", false);
+    features.addProperty("fixtureCallErrors", false);
+    features.addProperty("messageIds", false);
+    List<String> notes = new ArrayList<>();
+    notes.add(
+        "Java-OCA-OCPP answers a CALL with a CALLERROR only on its own terms (NotImplemented for an "
+            + "action it has no feature for, InternalError when a handler fails), so a fixture with "
+            + "callError answers is refused with exit 5.");
+    if (version.equals("1.6")) {
+      notes.add(
+          "JSONServer and JSONClient always register the Core profile: a Core action without a fixture "
+              + "answer is answered with InternalError, not NotImplemented.");
+    } else {
+      notes.add(
+          "OCPP 2.0.1 runs on MultiProtocolJSONServer and MultiProtocolJSONClient (artifact ocpp2), for "
+              + "that one protocol version. The server offers permessage-deflate by default (upstream "
+              + "default); compression is not declared because no self-test checks it.");
+    }
+    notes.add(
+        "The message id of a CALL the upstream sends is not exposed: result documents have no "
+            + "messageId, and call-sent and call-result events carry null.");
+    notes.add(
+        "The upstream does not expose the negotiated subprotocol, or the close code and reason: "
+            + "connection-opened has subprotocol null, connection-closed has code and reason null.");
+    if (version.equals("1.6")) {
+      notes.add("The 1.6 JSONServer also accepts a handshake that offers no subprotocol (upstream behaviour).");
+      notes.add(
+          "The 1.6 JSONServer refuses Basic credentials whose password is not 16 to 20 bytes long before "
+              + "the adapter sees them (no connection-rejected event).");
+    } else {
+      notes.add(
+          "The 2.0.1 server refuses Basic credentials whose password is not 16 to 40 bytes long before "
+              + "the adapter sees them (no connection-rejected event).");
+    }
+    JsonObject document = new JsonObject();
+    document.add("client", client);
+    document.add("server", server);
+    document.add("features", features);
+    document.add("notes", array(notes));
+    return document;
+  }
+
   static JsonObject capabilities() {
     JsonObject info = buildInfo();
     JsonObject upstream = new JsonObject();
@@ -305,50 +388,10 @@ public final class Main {
     upstream.addProperty("language", "Java");
     upstream.addProperty("independentEngine", true);
 
-    Set<String> stationHandles = new TreeSet<>(CSMS_SENDS);
-    stationHandles.remove("ExtendedTriggerMessage");
-    Set<String> csmsHandles = new TreeSet<>(STATION_SENDS);
-    csmsHandles.remove("SecurityEventNotification");
-
-    JsonObject client = new JsonObject();
-    client.addProperty("supported", true);
-    client.add("sends", array(STATION_SENDS));
-    client.add("handles", array(stationHandles));
-    JsonObject server = new JsonObject();
-    server.addProperty("supported", true);
-    server.add("sends", array(CSMS_SENDS));
-    server.add("handles", array(csmsHandles));
-    JsonObject features = new JsonObject();
-    features.add("securityProfiles", array(List.of()));
-    features.getAsJsonArray("securityProfiles").add(0);
-    features.getAsJsonArray("securityProfiles").add(1);
-    features.addProperty("compression", false);
-    features.addProperty("send", false);
-    features.addProperty("callResultError", false);
-    features.addProperty("fixtureCallErrors", false);
-    features.addProperty("messageIds", false);
-    JsonObject v16 = new JsonObject();
-    v16.add("client", client);
-    v16.add("server", server);
-    v16.add("features", features);
-    v16.add(
-        "notes",
-        array(
-            List.of(
-                "Java-OCA-OCPP answers a CALL with a CALLERROR only on its own terms (NotImplemented for an "
-                    + "action it has no feature for, InternalError when a handler fails), so a fixture with "
-                    + "callError answers is refused with exit 5.",
-                "JSONServer and JSONClient always register the Core profile: a Core action without a fixture "
-                    + "answer is answered with InternalError, not NotImplemented.",
-                "The message id of a CALL the upstream sends is not exposed: result documents have no "
-                    + "messageId, and call-sent and call-result events carry null.",
-                "The upstream does not expose the negotiated subprotocol, or the close code and reason: "
-                    + "connection-opened has subprotocol null, connection-closed has code and reason null.",
-                "The 1.6 JSONServer also accepts a handshake that offers no subprotocol (upstream behaviour).",
-                "The 1.6 JSONServer refuses Basic credentials whose password is not 16 to 20 bytes long before "
-                    + "the adapter sees them (no connection-rejected event).")));
     JsonObject versions = new JsonObject();
-    versions.add("1.6", v16);
+    for (String version : new TreeSet<>(SUPPORTED_VERSIONS)) {
+      versions.add(version, versionCapabilities(version));
+    }
 
     JsonObject document = new JsonObject();
     document.addProperty("schemaVersion", Out.SCHEMA_VERSION);

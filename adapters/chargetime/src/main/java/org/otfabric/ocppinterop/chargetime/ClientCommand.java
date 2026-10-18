@@ -5,6 +5,8 @@ import com.google.gson.JsonObject;
 import eu.chargetime.ocpp.ClientEvents;
 import eu.chargetime.ocpp.JSONClient;
 import eu.chargetime.ocpp.JSONConfiguration;
+import eu.chargetime.ocpp.MultiProtocolJSONClient;
+import eu.chargetime.ocpp.ProtocolVersion;
 import eu.chargetime.ocpp.feature.profile.ClientCoreEventHandler;
 import eu.chargetime.ocpp.feature.profile.ClientCoreProfile;
 import java.io.IOException;
@@ -18,15 +20,19 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /**
- * {@code client run} and {@code client <Action>}: a station. The upstream's {@link JSONClient}
- * (OCPP 1.6 JSON over Java-WebSocket) with the Core profile and the fixture's profile.
+ * {@code client run} and {@code client <Action>}: a station. OCPP 1.6: the upstream's {@link
+ * JSONClient} (OCPP 1.6 JSON over Java-WebSocket) with the Core profile and the fixture's profile.
+ * OCPP 2.0.1: the upstream's {@link MultiProtocolJSONClient} for that one protocol version, with
+ * the fixture's function.
  */
 final class ClientCommand {
   private ClientCommand() {}
 
-  /** An open connection. */
+  /** An open connection, with either upstream client class. */
   private static final class Connection {
-    JSONClient client;
+    Runnable connect;
+    Runnable disconnect;
+    Endpoint.Sender sender;
     final CompletableFuture<Void> opened = new CompletableFuture<>();
     final CompletableFuture<Void> closed = new CompletableFuture<>();
   }
@@ -75,7 +81,7 @@ final class ClientCommand {
           Path.of(flags.get("ready-file", Main.READY_FILE)),
           Path.of(flags.get("control-socket", Main.CONTROL_SOCKET)));
     }
-    if (Registry.feature(action, null) == null) {
+    if (Registry.feature(version, action, null) == null) {
       Out.line(Out.result(version, action, false, payload, null, null, "unsupported",
           "Java-OCA-OCPP has no OCPP " + version + " feature for " + action, 0));
       return 5;
@@ -89,7 +95,7 @@ final class ClientCommand {
           "the WebSocket handshake with " + fullUrl + " failed or was refused (the upstream logs why on stderr)",
           TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
     } else {
-      document = endpoint.execute(action, payload, timeoutMs, station, connection.client::send, connection.closed);
+      document = endpoint.execute(action, payload, timeoutMs, station, connection.sender, connection.closed);
       disconnect(connection);
       document.addProperty("elapsedMs", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
     }
@@ -109,33 +115,40 @@ final class ClientCommand {
           .setParameter(JSONConfiguration.PASSWORD_PARAMETER, fixture.password(station));
     }
     Connection connection = new Connection();
-    connection.client =
-        new JSONClient(
-            new ClientCoreProfile(endpoint.handler(ClientCoreEventHandler.class)),
-            station.isEmpty() ? null : station,
-            configuration);
-    connection.client.addFeatureProfile(endpoint);
-    // JSONClient.connect() blocks until the handshake succeeds or fails, and
-    // reports neither (eu.chargetime.ocpp.WebSocketTransmitter); the events
-    // say whether it opened. It runs in its own thread so that a peer that
-    // never answers the handshake is bounded by the connect timeout too.
-    Thread connector =
-        new Thread(
-            () ->
-                connection.client.connect(
-                    url.replaceAll("/+$", ""),
-                    new ClientEvents() {
-                      @Override
-                      public void connectionOpened() {
-                        connection.opened.complete(null);
-                      }
+    ClientEvents events =
+        new ClientEvents() {
+          @Override
+          public void connectionOpened() {
+            connection.opened.complete(null);
+          }
 
-                      @Override
-                      public void connectionClosed() {
-                        connection.closed.complete(null);
-                      }
-                    }),
-            "connect");
+          @Override
+          public void connectionClosed() {
+            connection.closed.complete(null);
+          }
+        };
+    String base = url.replaceAll("/+$", "");
+    String identity = station.isEmpty() ? null : station;
+    if (endpoint.version().equals("1.6")) {
+      JSONClient client =
+          new JSONClient(new ClientCoreProfile(endpoint.handler(ClientCoreEventHandler.class)), identity, configuration);
+      client.addFeatureProfile(endpoint.profile());
+      connection.connect = () -> client.connect(base, events);
+      connection.disconnect = client::disconnect;
+      connection.sender = client::send;
+    } else {
+      MultiProtocolJSONClient client =
+          new MultiProtocolJSONClient(List.of(ProtocolVersion.OCPP2_0_1), identity, configuration);
+      client.addFunction(ProtocolVersion.OCPP2_0_1, endpoint.function());
+      connection.connect = () -> client.connect(base, events);
+      connection.disconnect = client::disconnect;
+      connection.sender = client::send;
+    }
+    // connect() blocks until the handshake succeeds or fails, and reports
+    // neither (eu.chargetime.ocpp.WebSocketTransmitter); the events say
+    // whether it opened. It runs in its own thread so that a peer that never
+    // answers the handshake is bounded by the connect timeout too.
+    Thread connector = new Thread(connection.connect, "connect");
     connector.setDaemon(true);
     connector.start();
     connector.join(connectTimeoutMs + 1000);
@@ -143,7 +156,7 @@ final class ClientCommand {
   }
 
   private static void disconnect(Connection connection) {
-    Thread closer = new Thread(connection.client::disconnect, "disconnect");
+    Thread closer = new Thread(connection.disconnect, "disconnect");
     closer.setDaemon(true);
     closer.start();
     try {
@@ -178,7 +191,7 @@ final class ClientCommand {
                   return Out.result(version, action, false, payload, null, null, "not-connected",
                       "no open connection for station " + wanted, 0);
                 }
-                return endpoint.execute(action, payload, timeoutMs, station, connection.client::send, connection.closed);
+                return endpoint.execute(action, payload, timeoutMs, station, connection.sender, connection.closed);
               });
     } catch (IOException e) {
       System.err.println("client: cannot open the control socket " + controlPath + ": " + e);

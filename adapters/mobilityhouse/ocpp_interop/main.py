@@ -16,7 +16,7 @@ from .fixture import FIXTURES_DIR, VERSION_DIRS, FixtureError, default_path, loa
 BUILD_INFO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "build-info.json")
 READY_FILE = "/run/ocpp-interop/ready"
 CONTROL_SOCKET = "/run/ocpp-interop/control.sock"
-SUPPORTED_VERSIONS = {"1.6"}
+SUPPORTED_VERSIONS = {"1.6", "2.0.1"}
 _NAME = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _ACTION = re.compile(r"^[A-Z][A-Za-z0-9]+$")
 
@@ -33,22 +33,43 @@ USAGE = """usage:
   ocpp-interop print-fixture --version V [NAME]
   ocpp-interop version"""
 
-# What the self-tests exercise (scripts/smoke.sh, scripts/interop.sh). Nothing
-# else is declared (REQUIREMENTS.md R4.2).
-STATION_SENDS = [
-    "Authorize", "BootNotification", "DataTransfer", "DiagnosticsStatusNotification",
-    "FirmwareStatusNotification", "Heartbeat", "MeterValues", "SecurityEventNotification",
-    "StartTransaction", "StatusNotification", "StopTransaction",
-]
-CSMS_SENDS = [
-    "CancelReservation", "ChangeAvailability", "ChangeConfiguration", "ClearCache",
-    "ClearChargingProfile", "DataTransfer", "ExtendedTriggerMessage", "GetCompositeSchedule",
-    "GetConfiguration", "GetDiagnostics", "GetLocalListVersion", "RemoteStartTransaction",
-    "RemoteStopTransaction", "ReserveNow", "Reset", "SendLocalList", "SetChargingProfile",
-    "TriggerMessage", "UnlockConnector", "UpdateFirmware",
-]
-STATION_HANDLES = sorted(set(CSMS_SENDS) - {"ExtendedTriggerMessage"})
-CSMS_HANDLES = sorted(set(STATION_SENDS) - {"SecurityEventNotification"})
+# What the self-tests exercise (scripts/smoke.sh, scripts/interop.sh), per
+# version. Nothing else is declared (REQUIREMENTS.md R4.2).
+STATION_SENDS = {
+    "1.6": [
+        "Authorize", "BootNotification", "DataTransfer", "DiagnosticsStatusNotification",
+        "FirmwareStatusNotification", "Heartbeat", "MeterValues", "SecurityEventNotification",
+        "StartTransaction", "StatusNotification", "StopTransaction",
+    ],
+    "2.0.1": [
+        "Authorize", "BootNotification", "DataTransfer", "FirmwareStatusNotification", "Heartbeat",
+        "LogStatusNotification", "MeterValues", "NotifyEvent", "NotifyReport", "ReservationStatusUpdate",
+        "SecurityEventNotification", "StatusNotification", "TransactionEvent",
+    ],
+}
+CSMS_SENDS = {
+    "1.6": [
+        "CancelReservation", "ChangeAvailability", "ChangeConfiguration", "ClearCache",
+        "ClearChargingProfile", "DataTransfer", "ExtendedTriggerMessage", "GetCompositeSchedule",
+        "GetConfiguration", "GetDiagnostics", "GetLocalListVersion", "RemoteStartTransaction",
+        "RemoteStopTransaction", "ReserveNow", "Reset", "SendLocalList", "SetChargingProfile",
+        "TriggerMessage", "UnlockConnector", "UpdateFirmware",
+    ],
+    "2.0.1": [
+        "CancelReservation", "ChangeAvailability", "ClearCache", "ClearChargingProfile", "DataTransfer",
+        "GetBaseReport", "GetLocalListVersion", "GetVariables", "RequestStartTransaction",
+        "RequestStopTransaction", "Reset", "SetChargingProfile", "SetVariables", "TriggerMessage",
+        "UnlockConnector",
+    ],
+}
+# Sent by the self-tests, and answered NotImplemented: the baseline fixtures
+# have no answer for them.
+UNANSWERED = {
+    "1.6": {"station": "SecurityEventNotification", "csms": "ExtendedTriggerMessage"},
+    "2.0.1": {"station": "ReservationStatusUpdate", "csms": "CancelReservation"},
+}
+STATION_HANDLES = {v: sorted(set(a) - {UNANSWERED[v]["csms"]}) for v, a in CSMS_SENDS.items()}
+CSMS_HANDLES = {v: sorted(set(a) - {UNANSWERED[v]["station"]}) for v, a in STATION_SENDS.items()}
 
 
 class UsageError(Exception):
@@ -132,7 +153,17 @@ def action_of(positional: list[str]) -> str:
 
 
 def fixture_of(given: dict, version: str):
-    return load(given.get("fixture", str(default_path(version))), version)
+    fixture = load(given.get("fixture", str(default_path(version))), version)
+    from .endpoint import error_class  # pylint: disable=import-outside-toplevel
+
+    # The upstream answers with a CALLERROR of a code only through its
+    # OCPPError subclass of that code.
+    for role in ("csms", "station"):
+        for action, answer in fixture.answers(role).items():
+            code = answer.get("callError", {}).get("code")
+            if code is not None and error_class(code) is None:
+                raise Unsupported(f"answers.{role}.{action}: the ocpp package has no CALLERROR {code!r}")
+    return fixture
 
 
 def build_info() -> dict:
@@ -161,28 +192,31 @@ def capabilities() -> dict:
             "language": "Python",
             "independentEngine": True,
         },
-        "versions": {
-            "1.6": {
-                "client": {"supported": True, "sends": STATION_SENDS, "handles": STATION_HANDLES},
-                "server": {"supported": True, "sends": CSMS_SENDS, "handles": CSMS_HANDLES},
-                "features": {
-                    "securityProfiles": [0, 1],
-                    "compression": False,
-                    "send": False,
-                    "callResultError": False,
-                    "fixtureCallErrors": True,
-                    "messageIds": True,
-                },
-                "notes": [
-                    "The ocpp package has no transport; the adapter runs it over the websockets package, "
-                    "as the upstream's documentation and examples do.",
-                    "The server answers an action of OCPP 1.6 without a fixture entry with NotImplemented, "
-                    "and an action that is not part of OCPP 1.6 with NotSupported (upstream behaviour).",
-                    "The server refuses a handshake that does not offer the subprotocol ocpp1.6 (HTTP 400, "
-                    "websockets).",
-                ],
-            },
+        "versions": {version: version_capabilities(version) for version in sorted(SUPPORTED_VERSIONS)},
+    }
+
+
+def version_capabilities(version: str) -> dict:
+    subprotocol = {"1.6": "ocpp1.6", "2.0.1": "ocpp2.0.1"}[version]
+    return {
+        "client": {"supported": True, "sends": STATION_SENDS[version], "handles": STATION_HANDLES[version]},
+        "server": {"supported": True, "sends": CSMS_SENDS[version], "handles": CSMS_HANDLES[version]},
+        "features": {
+            "securityProfiles": [0, 1],
+            "compression": False,
+            "send": False,
+            "callResultError": False,
+            "fixtureCallErrors": True,
+            "messageIds": True,
         },
+        "notes": [
+            "The ocpp package has no transport; the adapter runs it over the websockets package, "
+            "as the upstream's documentation and examples do.",
+            f"An endpoint answers an action of OCPP {version} without a fixture entry with NotImplemented, "
+            f"and an action that is not part of OCPP {version} with NotSupported (upstream behaviour).",
+            f"The server refuses a handshake that does not offer the subprotocol {subprotocol} (HTTP 400, "
+            "websockets).",
+        ],
     }
 
 

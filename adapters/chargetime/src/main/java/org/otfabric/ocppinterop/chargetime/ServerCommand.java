@@ -4,6 +4,8 @@ package org.otfabric.ocppinterop.chargetime;
 import eu.chargetime.ocpp.AuthenticationException;
 import eu.chargetime.ocpp.JSONConfiguration;
 import eu.chargetime.ocpp.JSONServer;
+import eu.chargetime.ocpp.MultiProtocolJSONServer;
+import eu.chargetime.ocpp.ProtocolVersion;
 import eu.chargetime.ocpp.ServerEvents;
 import eu.chargetime.ocpp.feature.profile.ServerCoreEventHandler;
 import eu.chargetime.ocpp.feature.profile.ServerCoreProfile;
@@ -25,11 +27,58 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 
 /**
- * {@code server}: a CSMS. The upstream's {@link JSONServer} (OCPP 1.6 JSON over Java-WebSocket)
- * with the Core profile and the fixture's profile.
+ * {@code server}: a CSMS. OCPP 1.6: the upstream's {@link JSONServer} (OCPP 1.6 JSON over
+ * Java-WebSocket) with the Core profile and the fixture's profile. OCPP 2.0.1: the upstream's
+ * {@link MultiProtocolJSONServer} for that one protocol version, with the fixture's function.
  */
 final class ServerCommand {
   private ServerCommand() {}
+
+  /** What the command needs of either upstream server class. */
+  private interface Upstream {
+    void open(String host, int port, ServerEvents events);
+
+    void close();
+
+    Endpoint.Sender sender(UUID session);
+  }
+
+  private static Upstream upstream(String version, Endpoint endpoint) {
+    if (version.equals("1.6")) {
+      JSONServer server =
+          new JSONServer(new ServerCoreProfile(endpoint.handler(ServerCoreEventHandler.class)), JSONConfiguration.get());
+      server.addFeatureProfile(endpoint.profile());
+      return new Upstream() {
+        public void open(String host, int port, ServerEvents events) {
+          server.open(host, port, events);
+        }
+
+        public void close() {
+          server.close();
+        }
+
+        public Endpoint.Sender sender(UUID session) {
+          return request -> server.send(session, request);
+        }
+      };
+    }
+    MultiProtocolJSONServer server =
+        new MultiProtocolJSONServer(List.of(ProtocolVersion.OCPP2_0_1), JSONConfiguration.get());
+    server.addFunction(ProtocolVersion.OCPP2_0_1, endpoint.function());
+    return new Upstream() {
+      public void open(String host, int port, ServerEvents events) {
+        server.open(host, port, events);
+      }
+
+      public void close() {
+        server.close();
+      }
+
+      public Endpoint.Sender sender(UUID session) {
+        return request -> server.send(session, request);
+      }
+    };
+  }
 
   /** The station identity: the last segment of the request path. */
   static String stationOf(String resource) {
@@ -68,9 +117,7 @@ final class ServerCommand {
     Map<UUID, CompletableFuture<Void>> closedBySession = new ConcurrentHashMap<>();
 
     Endpoint endpoint = new Endpoint(version, fixture, "csms", stationBySession::get, true);
-    JSONServer server =
-        new JSONServer(new ServerCoreProfile(endpoint.handler(ServerCoreEventHandler.class)), JSONConfiguration.get());
-    server.addFeatureProfile(endpoint);
+    Upstream server = upstream(version, endpoint);
 
     ServerEvents events =
         new ServerEvents() {
@@ -145,7 +192,7 @@ final class ServerCommand {
                   return Out.result(version, action, false, payload, null, null, "not-connected",
                       "no open connection for station " + station, 0);
                 }
-                return endpoint.execute(action, payload, timeoutMs, station, request -> server.send(session, request), closed);
+                return endpoint.execute(action, payload, timeoutMs, station, server.sender(session), closed);
               });
     } catch (IOException e) {
       System.err.println("server: cannot open the control socket " + controlPath + ": " + e);

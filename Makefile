@@ -33,7 +33,7 @@ BUILDER ?= ocpp-interop
 
 # Adapters with an image, in priority order. The self-tests run over all of
 # them; override to work on one: make smoke ADAPTERS=mobilityhouse
-ADAPTERS ?= mobilityhouse chargetime
+ADAPTERS ?= mobilityhouse chargetime lorenzodonini
 
 image = $(REGISTRY)/ocpp-interop-$(1)
 
@@ -81,7 +81,7 @@ fixtures: ## Validate every fixture against the schema and the cross-field rules
 	@echo "Validating fixtures..."
 	$(call with_jsonschema,scripts/validate-fixtures.py --require-schema)
 
-lint: ## Shellcheck the scripts and byte-compile the Python ones
+lint: ## Shellcheck the scripts, byte-compile the Python ones, gofmt the Go adapter (the image build also runs gofmt and go vet)
 	@if command -v shellcheck >/dev/null; then \
 		shellcheck --severity=warning -x -P scripts scripts/*.sh; \
 	else \
@@ -89,6 +89,9 @@ lint: ## Shellcheck the scripts and byte-compile the Python ones
 	fi
 	@$(PYTHON) -m py_compile scripts/*.py adapters/mobilityhouse/ocpp_interop/*.py \
 		&& rm -rf scripts/__pycache__ adapters/mobilityhouse/ocpp_interop/__pycache__
+	@if command -v gofmt >/dev/null; then \
+		test -z "$$(gofmt -l adapters/lorenzodonini)" || { gofmt -l adapters/lorenzodonini; echo "gofmt: the files above need formatting"; exit 1; }; \
+	fi
 	@echo "lint ok"
 
 documents: ## Run the self-tests keeping every document, and validate them against schemas/
@@ -151,9 +154,10 @@ capabilities: ## Print the capability document of every adapter
 # ── Run a reference server on the host ────────────────────────────────────────
 
 RUN_PORT ?= 9000
+RUN_OCPP ?= 1.6
 
-run-%: FORCE ## Run one reference CSMS (OCPP 1.6) on 127.0.0.1:$(RUN_PORT), e.g. run-mobilityhouse
-	docker run --rm -p 127.0.0.1:$(RUN_PORT):9000 $(call image,$*):$(VERSION) server --version 1.6
+run-%: FORCE ## Run one reference CSMS (OCPP $(RUN_OCPP)) on 127.0.0.1:$(RUN_PORT), e.g. run-mobilityhouse RUN_OCPP=2.0.1
+	docker run --rm -p 127.0.0.1:$(RUN_PORT):9000 $(call image,$*):$(VERSION) server --version $(RUN_OCPP)
 
 # ── Multi-arch build and publish ──────────────────────────────────────────────
 
