@@ -15,7 +15,7 @@ import java.time.temporal.ChronoUnit;
 final class Out {
   static final String ADAPTER = "chargetime";
   static final String SCHEMA_VERSION = "1.0";
-  static final String CONTRACT_VERSION = "0.3";
+  static final String CONTRACT_VERSION = "0.4";
 
   /** Glue only: the adapter's own documents. OCPP payloads go through the upstream's Gson. */
   static final Gson GSON = new GsonBuilder().disableHtmlEscaping().serializeNulls().create();

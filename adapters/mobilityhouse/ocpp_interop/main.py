@@ -16,7 +16,7 @@ from .fixture import FIXTURES_DIR, VERSION_DIRS, FixtureError, default_path, loa
 BUILD_INFO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "build-info.json")
 READY_FILE = "/run/ocpp-interop/ready"
 CONTROL_SOCKET = "/run/ocpp-interop/control.sock"
-SUPPORTED_VERSIONS = {"1.6", "2.0.1"}
+SUPPORTED_VERSIONS = {"1.6", "2.0.1", "2.1"}
 _NAME = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _ACTION = re.compile(r"^[A-Z][A-Za-z0-9]+$")
 
@@ -46,6 +46,12 @@ STATION_SENDS = {
         "LogStatusNotification", "MeterValues", "NotifyEvent", "NotifyReport", "ReservationStatusUpdate",
         "SecurityEventNotification", "StatusNotification", "TransactionEvent",
     ],
+    "2.1": [
+        "Authorize", "BootNotification", "ClosePeriodicEventStream", "DataTransfer",
+        "FirmwareStatusNotification", "Heartbeat", "LogStatusNotification", "MeterValues", "NotifyDERAlarm",
+        "NotifyDERStartStop", "NotifyEvent", "NotifyReport", "OpenPeriodicEventStream", "ReportDERControl",
+        "ReservationStatusUpdate", "SecurityEventNotification", "StatusNotification", "TransactionEvent",
+    ],
 }
 CSMS_SENDS = {
     "1.6": [
@@ -61,12 +67,20 @@ CSMS_SENDS = {
         "RequestStopTransaction", "Reset", "SetChargingProfile", "SetVariables", "TriggerMessage",
         "UnlockConnector",
     ],
+    "2.1": [
+        "AdjustPeriodicEventStream", "CancelReservation", "ChangeAvailability", "ClearCache",
+        "ClearChargingProfile", "ClearDERControl", "ClearTariffs", "DataTransfer", "GetBaseReport",
+        "GetDERControl", "GetLocalListVersion", "GetPeriodicEventStream", "GetTariffs", "GetVariables",
+        "RequestBatterySwap", "RequestStartTransaction", "RequestStopTransaction", "Reset", "SetChargingProfile",
+        "SetDERControl", "SetDefaultTariff", "SetVariables", "TriggerMessage", "UnlockConnector",
+    ],
 }
 # Sent by the self-tests, and answered NotImplemented: the baseline fixtures
 # have no answer for them.
 UNANSWERED = {
     "1.6": {"station": "SecurityEventNotification", "csms": "ExtendedTriggerMessage"},
     "2.0.1": {"station": "ReservationStatusUpdate", "csms": "CancelReservation"},
+    "2.1": {"station": "ReservationStatusUpdate", "csms": "CancelReservation"},
 }
 STATION_HANDLES = {v: sorted(set(a) - {UNANSWERED[v]["csms"]}) for v, a in CSMS_SENDS.items()}
 CSMS_HANDLES = {v: sorted(set(a) - {UNANSWERED[v]["station"]}) for v, a in STATION_SENDS.items()}
@@ -197,7 +211,27 @@ def capabilities() -> dict:
 
 
 def version_capabilities(version: str) -> dict:
-    subprotocol = {"1.6": "ocpp1.6", "2.0.1": "ocpp2.0.1"}[version]
+    subprotocol = {"1.6": "ocpp1.6", "2.0.1": "ocpp2.0.1", "2.1": "ocpp2.1"}[version]
+    notes = [
+        "The ocpp package has no transport; the adapter runs it over the websockets package, "
+        "as the upstream's documentation and examples do.",
+        f"An endpoint answers an action of OCPP {version} without a fixture entry with NotImplemented, "
+        f"and an action that is not part of OCPP {version} with NotSupported (upstream behaviour).",
+        f"The server refuses a handshake that does not offer the subprotocol {subprotocol} (HTTP 400, "
+        "websockets).",
+    ]
+    if version == "2.1":
+        notes[1] = (
+            "An endpoint does not answer an OCPP 2.1 CALL whose action has no fixture entry: ocpp 2.1.0 raises "
+            "neither NotImplemented nor NotSupported for 2.1 (charge_point._raise_key_error), so the sender "
+            "times out (tests/known-bugs.tsv; fixed on the upstream's master, unreleased).")
+        notes += [
+            "No SEND and no CALLRESULTERROR: ocpp 2.1.0 knows the message types 2, 3 and 4 only "
+            "(ocpp.messages.MessageType). It has no NotifyPeriodicEventStream (a SEND), which is unsupported "
+            "(exit 5), and drops a frame of type 5 or 6 it receives, which the adapter reports as protocol-error.",
+            "BatterySwap is not sent: ocpp 2.1.0 writes the battery fields soC and soH as SoC and soh "
+            "(charge_point.snake_to_camel_case), which its own schema validation refuses.",
+        ]
     return {
         "client": {"supported": True, "sends": STATION_SENDS[version], "handles": STATION_HANDLES[version]},
         "server": {"supported": True, "sends": CSMS_SENDS[version], "handles": CSMS_HANDLES[version]},
@@ -209,14 +243,7 @@ def version_capabilities(version: str) -> dict:
             "fixtureCallErrors": True,
             "messageIds": True,
         },
-        "notes": [
-            "The ocpp package has no transport; the adapter runs it over the websockets package, "
-            "as the upstream's documentation and examples do.",
-            f"An endpoint answers an action of OCPP {version} without a fixture entry with NotImplemented, "
-            f"and an action that is not part of OCPP {version} with NotSupported (upstream behaviour).",
-            f"The server refuses a handshake that does not offer the subprotocol {subprotocol} (HTTP 400, "
-            "websockets).",
-        ],
+        "notes": notes,
     }
 
 

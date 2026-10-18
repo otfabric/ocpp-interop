@@ -15,7 +15,7 @@ values in the fixture, which they read from the image with `print-fixture`.
 fixtures/schema/ocpp-fixture.schema.json   the schema (draft 2020-12)
 fixtures/v16/<name>/fixture.json           OCPP 1.6J
 fixtures/v201/<name>/fixture.json          OCPP 2.0.1
-fixtures/v21/<name>/fixture.json           OCPP 2.1 (from Phase 6)
+fixtures/v21/<name>/fixture.json           OCPP 2.1
 ```
 
 `make fixtures` validates each fixture against the schema, then checks the
@@ -25,17 +25,20 @@ cross-field rules (scripts/validate-fixtures.py):
   `ocppVersion`;
 - identities, id tokens, configuration keys, variables and EVSE IDs are
   unique;
-- id tokens are at most 20 characters in 1.6 and 36 in 2.x, and every 2.x
-  token has a type;
+- id tokens are at most 20 characters in 1.6, 36 in 2.0.1 and 255 in 2.1,
+  and every 2.x token has a type;
 - every answer is for an action the answering role actually receives in
-  that version;
+  that version (for 2.1, the directions of OCPP 2.1 Edition 2, Part 2), and
+  an action the version sends as a SEND (2.1: NotifyPeriodicEventStream) has
+  no answer;
 - every sample is sent by the role that sends that action;
 - a derived answer names a table that fits the action and is not empty.
 
 The adapters check a fixture when they load it, and exit 4 on a violation:
 `mobilityhouse` with the schema and the code of scripts/validate-fixtures.py
 itself, `chargetime` and `lorenzodonini` with a hand-written equivalent of
-the rules for the versions they support (1.6 and 2.0.1). A fixture with an
+the rules for the versions they support (1.6 and 2.0.1; neither supports
+2.1). A fixture with an
 answer the adapter cannot give (`callError` without the `fixtureCallErrors`
 capability, or with a code that is not an OCPP-J error code) exits 5.
 
@@ -84,9 +87,10 @@ the lifetime of the process. Nothing else changes values.
 
 ## Baseline fixtures
 
-`fixtures/v16/baseline` and `fixtures/v201/baseline` describe the station
-`OT-FABRIC-TEST-001`, vendor `OTFabric`, model `TestStation`. It has two
-connectors in 1.6, and two EVSEs with one connector each in 2.0.1. The id
+`fixtures/v16/baseline`, `fixtures/v201/baseline` and `fixtures/v21/baseline`
+describe the station `OT-FABRIC-TEST-001`, vendor `OTFabric`, model
+`TestStation`. It has two connectors in 1.6, and two EVSEs with one connector
+each in 2.x. The id
 tokens are one accepted, one blocked and one expired. Samples cover
 provisioning, authorization, the transaction lifecycle, meter values,
 remote start and stop, configuration or the device model, reset, triggers
@@ -97,13 +101,14 @@ directions, and samples for actions it does not answer, so that a test can
 check the `NotImplemented` CALLERROR from both ends. In 1.6:
 `securityEvent`/`securityEventMinimal` (SecurityEventNotification, with and
 without the optional `techInfo`) and `extendedTriggerHeartbeat`
-(ExtendedTriggerMessage). In 2.0.1: `reservationStatusUpdate`
+(ExtendedTriggerMessage). In 2.0.1 and 2.1: `reservationStatusUpdate`
 (ReservationStatusUpdate) and `cancelReservation` (CancelReservation).
 
 Every sample, every fixed answer and every derived answer for a sample
 validates against the OCA JSON schemas of its version (1.6 including the
-Security Whitepaper messages, 2.0.1), as bundled with The Mobility House
-ocpp 2.1.0. The schemas are not part of this repository;
+Security Whitepaper messages, 2.0.1, 2.1), as bundled with The Mobility
+House ocpp 2.1.0. Its 2.1 schemas are identical to the OCA's
+`OCPP-2.1_part3_JSON_schemas` of OCPP 2.1 Edition 2. The schemas are not part of this repository;
 [scripts/validate-payloads.py](../scripts/validate-payloads.py) checks a
 fixture against a copy of them:
 
@@ -112,6 +117,7 @@ python3 -m venv /tmp/oca && /tmp/oca/bin/pip install --index-url https://pypi.or
 schemas="$(/tmp/oca/bin/python -c 'import ocpp, os; print(os.path.dirname(ocpp.__file__))')"
 /tmp/oca/bin/python scripts/validate-payloads.py "$schemas/v16/schemas" fixtures/v16/baseline/fixture.json
 /tmp/oca/bin/python scripts/validate-payloads.py "$schemas/v201/schemas" fixtures/v201/baseline/fixture.json
+/tmp/oca/bin/python scripts/validate-payloads.py "$schemas/v21/schemas" fixtures/v21/baseline/fixture.json
 ```
 
 The 2.0.1 samples cover provisioning (BootNotification, Heartbeat,
@@ -122,6 +128,20 @@ FirmwareStatusNotification, LogStatusNotification, DataTransfer from both
 ends, RequestStart/StopTransaction, Reset, TriggerMessage, ChangeAvailability,
 ClearCache, UnlockConnector, SetChargingProfile (TxDefaultProfile),
 ClearChargingProfile and GetLocalListVersion.
+
+The 2.1 baseline has every 2.0.1 sample and answer (all of them are valid
+2.1 payloads), and these OCPP 2.1 additions:
+
+| Area | Station sends (CSMS answers) | CSMS sends (station answers) |
+|---|---|---|
+| Tariffs and cost | — | SetDefaultTariff, GetTariffs, ClearTariffs |
+| DER control | NotifyDERAlarm, NotifyDERStartStop, ReportDERControl | SetDERControl, GetDERControl, ClearDERControl |
+| Periodic event streams | OpenPeriodicEventStream, ClosePeriodicEventStream; NotifyPeriodicEventStream as a SEND (no answer) | GetPeriodicEventStream, AdjustPeriodicEventStream |
+| Battery swap | BatterySwap | RequestBatterySwap |
+
+The answers are fixed: GetTariffs reports the tariff that SetDefaultTariff
+installs, and GetPeriodicEventStream the stream that OpenPeriodicEventStream
+opens, whatever happened before.
 
 The station password (`OTFabricTestPass0001`) is a public test value. It
 exists so that security profile 1 and 2 scenarios can run, and must never be

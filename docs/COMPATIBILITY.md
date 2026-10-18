@@ -2,7 +2,7 @@
 
 Results of the reference-to-reference self-tests
 ([scripts/interop.sh](../scripts/interop.sh)): every station (`client`)
-against every CSMS (`server`), for OCPP 1.6J and 2.0.1, with CALLs sent by
+against every CSMS (`server`), for OCPP 1.6J, 2.0.1 and 2.1, with CALLs sent by
 the station and by the CSMS. The matrix below is the output of `make matrix` (from
 `reports/report-interop.json`, written by `make documents`); CI writes the
 same matrix for each architecture into its job summary.
@@ -18,7 +18,9 @@ security profile 1 and the fixture's CALLERROR answers. A 2.0.1 pairing has
 25 initiated by the station and 18 by the CSMS: one per sample, the derived
 answers (an unknown token; unknown component and variable with
 case-insensitive names; a read-only variable), connectivity, security
-profile 1 and the CALLERROR answers.
+profile 1 and the CALLERROR answers. A 2.1 pairing has 33 initiated by the
+station and 28 by the CSMS: the 2.0.1 tests, one per 2.1 sample, the SEND
+sample and CALLRESULTERROR (from each end).
 
 ## OCPP 1.6J
 
@@ -60,8 +62,31 @@ passes); every later CALL on the connection fails, because the station
 cannot decompress the CSMS's second message. The chargetime station and the
 lorenzodonini station do not offer compression and are not affected.
 
-Every smoke test ([scripts/smoke.sh](../scripts/smoke.sh)) passes: 127
-checks per image, for both versions.
+## OCPP 2.1
+
+Only `mobilityhouse` declares 2.1: the pinned releases of Java-OCA-OCPP
+(v2.0) and ocpp-go (v0.19.0) have no 2.1, so every pairing with them is one
+`v21.pairing` SKIP_UNSUPPORTED.
+
+| Station ↓ / CSMS → | chargetime v2.0 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 |
+|---|---|---|---|
+| chargetime v2.0 | 1 skip / — | 1 skip / — | 1 skip / — |
+| lorenzodonini v0.19.0 | 1 skip / — | 1 skip / — | 1 skip / — |
+| mobilityhouse 2.1.0 | 1 skip / — | 1 skip / — | 29 pass 3 skip 1 known / 26 pass 1 skip 1 known |
+
+Totals: 55 PASS, 2 KNOWN_ISSUE, 12 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
+
+| Station | CSMS | Test | Status | Evidence |
+|---|---|---|---|---|
+| mobilityhouse | mobilityhouse | `v21.from-station.reservation-status-update`, `v21.from-csms.cancel-reservation` | KNOWN_ISSUE (2) | [mobilityhouse/ocpp `charge_point.py`](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/charge_point.py#L161-L193) |
+| mobilityhouse | mobilityhouse | `v21.from-station.battery-swap-in` | SKIP_UNSUPPORTED | BatterySwap is not declared: ocpp 2.1.0 cannot send it (see below) |
+| mobilityhouse | mobilityhouse | `v21.send.notify-periodic-event-stream` | SKIP_UNSUPPORTED | no adapter declares `send` |
+| mobilityhouse | mobilityhouse | `v21.rpc.call-result-error` (from each end) | SKIP_UNSUPPORTED (2) | no adapter declares `callResultError` |
+| chargetime, lorenzodonini | all three | `v21.pairing` | SKIP_UNSUPPORTED (8) | 2.1 not declared by one of the two |
+
+Every smoke test ([scripts/smoke.sh](../scripts/smoke.sh)) passes: 128
+checks for chargetime and lorenzodonini (1.6 and 2.0.1), 176 for
+mobilityhouse (1.6, 2.0.1 and 2.1).
 
 ### What a PASS means
 
@@ -93,6 +118,8 @@ about conformance to the specification.
 | mobilityhouse (station, 1.6) | ocpp 2.1.0 | `ocpp.v16.call.SecurityEventNotification` declares `tech_info` without a default: a SecurityEventNotification without the optional `techInfo` cannot be built, although the bundled OCA schema makes it optional. Still so on master (2026-10-04) | [source](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/v16/call.py#L232-L236) |
 | chargetime (CSMS, 2.0.1), with a station that offers permessage-deflate | Java-OCA-OCPP v2.0 with Java-WebSocket 1.6.0 | `MultiProtocolJSONServer` enables permessage-deflate by default and keeps its compression context (`setServerNoContextTakeover(false)`), but Java-WebSocket 1.6.0 always answers `server_no_context_takeover`; the station cannot decompress the second message and closes the connection (1002). Java-WebSocket's master announces the parameter only when set | [source](https://github.com/TooTallNate/Java-WebSocket/blob/da3cf2a777aed862f2f5b5cf060cae7969958667/src/main/java/org/java_websocket/extensions/permessage_deflate/PerMessageDeflateExtension.java#L335-L340) |
 | lorenzodonini (station, 2.0.1), with a CSMS that validates responses | ocpp-go v0.19.0 | `ResetResponse` (and `SetNetworkProfileResponse`) declare `statusInfo` without `omitempty`: the station sends `"statusInfo": null`, which the OCA schema does not allow | [source](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/provisioning/reset.go#L61-L64) |
+| mobilityhouse (both roles, 2.1) | ocpp 2.1.0 | `charge_point._raise_key_error` raises NotImplemented or NotSupported for 1.6, 2.0 and 2.0.1 only: a 2.1 CALL whose action has no handler gets no answer, and the sender times out. Fixed on master (ae716a1, #744), unreleased | [source](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/charge_point.py#L161-L193) |
+| mobilityhouse (station, 2.1) | ocpp 2.1.0 | `snake_to_camel_case` writes the `soc` and `soh` fields of `BatteryDataType` as `SoC` and `soh` (the schema has `soC`, `soH`), so a BatterySwapRequest fails the upstream's own validation and cannot be sent. Not in known-bugs.tsv: BatterySwap is not declared, so no test runs it. Still so on master (2026-10-04) | [source](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/charge_point.py#L57-L64) |
 | lorenzodonini (station, 2.0.1) | ocpp-go v0.19.0 | `NotifyReportRequest.Tbc` is a `bool` with `omitempty`: an explicit `"tbc": false` is dropped from the request (false is the default) | [source](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/provisioning/notify_report.go#L98-L104) |
 
 See [tests/known-bugs.tsv](../tests/known-bugs.tsv).

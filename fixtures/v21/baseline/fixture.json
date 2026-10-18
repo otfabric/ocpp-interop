@@ -1,0 +1,185 @@
+{
+  "schemaVersion": "1.0",
+  "name": "baseline",
+  "ocppVersion": "2.1",
+  "description": "Two-EVSE AC station and a CSMS that accepts it. Covers provisioning, authorization, TransactionEvent, the device model, smart charging, and the OCPP 2.1 additions: tariffs, DER control, periodic event streams and battery swap.",
+  "stations": [
+    {
+      "id": "OT-FABRIC-TEST-001",
+      "vendor": "OTFabric",
+      "model": "TestStation",
+      "serialNumber": "OTF-0001",
+      "firmwareVersion": "1.0.0",
+      "password": "OTFabricTestPass0001",
+      "evses": [
+        {"id": 1, "connectors": [1]},
+        {"id": 2, "connectors": [1]}
+      ]
+    }
+  ],
+  "idTokens": [
+    {"idToken": "04A1B2C3D4E5F6", "type": "ISO14443", "status": "Accepted"},
+    {"idToken": "04BLOCKED00001", "type": "ISO14443", "status": "Blocked"},
+    {"idToken": "04EXPIRED00001", "type": "ISO14443", "status": "Expired"}
+  ],
+  "variables": [
+    {"component": {"name": "OCPPCommCtrlr"}, "variable": {"name": "HeartbeatInterval"}, "value": "300", "mutability": "ReadWrite"},
+    {"component": {"name": "SampledDataCtrlr"}, "variable": {"name": "TxUpdatedInterval"}, "value": "60", "mutability": "ReadWrite"},
+    {"component": {"name": "AuthCtrlr"}, "variable": {"name": "AuthorizeRemoteStart"}, "value": "true", "mutability": "ReadWrite"},
+    {"component": {"name": "ChargingStation"}, "variable": {"name": "AvailabilityState"}, "value": "Available", "mutability": "ReadOnly"}
+  ],
+  "answers": {
+    "csms": {
+      "BootNotification": {"payload": {"status": "Accepted", "currentTime": "${now}", "interval": 300}},
+      "Heartbeat": {"payload": {"currentTime": "${now}"}},
+      "Authorize": {"derived": "idTokens"},
+      "TransactionEvent": {"payload": {}},
+      "StatusNotification": {"payload": {}},
+      "MeterValues": {"payload": {}},
+      "NotifyReport": {"payload": {}},
+      "NotifyEvent": {"payload": {}},
+      "SecurityEventNotification": {"payload": {}},
+      "FirmwareStatusNotification": {"payload": {}},
+      "LogStatusNotification": {"payload": {}},
+      "DataTransfer": {"payload": {"status": "UnknownVendorId"}},
+      "NotifyDERAlarm": {"payload": {}},
+      "NotifyDERStartStop": {"payload": {}},
+      "ReportDERControl": {"payload": {}},
+      "OpenPeriodicEventStream": {"payload": {"status": "Accepted"}},
+      "ClosePeriodicEventStream": {"payload": {}},
+      "BatterySwap": {"payload": {}}
+    },
+    "station": {
+      "RequestStartTransaction": {"payload": {"status": "Accepted"}},
+      "RequestStopTransaction": {"payload": {"status": "Accepted"}},
+      "GetVariables": {"derived": "variables"},
+      "SetVariables": {"derived": "variables"},
+      "GetBaseReport": {"payload": {"status": "Accepted"}},
+      "ChangeAvailability": {"payload": {"status": "Accepted"}},
+      "ClearCache": {"payload": {"status": "Accepted"}},
+      "Reset": {"payload": {"status": "Accepted"}},
+      "UnlockConnector": {"payload": {"status": "Unlocked"}},
+      "TriggerMessage": {"payload": {"status": "Accepted"}},
+      "SetChargingProfile": {"payload": {"status": "Accepted"}},
+      "ClearChargingProfile": {"payload": {"status": "Accepted"}},
+      "GetLocalListVersion": {"payload": {"versionNumber": 0}},
+      "DataTransfer": {"payload": {"status": "UnknownVendorId"}},
+      "SetDefaultTariff": {"payload": {"status": "Accepted"}},
+      "GetTariffs": {"payload": {"status": "Accepted", "tariffAssignments": [
+        {"tariffId": "OTF-TARIFF-0001", "tariffKind": "DefaultTariff", "evseIds": [1, 2]}]}},
+      "ClearTariffs": {"payload": {"clearTariffsResult": [{"tariffId": "OTF-TARIFF-0001", "status": "Accepted"}]}},
+      "SetDERControl": {"payload": {"status": "Accepted"}},
+      "GetDERControl": {"payload": {"status": "Accepted"}},
+      "ClearDERControl": {"payload": {"status": "Accepted"}},
+      "GetPeriodicEventStream": {"payload": {"constantStreamData": [
+        {"id": 1, "variableMonitoringId": 1, "params": {"interval": 10, "values": 5}}]}},
+      "AdjustPeriodicEventStream": {"payload": {"status": "Accepted"}},
+      "RequestBatterySwap": {"payload": {"status": "Accepted"}}
+    }
+  },
+  "samples": {
+    "boot": {"action": "BootNotification", "from": "station", "payload": {
+      "reason": "PowerUp",
+      "chargingStation": {"vendorName": "OTFabric", "model": "TestStation",
+        "serialNumber": "OTF-0001", "firmwareVersion": "1.0.0"}}},
+    "heartbeat": {"action": "Heartbeat", "from": "station", "payload": {}},
+    "statusAvailable": {"action": "StatusNotification", "from": "station", "payload": {
+      "timestamp": "2026-01-01T10:00:00Z", "connectorStatus": "Available", "evseId": 1, "connectorId": 1}},
+    "authorizeAccepted": {"action": "Authorize", "from": "station", "payload": {
+      "idToken": {"idToken": "04A1B2C3D4E5F6", "type": "ISO14443"}}},
+    "authorizeBlocked": {"action": "Authorize", "from": "station", "payload": {
+      "idToken": {"idToken": "04BLOCKED00001", "type": "ISO14443"}}},
+    "transactionStarted": {"action": "TransactionEvent", "from": "station", "payload": {
+      "eventType": "Started", "timestamp": "2026-01-01T10:00:00Z", "triggerReason": "Authorized", "seqNo": 0,
+      "transactionInfo": {"transactionId": "OTF-TX-0001"},
+      "evse": {"id": 1, "connectorId": 1},
+      "idToken": {"idToken": "04A1B2C3D4E5F6", "type": "ISO14443"}}},
+    "transactionUpdated": {"action": "TransactionEvent", "from": "station", "payload": {
+      "eventType": "Updated", "timestamp": "2026-01-01T10:05:00Z", "triggerReason": "MeterValuePeriodic", "seqNo": 1,
+      "transactionInfo": {"transactionId": "OTF-TX-0001", "chargingState": "Charging"},
+      "meterValue": [{"timestamp": "2026-01-01T10:05:00Z", "sampledValue": [
+        {"value": 1234.0, "measurand": "Energy.Active.Import.Register"}]}]}},
+    "transactionEnded": {"action": "TransactionEvent", "from": "station", "payload": {
+      "eventType": "Ended", "timestamp": "2026-01-01T10:30:00Z", "triggerReason": "StopAuthorized", "seqNo": 2,
+      "transactionInfo": {"transactionId": "OTF-TX-0001", "stoppedReason": "Local"}}},
+    "meterValues": {"action": "MeterValues", "from": "station", "payload": {
+      "evseId": 1,
+      "meterValue": [{"timestamp": "2026-01-01T10:05:00Z", "sampledValue": [
+        {"value": 7360.0, "measurand": "Power.Active.Import"}]}]}},
+    "notifyReport": {"action": "NotifyReport", "from": "station", "payload": {
+      "requestId": 1, "generatedAt": "2026-01-01T10:00:00Z", "seqNo": 0, "tbc": false,
+      "reportData": [{"component": {"name": "OCPPCommCtrlr"}, "variable": {"name": "HeartbeatInterval"},
+        "variableAttribute": [{"type": "Actual", "value": "300", "mutability": "ReadWrite"}]}]}},
+    "notifyEvent": {"action": "NotifyEvent", "from": "station", "payload": {
+      "generatedAt": "2026-01-01T10:00:00Z", "seqNo": 0,
+      "eventData": [{"eventId": 1, "timestamp": "2026-01-01T10:00:00Z", "trigger": "Delta", "actualValue": "Available",
+        "eventNotificationType": "HardWiredNotification",
+        "component": {"name": "ChargingStation"}, "variable": {"name": "AvailabilityState"}}]}},
+    "securityEvent": {"action": "SecurityEventNotification", "from": "station", "payload": {
+      "type": "SettingSystemTime", "timestamp": "2026-01-01T10:00:00Z", "techInfo": "clock set by test"}},
+    "firmwareStatus": {"action": "FirmwareStatusNotification", "from": "station", "payload": {"status": "Idle"}},
+    "logStatus": {"action": "LogStatusNotification", "from": "station", "payload": {"status": "Idle"}},
+    "dataTransfer": {"action": "DataTransfer", "from": "station", "payload": {
+      "vendorId": "org.otfabric", "messageId": "Ping", "data": "hello"}},
+    "notifyDERAlarm": {"action": "NotifyDERAlarm", "from": "station", "payload": {
+      "controlType": "HVMustTrip", "gridEventFault": "OverVoltage", "timestamp": "2026-01-01T10:10:00Z"}},
+    "notifyDERStartStop": {"action": "NotifyDERStartStop", "from": "station", "payload": {
+      "controlId": "OTF-DER-0001", "started": true, "timestamp": "2026-01-01T10:00:00Z"}},
+    "reportDERControl": {"action": "ReportDERControl", "from": "station", "payload": {
+      "requestId": 2, "tbc": false,
+      "fixedVar": [{"id": "OTF-DER-0001", "isDefault": false, "isSuperseded": false,
+        "fixedVar": {"priority": 1, "setpoint": 10.0, "unit": "PctMaxVar"}}]}},
+    "openPeriodicEventStream": {"action": "OpenPeriodicEventStream", "from": "station", "payload": {
+      "constantStreamData": {"id": 1, "variableMonitoringId": 1, "params": {"interval": 10, "values": 5}}}},
+    "closePeriodicEventStream": {"action": "ClosePeriodicEventStream", "from": "station", "payload": {"id": 1}},
+    "batterySwapIn": {"action": "BatterySwap", "from": "station", "payload": {
+      "eventType": "BatteryIn", "requestId": 3, "idToken": {"idToken": "04A1B2C3D4E5F6", "type": "ISO14443"},
+      "batteryData": [{"evseId": 1, "serialNumber": "OTF-BAT-0001", "soC": 80.0, "soH": 95.0}]}},
+    "notifyPeriodicEventStream": {"action": "NotifyPeriodicEventStream", "from": "station", "payload": {
+      "id": 1, "pending": 0, "basetime": "2026-01-01T10:00:00Z",
+      "data": [{"t": 0, "v": "230.1"}, {"t": 10, "v": "229.8"}]}},
+    "reservationStatusUpdate": {"action": "ReservationStatusUpdate", "from": "station", "payload": {
+      "reservationId": 7, "reservationUpdateStatus": "Expired"}},
+    "requestStart": {"action": "RequestStartTransaction", "from": "csms", "payload": {
+      "evseId": 1, "remoteStartId": 1, "idToken": {"idToken": "04A1B2C3D4E5F6", "type": "ISO14443"}}},
+    "requestStop": {"action": "RequestStopTransaction", "from": "csms", "payload": {"transactionId": "OTF-TX-0001"}},
+    "getVariables": {"action": "GetVariables", "from": "csms", "payload": {
+      "getVariableData": [{"component": {"name": "OCPPCommCtrlr"}, "variable": {"name": "HeartbeatInterval"}}]}},
+    "setVariables": {"action": "SetVariables", "from": "csms", "payload": {
+      "setVariableData": [{"component": {"name": "OCPPCommCtrlr"}, "variable": {"name": "HeartbeatInterval"}, "attributeValue": "120"}]}},
+    "resetImmediate": {"action": "Reset", "from": "csms", "payload": {"type": "Immediate"}},
+    "triggerHeartbeat": {"action": "TriggerMessage", "from": "csms", "payload": {"requestedMessage": "Heartbeat"}},
+    "setTxDefaultProfile": {"action": "SetChargingProfile", "from": "csms", "payload": {
+      "evseId": 0,
+      "chargingProfile": {
+        "id": 1, "stackLevel": 0,
+        "chargingProfilePurpose": "TxDefaultProfile", "chargingProfileKind": "Absolute",
+        "chargingSchedule": [{"id": 1, "chargingRateUnit": "W", "startSchedule": "2026-01-01T00:00:00Z",
+          "chargingSchedulePeriod": [{"startPeriod": 0, "limit": 11000.0}]}]}}},
+    "getBaseReport": {"action": "GetBaseReport", "from": "csms", "payload": {"requestId": 1, "reportBase": "ConfigurationInventory"}},
+    "changeAvailability": {"action": "ChangeAvailability", "from": "csms", "payload": {
+      "operationalStatus": "Inoperative", "evse": {"id": 1}}},
+    "clearCache": {"action": "ClearCache", "from": "csms", "payload": {}},
+    "unlockConnector": {"action": "UnlockConnector", "from": "csms", "payload": {"evseId": 1, "connectorId": 1}},
+    "clearChargingProfile": {"action": "ClearChargingProfile", "from": "csms", "payload": {"chargingProfileId": 1}},
+    "getLocalListVersion": {"action": "GetLocalListVersion", "from": "csms", "payload": {}},
+    "dataTransferFromCsms": {"action": "DataTransfer", "from": "csms", "payload": {
+      "vendorId": "org.otfabric", "messageId": "Ping", "data": "hello"}},
+    "setDefaultTariff": {"action": "SetDefaultTariff", "from": "csms", "payload": {
+      "evseId": 0,
+      "tariff": {"tariffId": "OTF-TARIFF-0001", "currency": "EUR", "energy": {"prices": [{"priceKwh": 0.3}]}}}},
+    "getTariffs": {"action": "GetTariffs", "from": "csms", "payload": {"evseId": 0}},
+    "clearTariffs": {"action": "ClearTariffs", "from": "csms", "payload": {"tariffIds": ["OTF-TARIFF-0001"]}},
+    "setDERControl": {"action": "SetDERControl", "from": "csms", "payload": {
+      "isDefault": false, "controlId": "OTF-DER-0001", "controlType": "FixedVar",
+      "fixedVar": {"priority": 1, "setpoint": 10.0, "unit": "PctMaxVar"}}},
+    "getDERControl": {"action": "GetDERControl", "from": "csms", "payload": {"requestId": 2, "controlType": "FixedVar"}},
+    "clearDERControl": {"action": "ClearDERControl", "from": "csms", "payload": {"isDefault": false, "controlId": "OTF-DER-0001"}},
+    "getPeriodicEventStream": {"action": "GetPeriodicEventStream", "from": "csms", "payload": {}},
+    "adjustPeriodicEventStream": {"action": "AdjustPeriodicEventStream", "from": "csms", "payload": {
+      "id": 1, "params": {"interval": 30, "values": 10}}},
+    "requestBatterySwap": {"action": "RequestBatterySwap", "from": "csms", "payload": {
+      "requestId": 3, "idToken": {"idToken": "04A1B2C3D4E5F6", "type": "ISO14443"}}},
+    "cancelReservation": {"action": "CancelReservation", "from": "csms", "payload": {"reservationId": 7}}
+  }
+}

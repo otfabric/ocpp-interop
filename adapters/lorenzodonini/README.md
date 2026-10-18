@@ -12,7 +12,7 @@ OCPP 1.6J and 2.0.1 reference CSMS and station built on
 | Other modules in the binary | go-playground/validator.v9 9.30.0 (ocpp-go's message validation) with go-playground/locales 0.12.1, go-playground/universal-translator 0.16.0 and leodido/go-urn 1.1.0; relvacode/iso8601 1.6.0 (date-time parsing). These are the versions ocpp-go's go.mod requires |
 | Licences | ocpp-go MIT; gorilla/websocket BSD-2-Clause; gorilla/mux BSD-3-Clause; the go-playground modules, go-urn and iso8601 MIT; the Go standard library BSD-3-Clause |
 | Base images | `golang:1.27.2-trixie` (build), `debian:trixie-slim` (runtime), pinned by digest in the [Dockerfile](Dockerfile) |
-| OCPP | 1.6J and 2.0.1, both roles, security profiles 0 and 1 |
+| OCPP | 1.6J and 2.0.1, both roles, security profiles 0 and 1. ocpp-go v0.19.0 has no OCPP 2.1 (`--version 2.1` exits 5) |
 
 The adapter code is MIT. `/licenses` in the image holds the licence files of
 every module in the binary (listed in `/licenses/BUNDLED-MODULES.txt`), Go's

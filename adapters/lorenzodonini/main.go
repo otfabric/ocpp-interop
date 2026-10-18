@@ -30,7 +30,7 @@ var (
 const (
 	adapterName     = "lorenzodonini"
 	schemaVersion   = "1.0"
-	contractVersion = "0.3"
+	contractVersion = "0.4"
 	readyFile       = "/run/ocpp-interop/ready"
 	controlSocket   = "/run/ocpp-interop/control.sock"
 )

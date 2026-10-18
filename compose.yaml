@@ -9,9 +9,13 @@
 # OCPP_INTEROP_VERSION selects the image tag (default: dev, the local build);
 # OCPP_INTEROP_OCPP the OCPP version (default 1.6), with
 # OCPP_INTEROP_FIXTURE_DIR its fixture directory (default v16; v201 for
-# 2.0.1); OCPP_INTEROP_FIXTURE a baked fixture (default: baseline):
+# 2.0.1, v21 for 2.1); OCPP_INTEROP_FIXTURE a baked fixture (default: baseline):
 #
 #   OCPP_INTEROP_OCPP=2.0.1 OCPP_INTEROP_FIXTURE_DIR=v201 docker compose up -d --wait
+#
+# OCPP 2.1 is served by mobilityhouse only (the others exit 5):
+#
+#   OCPP_INTEROP_OCPP=2.1 OCPP_INTEROP_FIXTURE_DIR=v21 docker compose up -d --wait mobilityhouse
 
 x-server: &server
   command: ["server", "--version", "${OCPP_INTEROP_OCPP:-1.6}",

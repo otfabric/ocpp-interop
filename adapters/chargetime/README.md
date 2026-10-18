@@ -12,7 +12,7 @@ behind the [container contract](../../docs/CONTAINER_CONTRACT.md).
 | Other dependencies | from the upstream's POMs: Java-WebSocket 1.6.0 (the transport), Gson 2.13.2, jaxb-api 2.3.1, javax.activation-api 1.2.0, slf4j-api 2.0.17, error_prone_annotations 2.41.0, jsr305 3.0.2; and slf4j-simple 2.0.17 for logging to stderr |
 | Licences | Java-OCA-OCPP MIT; Java-WebSocket MIT; Gson, error_prone_annotations and jsr305 Apache-2.0; jaxb-api and javax.activation-api CDDL-1.1 or GPL-2.0 with the Classpath Exception; slf4j MIT |
 | Base images | `maven:3.9.16-eclipse-temurin-25-noble` (build), `eclipse-temurin:25.0.4.1_1-jre-noble` (runtime), pinned by digest in the [Dockerfile](Dockerfile) |
-| OCPP | 1.6J and 2.0.1, both roles, security profiles 0 and 1 |
+| OCPP | 1.6J and 2.0.1, both roles, security profiles 0 and 1. No 2.1: see below |
 
 The adapter code is MIT. `/licenses` in the image holds the licence and
 notice files the jars carry, the texts in [licenses/](licenses) for those
@@ -57,6 +57,15 @@ authentication parsing are the upstream's. `ServerEvents.authenticateSession`
 refuses unknown identities (404) and, with profile 1, wrong credentials (401).
 
 ## Limitations of the upstream
+
+- **No OCPP 2.1 in the release.** The v2.0 tag's `ocpp-v2` module holds
+  `eu.chargetime.ocpp.v201` only
+  ([tree](https://github.com/ChargeTimeEU/Java-OCA-OCPP/tree/f27fe5bfb03e01491100597d6859080f5ae07545/ocpp-v2/src/main/java/eu/chargetime/ocpp)),
+  and `eu.chargetime.ocpp:ocpp2:2.0` is the latest ocpp2 on Maven Central.
+  The upstream's master added `eu.chargetime.ocpp.v21` and the 2.1 RPC
+  extensions (SEND, CALLRESULTERROR) after that release (commits `febd153b`,
+  2025-12-13, and `31aea97a`, 2025-12-19), not released as of 2026-10-18.
+  The adapter refuses `--version 2.1` (exit 5) until a release has it.
 
 These are why the adapter declares `fixtureCallErrors: false` and
 `messageIds: false` (see its `notes` and
