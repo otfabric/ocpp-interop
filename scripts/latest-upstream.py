@@ -10,7 +10,7 @@ Prints key=value lines (the format of $GITHUB_OUTPUT):
     pin_source=dockerfile|versions.yaml
     built=yes|no          whether adapters/<adapter>/Dockerfile exists
     latest=<latest stable upstream release>
-    latest_sha=<its commit, where it is looked up in git>
+    latest_sha=<the commit of its git tag>
     update=yes|no
     source=<where the latest release was looked up>
 
@@ -66,7 +66,11 @@ def git_tags(repository):
 def mobilityhouse():
     releases = json.loads(fetch("https://pypi.org/pypi/ocpp/json"))["releases"]
     live = [v for v, files in releases.items() if files and not all(f.get("yanked") for f in files)]
-    return newest(live), "", "PyPI"
+    latest = newest(live)
+    # The release is installed from PyPI; the commit of its git tag is what
+    # the image reports as the upstream revision.
+    tags = git_tags("https://github.com/mobilityhouse/ocpp.git")
+    return latest, tags.get(latest, tags.get("v" + latest, "")), "PyPI (commit: git tags of mobilityhouse/ocpp)"
 
 
 def chargetime():

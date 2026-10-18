@@ -1,0 +1,16 @@
+#!/usr/local/bin/python3 -I
+# SPDX-License-Identifier: MIT
+"""Entry point of the ocpp-interop adapter for The Mobility House ocpp."""
+
+import os
+import sys
+
+sys.path[:0] = ["/opt/ocpp-interop", "/opt/ocpp-interop/site-packages"]
+
+from ocpp_interop.main import main  # noqa: E402  pylint: disable=wrong-import-position
+
+if __name__ == "__main__":
+    code = main(sys.argv[1:])
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(code)

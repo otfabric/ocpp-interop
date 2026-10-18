@@ -1,8 +1,34 @@
-# Runs the reference servers locally, on loopback only:
-#   docker compose up -d --wait
+# Reference CSMSs for local work. Ports are published on loopback only: these
+# are unauthenticated OCPP servers (security profile 0 by default) that accept
+# any station the fixture lists, and must not be reachable from anywhere else.
 #
-# Phase 1: there are no adapter images yet. Services are added with the
-# first adapter (PLAN.md, Phase 4), one per server adapter, each publishing
-# 9000/tcp on its own 127.0.0.1 port.
+#   docker compose up -d --wait        # every server, waits for readiness
+#   docker compose down
+#
+# A station connects to ws://127.0.0.1:<port>/ocpp/<station identity>.
+# OCPP_INTEROP_VERSION selects the image tag (default: dev, the local build);
+# OCPP_INTEROP_FIXTURE a baked fixture (default: baseline).
+
+x-server: &server
+  command: ["server", "--version", "1.6", "--fixture", "/fixtures/v16/${OCPP_INTEROP_FIXTURE:-baseline}/fixture.json"]
+  healthcheck:
+    test: ["CMD", "test", "-f", "/run/ocpp-interop/ready"]
+    interval: 2s
+    timeout: 2s
+    retries: 15
+    start_period: 20s
+  stop_grace_period: 15s
+
 name: ocpp-interop
-services: {}
+services:
+  mobilityhouse:
+    <<: *server
+    image: ghcr.io/otfabric/ocpp-interop-mobilityhouse:${OCPP_INTEROP_VERSION:-dev}
+    ports:
+      - "127.0.0.1:9000:9000"
+
+  chargetime:
+    <<: *server
+    image: ghcr.io/otfabric/ocpp-interop-chargetime:${OCPP_INTEROP_VERSION:-dev}
+    ports:
+      - "127.0.0.1:9001:9000"
