@@ -98,7 +98,7 @@ std::vector<std::string> version_notes(const std::string& version) {
         "libocpp does not pass close codes to the application: connection-closed has code and reason null.",
         "Security profiles 2 and 3 use libocpp's TLS (OpenSSL through libwebsockets) with the files of --tls-dir: "
         "ca.crt verifies the CSMS and its host name, client.crt and client.key are the station's certificate in "
-        "profile 3. They are implemented but not declared until the self-tests exercise them.",
+        "profile 3.",
         "No compression: libocpp creates its libwebsockets client context without extensions, so it cannot offer "
         "permessage-deflate; --compression exits 5.",
         "Message ids are libocpp's (a UUID per CALL).",
@@ -133,7 +133,7 @@ ojson capabilities() {
         server["sends"] = ojson::array();
         server["handles"] = ojson::array();
         ojson features = ojson::object();
-        features["securityProfiles"] = {0, 1};
+        features["securityProfiles"] = {0, 1, 2, 3};
         features["compression"] = false;
         features["send"] = false;
         features["callResultError"] = false;

@@ -25,7 +25,7 @@ using ojson = nlohmann::ordered_json;
 
 constexpr const char* adapter_name = "everest";
 constexpr const char* schema_version = "1.0";
-constexpr const char* contract_version = "0.4";
+constexpr const char* contract_version = "0.5";
 constexpr const char* default_ready_file = "/run/ocpp-interop/ready";
 constexpr const char* default_control_socket = "/run/ocpp-interop/control.sock";
 constexpr const char* fixtures_dir = "/fixtures";
