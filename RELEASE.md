@@ -61,6 +61,15 @@ with security profiles 0 to 3 (contract 0.5).
 
 - CI: the self-test job may take 75 minutes (libocpp is compiled)
 
+### Verification
+
+`make ci` with the four adapters on contract 0.5 (2026-10-18, linux/arm64):
+smoke 268 (mobilityhouse), 188 (chargetime, 1 known upstream bug), 187
+(lorenzodonini) and 147 (everest) checks passed, 0 failed; interop 1689
+PASS, 20 KNOWN_ISSUE, 257 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR. The
+everest station passes security profiles 2 and 3 with every CSMS (1.6,
+2.0.1; 2.1 with mobilityhouse).
+
 ---
 
 ## v0.3.0

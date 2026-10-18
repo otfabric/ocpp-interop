@@ -14,10 +14,11 @@ self-tested locally; CI does that natively.
 
 `everest` (EVerest libocpp, everest-core 2026.02.1) is a station only.
 Every pairing with `everest` as the CSMS is one `pairing` SKIP_UNSUPPORTED
-(not in the tables). Its rows below are from a run before contract 0.5 and
-the widened fixtures (contract 0.4: 1099 PASS, 45 KNOWN_ISSUE, 44
-SKIP_UNSUPPORTED, 0 FAIL with four adapters); the tables are rerun with all
-four adapters on contract 0.5 for the next update of this file.
+(not in the tables). The tables are from one run of the four adapters
+on contract 0.5 (2026-10-18, linux/arm64, `make ci`): 1689 PASS, 20
+KNOWN_ISSUE, 257 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR. Most of the
+everest skips are actions it does not declare (libocpp's message queue
+knows a subset of the actions, adapters/everest/README.md) and compression.
 
 Each cell: results of the CALLs and checks initiated by the station / by
 the CSMS. The baseline fixtures have a sample of every action of their
@@ -49,13 +50,14 @@ where both ends declare the profile or `compression`.
 
 | Station ↓ / CSMS → | chargetime v2.0 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 |
 |---|---|---|---|
-| chargetime v2.0 | 25 pass 1 skip / 28 pass 1 skip | 26 pass / 28 pass 1 skip | 26 pass / 28 pass 1 skip |
-| lorenzodonini v0.19.0 | 25 pass 1 skip / 29 pass | 26 pass / 29 pass | 26 pass / 29 pass |
-| mobilityhouse 2.1.0 | 24 pass 1 skip 1 known / 29 pass | 25 pass 1 known / 29 pass | 25 pass 1 known / 29 pass |
-| everest 2026.02.1 | 21 pass 1 skip / 22 pass | 22 pass / 22 pass | 22 pass / 22 pass |
+| chargetime v2.0 | 27 pass 2 skip / 28 pass 1 skip | 28 pass 1 skip / 28 pass 1 skip | 28 pass 1 skip / 28 pass 1 skip |
+| lorenzodonini v0.19.0 | 27 pass 2 skip / 29 pass | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass |
+| mobilityhouse 2.1.0 | 26 pass 2 skip 1 known / 29 pass | 27 pass 1 skip 1 known / 29 pass | 28 pass 1 known / 29 pass |
+| everest 2026.02.1 | 24 pass 5 skip / 22 pass 7 skip | 25 pass 4 skip / 22 pass 7 skip | 25 pass 4 skip / 22 pass 7 skip |
 
-Totals: 486 PASS, 3 KNOWN_ISSUE, 6 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
-Security profiles 2 and 3 pass in all nine pairings.
+Totals: 645 PASS, 3 KNOWN_ISSUE, 52 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
+Security profiles 2 and 3 pass in all twelve pairings (every station,
+everest included, with every CSMS).
 
 | Station | CSMS | Test | Status | Evidence |
 |---|---|---|---|---|
@@ -68,13 +70,14 @@ Security profiles 2 and 3 pass in all nine pairings.
 
 | Station ↓ / CSMS → | chargetime v2.0 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 |
 |---|---|---|---|
-| chargetime v2.0 | 37 pass 1 skip / 43 pass 1 skip | 38 pass / 42 pass 1 skip 1 known | 38 pass / 43 pass 1 skip |
-| lorenzodonini v0.19.0 | 36 pass 1 skip 1 known / 43 pass 1 known | 37 pass 1 known / 43 pass 1 known | 37 pass 1 known / 41 pass 3 known |
-| mobilityhouse 2.1.0 | 8 pass 1 skip 29 known / 1 pass 43 known | 38 pass / 43 pass 1 known | 38 pass / 44 pass |
-| everest 2026.02.1 | 24 pass 1 skip / 18 pass | 25 pass / 18 pass | 25 pass / 18 pass |
+| chargetime v2.0 | 39 pass 1 skip 1 known / 43 pass 1 skip | 40 pass 1 skip / 42 pass 1 skip 1 known | 40 pass 1 known / 43 pass 1 skip |
+| lorenzodonini v0.19.0 | 38 pass 2 skip 1 known / 43 pass 1 known | 39 pass 1 skip 1 known / 43 pass 1 known | 39 pass 1 skip 1 known / 41 pass 3 known |
+| mobilityhouse 2.1.0 | 39 pass 1 skip 1 known / 44 pass | 40 pass 1 skip / 43 pass 1 known | 41 pass / 44 pass |
+| everest 2026.02.1 | 27 pass 14 skip / 18 pass 26 skip | 28 pass 13 skip / 18 pass 26 skip | 28 pass 13 skip / 18 pass 26 skip |
 
-Totals: 650 PASS, 82 KNOWN_ISSUE, 6 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
-Security profiles 2 and 3 pass in all nine pairings.
+Totals: 878 PASS, 13 KNOWN_ISSUE, 133 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
+Security profiles 2 and 3 pass in all twelve pairings (every station,
+everest included, with every CSMS).
 
 | Station | CSMS | Test | Status | Evidence |
 |---|---|---|---|---|
@@ -106,11 +109,13 @@ station against the mobilityhouse CSMS is the pairing of two independent
 |---|---|---|---|
 | chargetime v2.0 | 1 skip / — | 1 skip / — | 1 skip / — |
 | lorenzodonini v0.19.0 | 1 skip / — | 1 skip / — | 1 skip / — |
-| mobilityhouse 2.1.0 | 1 skip / — | 1 skip / — | 47 pass 3 skip 1 known / 58 pass 1 skip 1 known |
-| everest 2026.02.1 | 1 skip / — | 1 skip / — | 28 pass 3 skip 2 known / 27 pass 1 skip |
+| mobilityhouse 2.1.0 | 1 skip / — | 1 skip / — | 50 pass 3 skip 1 known / 58 pass 1 skip 1 known |
+| everest 2026.02.1 | 1 skip / — | 1 skip / — | 31 pass 21 skip 2 known / 27 pass 33 skip |
 
-Totals: 105 PASS, 2 KNOWN_ISSUE, 12 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
-`v21.tls.profile2`, `v21.tls.profile3` and `v21.compression` pass.
+Totals: 166 PASS, 4 KNOWN_ISSUE, 72 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
+`v21.tls.profile2` and `v21.tls.profile3` pass for both stations with the
+mobilityhouse CSMS; `v21.compression` passes for mobilityhouse with itself
+(everest cannot offer compression).
 
 | Station | CSMS | Test | Status | Evidence |
 |---|---|---|---|---|
@@ -120,7 +125,7 @@ Totals: 105 PASS, 2 KNOWN_ISSUE, 12 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
 | mobilityhouse | mobilityhouse | `v21.rpc.call-result-error` (from each end) | SKIP_UNSUPPORTED (2) | no adapter declares `callResultError` |
 | chargetime, lorenzodonini | all three | `v21.pairing` | SKIP_UNSUPPORTED (8) | 2.1 not declared by one of the two |
 | everest | mobilityhouse | `v21.from-station.report-dercontrol` | KNOWN_ISSUE | [libocpp `ocpp::v2::MessageType`](https://github.com/EVerest/everest-core/blob/b61bb12b8cb89ee9d0fab037b05c3bb8cea9b13e/lib/everest/ocpp/include/ocpp/v2/types.hpp#L15-L195) has no ReportDERControl |
-| everest | mobilityhouse | `v21.from-station.reservation-status-update` | KNOWN_ISSUE | the mobilityhouse defect above (no answer to an unanswered 2.1 action) |
+| everest | mobilityhouse | `v21.not-implemented.from-station` | KNOWN_ISSUE | the mobilityhouse defect above (no answer to an unanswered 2.1 action) |
 | everest | mobilityhouse | `v21.from-station.battery-swap-in`, `v21.send.notify-periodic-event-stream`, `v21.rpc.call-result-error` (from each end) | SKIP_UNSUPPORTED (4) | everest does not declare BatterySwap (no CSMS declares that it handles it, so no test would run it); libocpp has no SEND and no CALLRESULTERROR |
 
 Every smoke test ([scripts/smoke.sh](../scripts/smoke.sh)) passes: 187
@@ -130,7 +135,7 @@ also has its 2.0.1 compression session reported as a known upstream bug),
 security profiles 2 and 3 with RSA and ECDSA keys and what must not connect
 (wrong password, a client certificate of another identity, from another CA
 or none, a server certificate from another CA or for another host name,
-`ws://` to a TLS server), and compression. everest: 146 (1.6, 2.0.1 and 2.1, station checks against
+`ws://` to a TLS server), and compression. everest: 147 (1.6, 2.0.1 and 2.1, station checks against
 the mobilityhouse CSMS).
 
 ### What a PASS means
