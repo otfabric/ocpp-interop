@@ -3,12 +3,13 @@
 # The Dockerfiles are the source of truth for a build:
 # scripts/check-versions.sh fails when this file disagrees with them.
 #
-# Phase 5: mobilityhouse, chargetime and lorenzodonini are built for OCPP
-# 1.6J and 2.0.1, both roles. citrineos is a candidate (status `planned`):
-# its entry records what the upstream says, unverified.
+# Phase 6: mobilityhouse, chargetime and lorenzodonini are built for OCPP
+# 1.6J and 2.0.1, both roles; mobilityhouse also for OCPP 2.1. citrineos is a
+# candidate (status `planned`): its entry records what the upstream says,
+# unverified.
 
-interop_version: "0.1.0"
-contract_version: "0.3"        # docs/CONTAINER_CONTRACT.md (draft until 1.0); documents carry schemaVersion "1.0"
+interop_version: "0.2.0"         # the next planned release
+contract_version: "0.4"        # docs/CONTAINER_CONTRACT.md (draft until 1.0); documents carry schemaVersion "1.0"
 fixture_schema: "1.0"          # fixtures/schema/ocpp-fixture.schema.json
 
 protocol:
@@ -34,12 +35,13 @@ implementations:
     language: "Python"
     independent_engine: true
     roles: [server, client]
-    versions_verified: ["1.6", "2.0.1"]   # by the self-tests (scripts/smoke.sh, scripts/interop.sh)
+    versions_verified: ["1.6", "2.0.1", "2.1"]   # by the self-tests (scripts/smoke.sh, scripts/interop.sh)
     versions_claimed: ["1.6", "2.0.1", "2.1"]
     note: >-
-      The README names 1.6 and 2.0.1 only; an ocpp/v21 package exists since
-      2.1.0. 2.1 is a candidate until a self-test exercises it (PLAN.md,
-      Phase 6).
+      The README names 1.6 and 2.0.1 only; the ocpp/v21 package (since
+      2.1.0) is verified by the self-tests, with two upstream defects
+      (tests/known-bugs.tsv, docs/COMPATIBILITY.md). It knows the OCPP-J
+      message types 2 to 4 only: no SEND, no CALLRESULTERROR.
 
   chargetime:
     priority: P0
@@ -56,13 +58,16 @@ implementations:
     independent_engine: true
     roles: [server, client]
     versions_verified: ["1.6", "2.0.1"]   # by the self-tests (scripts/smoke.sh, scripts/interop.sh)
-    versions_claimed: ["1.6", "2.0.1", "2.1"]
+    versions_claimed: ["1.6", "2.0.1", "2.1"]   # 2.1 on master only, unreleased
     note: >-
       1.6J in ocpp-v1_6 and ocpp-v1_6-json (artifacts ocpp16, ocpp16j); 2.0.1
       in the multi-protocol ocpp-v2 module (artifact ocpp2, package
       eu.chargetime.ocpp.v201, MultiProtocolJSONServer and
       MultiProtocolJSONClient). The v2.0 release has no OCPP 2.1 package:
-      ocpp-v2 holds eu.chargetime.ocpp.v201 only.
+      ocpp-v2 holds eu.chargetime.ocpp.v201 only, and Maven Central has no
+      later ocpp2. master added eu.chargetime.ocpp.v21 with SEND and
+      CALLRESULTERROR after v2.0 (febd153b, 2025-12-13; 31aea97a,
+      2025-12-19), unreleased (last seen 2026-10-18).
 
   lorenzodonini:
     priority: P1

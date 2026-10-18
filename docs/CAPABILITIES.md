@@ -20,10 +20,11 @@ reports the rest as `SKIP_UNSUPPORTED`.
 
 ## Declared now
 
-All three adapters declare OCPP 1.6 and 2.0.1 in both roles, exactly what
+All three adapters declare OCPP 1.6 and 2.0.1 in both roles, and
+`mobilityhouse` also OCPP 2.1, exactly what
 [scripts/smoke.sh](../scripts/smoke.sh) and
-[scripts/interop.sh](../scripts/interop.sh) exercise. The action lists are
-the same for every adapter:
+[scripts/interop.sh](../scripts/interop.sh) exercise. For 1.6 and 2.0.1 the
+action lists are the same for every adapter:
 
 | | OCPP 1.6 | OCPP 2.0.1 |
 |---|---|---|
@@ -36,7 +37,23 @@ The actions the other end does not handle are listed as sent because the
 self-tests send them and check that the other end answers `NotImplemented`
 (the baseline fixtures have no answer for them).
 
-The features differ per adapter; they are the same in both versions:
+OCPP 2.1 (`mobilityhouse` only: the pinned releases of the other upstreams
+have no 2.1):
+
+| | OCPP 2.1 |
+|---|---|
+| Station sends | the 2.0.1 list, and ClosePeriodicEventStream, NotifyDERAlarm, NotifyDERStartStop, OpenPeriodicEventStream, ReportDERControl |
+| Station handles | the 2.0.1 list, and AdjustPeriodicEventStream, ClearDERControl, ClearTariffs, GetDERControl, GetPeriodicEventStream, GetTariffs, RequestBatterySwap, SetDERControl, SetDefaultTariff |
+| CSMS sends | the station's handled actions, and CancelReservation |
+| CSMS handles | the station's sent actions except ReservationStatusUpdate |
+
+BatterySwap is not declared: ocpp 2.1.0 cannot send it (it writes the
+battery fields `soC` and `soH` as `SoC` and `soh`), so no self-test reaches
+a CSMS with it. NotifyPeriodicEventStream is a SEND and is not declared
+either ([CONTAINER_CONTRACT.md](CONTAINER_CONTRACT.md#ocpp-21-send-and-callresulterror)).
+
+The features differ per adapter; they are the same in every version it
+declares:
 
 | | mobilityhouse | chargetime | lorenzodonini |
 |---|---|---|---|
@@ -59,7 +76,7 @@ against a particular peer because of one (for example, the chargetime
   "schemaVersion": "1.0",
   "adapter": "mobilityhouse",
   "adapterVersion": "v0.1.0",
-  "contractVersion": "0.3",
+  "contractVersion": "0.4",
   "upstream": {
     "name": "The Mobility House ocpp",
     "repository": "https://github.com/mobilityhouse/ocpp",
@@ -93,8 +110,8 @@ artifact.
 |---|---|
 | `securityProfiles` | Profiles exercised: 0 (none), 1 (Basic over `ws://`), 2 (TLS + Basic), 3 (mutual TLS) |
 | `compression` | `permessage-deflate` negotiated and used |
-| `send` | OCPP 2.1 SEND frames sent and received |
-| `callResultError` | OCPP 2.1 CALLRESULTERROR frames sent and received |
+| `send` | OCPP 2.1 SEND frames (message type 6) sent and received. `false` everywhere: no pinned upstream release implements SEND |
+| `callResultError` | OCPP 2.1 CALLRESULTERROR frames (message type 5) sent and received. `false` everywhere, for the same reason |
 | `fixtureCallErrors` | The adapter answers with the CALLERROR a fixture's `callError` answer names. Without it, such a fixture exits 5 |
 | `messageIds` | Result documents and the `call-sent` and `call-result` events carry the message id of the CALL the upstream sent |
 

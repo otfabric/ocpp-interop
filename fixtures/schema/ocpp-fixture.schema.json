@@ -119,8 +119,8 @@
       "required": ["idToken", "status"],
       "additionalProperties": false,
       "properties": {
-        "idToken": {"type": "string", "minLength": 1, "maxLength": 36},
-        "type": {"type": "string", "description": "OCPP 2.x IdTokenEnumType"},
+        "idToken": {"type": "string", "minLength": 1, "maxLength": 255, "description": "At most 20 characters in 1.6, 36 in 2.0.1, 255 in 2.1 (scripts/validate-fixtures.py)"},
+        "type": {"type": "string", "maxLength": 20, "description": "OCPP 2.0.1 IdTokenEnumType; OCPP 2.1 a string of at most 20 characters"},
         "status": {"enum": ["Accepted", "Blocked", "Expired", "Invalid", "ConcurrentTx", "NoCredit", "NotAllowedTypeEVSE", "NotAtThisLocation", "NotAtThisTime", "Unknown"]}
       }
     },

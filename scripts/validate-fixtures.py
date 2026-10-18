@@ -13,6 +13,7 @@ Two layers, both required:
        unique;
      - every answer is for an action that the answering role receives in
        that version, and every sample is sent by the role that sends it;
+     - an action that is sent as a SEND (OCPP 2.1) has no answer;
      - a derived answer names a table that fits the action.
 
 The adapters apply the same rules when they load a fixture. This script makes
@@ -71,18 +72,39 @@ V201_FROM_CSMS = {
     "SetVariableMonitoring", "SetVariables", "TriggerMessage", "UnlockConnector",
     "UnpublishFirmware", "UpdateFirmware",
 }
-# 2.1 fixtures are rejected until the 2.1 action list is checked against
-# OCPP 2.1 Edition 2 (PLAN.md, Phase 6).
+# OCPP 2.1 Edition 2, Part 2: every 2.0.1 action, in the same direction,
+# and the actions 2.1 adds. Their direction is from the message definitions
+# (1.4 BatterySwap, 1.44 NotifyAllowedEnergyTransfer, 1.55
+# NotifyPriorityCharging, 1.62 PullDynamicScheduleUpdate, 1.88
+# UpdateDynamicSchedule, 1.90 UsePriorityCharging, 1.64 ReportDERControl) and
+# from the use cases that send them (tariffs and cost I, payment C, DER
+# control R, periodic event streams N, battery swap, aFRR, certificates M).
+V21_FROM_STATION = V201_FROM_STATION | {
+    "BatterySwap", "ClosePeriodicEventStream", "GetCertificateChainStatus", "NotifyDERAlarm",
+    "NotifyDERStartStop", "NotifyPeriodicEventStream", "NotifyPriorityCharging", "NotifySettlement",
+    "OpenPeriodicEventStream", "PullDynamicScheduleUpdate", "ReportDERControl", "VatNumberValidation",
+}
+V21_FROM_CSMS = V201_FROM_CSMS | {
+    "AFRRSignal", "AdjustPeriodicEventStream", "ChangeTransactionTariff", "ClearDERControl",
+    "ClearTariffs", "GetDERControl", "GetPeriodicEventStream", "GetTariffs",
+    "NotifyAllowedEnergyTransfer", "NotifyWebPaymentStarted", "RequestBatterySwap", "SetDERControl",
+    "SetDefaultTariff", "UpdateDynamicSchedule", "UsePriorityCharging",
+}
 ACTIONS = {
     "1.6": {"station": V16_FROM_STATION, "csms": V16_FROM_CSMS},
     "2.0.1": {"station": V201_FROM_STATION, "csms": V201_FROM_CSMS},
+    "2.1": {"station": V21_FROM_STATION, "csms": V21_FROM_CSMS},
 }
+# Actions sent as a SEND (message type 6), which is never answered: OCPP 2.1
+# Part 2, 1.54 NotifyPeriodicEventStream; Part 4, SEND.
+SEND_ACTIONS = {"1.6": set(), "2.0.1": set(), "2.1": {"NotifyPeriodicEventStream"}}
 DERIVED = {
     "idTokens": {"Authorize", "StartTransaction"},
     "configuration": {"GetConfiguration"},
     "variables": {"GetVariables", "SetVariables"},
 }
-ID_TAG_MAX = {"1.6": 20, "2.0.1": 36}
+# IdToken lengths: CiString20Type (1.6), 36 (2.0.1), 255 (2.1 IdTokenType).
+ID_TAG_MAX = {"1.6": 20, "2.0.1": 36, "2.1": 255}
 
 
 def duplicates(values):
@@ -129,6 +151,8 @@ def semantic_errors(fx, path):
         for action, answer in table.items():
             if action not in receives.get(role, set()):
                 errors.append(f"answers.{role}.{action}: the {role} does not receive {action} in OCPP {version}")
+            elif action in SEND_ACTIONS[version]:
+                errors.append(f"answers.{role}.{action}: {action} is a SEND in OCPP {version}, which has no answer")
             derived = answer.get("derived") if isinstance(answer, dict) else None
             if derived and action not in DERIVED.get(derived, set()):
                 errors.append(f"answers.{role}.{action}: cannot be derived from {derived}")

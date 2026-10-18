@@ -14,7 +14,9 @@ The Mobility House ocpp package ships:
 
 The schema directory decides the version: OCPP 1.6 names a request schema
 <Action>.json, OCPP 2.x <Action>Request.json; responses are
-<Action>Response.json in both. Checked: every sample against the request
+<Action>Response.json in both. A SEND of OCPP 2.1 (NotifyPeriodicEventStream)
+has one schema, <Action>.json, and no response. For 2.1, point it at the
+OCA's OCPP-2.1_part3_JSON_schemas (identical to ocpp 2.1.0's v21/schemas). Checked: every sample against the request
 schema; every fixed answer (with "${now}" replaced) against the response
 schema; and every derived answer, as docs/FIXTURES.md defines it, for each
 sample of that action. Not part of `make ci`, because it needs the schemas.
@@ -125,7 +127,10 @@ def main(argv):
         errors, checked = [], 0
         for name, sample in fx["samples"].items():
             action = sample["action"]
-            errors += check(f"{action}.json" if v16 else f"{action}Request.json", sample["payload"], f"samples.{name}")
+            name_2x = f"{action}Request.json"
+            if not v16 and not (schemas / name_2x).exists() and (schemas / f"{action}.json").exists():
+                name_2x = f"{action}.json"  # a SEND: no Request suffix, no response
+            errors += check(f"{action}.json" if v16 else name_2x, sample["payload"], f"samples.{name}")
             checked += 1
         for role, table in fx["answers"].items():
             for action, answer in table.items():

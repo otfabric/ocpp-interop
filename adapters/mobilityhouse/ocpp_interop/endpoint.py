@@ -2,7 +2,8 @@
 """One OCPP connection, driven by the upstream ChargePoint.
 
 The Mobility House package has one class for both ends of a connection,
-ocpp.v16.ChargePoint (ocpp.v201.ChargePoint for OCPP 2.0.1): it routes
+ocpp.v16.ChargePoint (ocpp.v201.ChargePoint for OCPP 2.0.1, ocpp.v21.ChargePoint
+for 2.1): it routes
 received CALLs to handlers, answers them, and sends CALLs with
 ChargePoint.call(). The adapter subclasses it only to
 
@@ -35,12 +36,15 @@ from ocpp.v16 import ChargePoint as ChargePoint16
 from ocpp.v16.enums import Action as Action16
 from ocpp.v201 import ChargePoint as ChargePoint201
 from ocpp.v201.enums import Action as Action201
+from ocpp.v21 import ChargePoint as ChargePoint21
+from ocpp.v21.enums import Action as Action21
 
 from . import output
 from .fixture import CallErrorAnswer
 
-CHARGE_POINTS = {"1.6": ChargePoint16, "2.0.1": ChargePoint201}
-ACTIONS = {"1.6": {a.value for a in Action16}, "2.0.1": {a.value for a in Action201}}
+CHARGE_POINTS = {"1.6": ChargePoint16, "2.0.1": ChargePoint201, "2.1": ChargePoint21}
+ACTIONS = {"1.6": {a.value for a in Action16}, "2.0.1": {a.value for a in Action201},
+           "2.1": {a.value for a in Action21}}
 
 
 def error_class(code: str):

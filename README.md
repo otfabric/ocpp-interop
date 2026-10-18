@@ -8,13 +8,14 @@ same command-line contract. With them, any OCPP library can be tested
 against real implementation diversity, in both roles and in both directions
 of request flow, without owning any of that code.
 
-> **Status: Phase 5 (OCPP 2.0.1, third adapter).** `mobilityhouse`,
-> `chargetime` and `lorenzodonini` implement the container contract, draft
-> 0.3, for OCPP 1.6J and 2.0.1 in both roles, and are self-tested against
-> each other in both directions of request flow, with the upstream defects
-> that shows recorded ([results](docs/COMPATIBILITY.md)). Release v0.0.1
-> published the contract, schemas and fixtures; no image is published yet.
-> See [PLAN.md](PLAN.md).
+> **Status: Phase 6 (OCPP 2.1).** `mobilityhouse`, `chargetime` and
+> `lorenzodonini` implement the container contract, draft 0.4, for OCPP 1.6J
+> and 2.0.1 in both roles, and `mobilityhouse` also for OCPP 2.1 (the pinned
+> releases of the other two upstreams have no 2.1). They are self-tested
+> against each other in both directions of request flow, with the upstream
+> defects that shows recorded ([results](docs/COMPATIBILITY.md)). No pinned
+> upstream release implements the OCPP 2.1 SEND and CALLRESULTERROR frames
+> yet. See [PLAN.md](PLAN.md).
 
 ## Table of contents
 
@@ -50,8 +51,8 @@ to the specification. Neither does it establish OCA certification.
 
 | Adapter | Upstream | Language | OCPP versions to verify | Status |
 |---|---|---|---|---|
-| `mobilityhouse` | [mobilityhouse/ocpp](https://github.com/mobilityhouse/ocpp) 2.1.0 | Python | 1.6J, 2.0.1 (2.1 candidate) | **built: 1.6J and 2.0.1, both roles**, security profiles 0 and 1 |
-| `chargetime` | [ChargeTimeEU/Java-OCA-OCPP](https://github.com/ChargeTimeEU/Java-OCA-OCPP) v2.0 | Java | 1.6J, 2.0.1, 2.1 | **built: 1.6J and 2.0.1, both roles**, security profiles 0 and 1 |
+| `mobilityhouse` | [mobilityhouse/ocpp](https://github.com/mobilityhouse/ocpp) 2.1.0 | Python | 1.6J, 2.0.1, 2.1 | **built: 1.6J, 2.0.1 and 2.1, both roles**, security profiles 0 and 1 |
+| `chargetime` | [ChargeTimeEU/Java-OCA-OCPP](https://github.com/ChargeTimeEU/Java-OCA-OCPP) v2.0 | Java | 1.6J, 2.0.1 (2.1 on master only, unreleased) | **built: 1.6J and 2.0.1, both roles**, security profiles 0 and 1 |
 | `lorenzodonini` | [lorenzodonini/ocpp-go](https://github.com/lorenzodonini/ocpp-go) v0.19.0 | Go | 1.6J, 2.0.1 | **built: 1.6J and 2.0.1, both roles**, security profiles 0 and 1 |
 
 The versions listed are what each upstream advertises. A version or feature
@@ -88,12 +89,15 @@ docker exec csms ocpp-interop call --station OT-FABRIC-TEST-001 Reset --payload 
 ```
 
 The same works with `--version 2.0.1` and the 2.0.1 fixture
-(`print-fixture --version 2.0.1`).
+(`print-fixture --version 2.0.1`), and, with the `mobilityhouse` image, with
+`--version 2.1`.
 
 `docker compose up -d --wait` runs the three reference CSMSs on
 127.0.0.1:9000 (mobilityhouse), 127.0.0.1:9001 (chargetime) and
 127.0.0.1:9002 (lorenzodonini), for OCPP 1.6 unless
-`OCPP_INTEROP_OCPP=2.0.1 OCPP_INTEROP_FIXTURE_DIR=v201` is set.
+`OCPP_INTEROP_OCPP=2.0.1 OCPP_INTEROP_FIXTURE_DIR=v201` is set. For OCPP 2.1
+(`OCPP_INTEROP_OCPP=2.1 OCPP_INTEROP_FIXTURE_DIR=v21`), start the
+`mobilityhouse` service only: the other two exit 5.
 
 ## Repository layout
 
@@ -123,8 +127,8 @@ make matrix      # the compatibility matrix of reports/report-interop.json
 
 `make validate` needs Python 3 with `jsonschema`. If `jsonschema` is
 missing, the target runs in a `python:3.12-slim` container instead. The
-self-tests need Docker and jq. `OCPP_VERSIONS=2.0.1 make interop` limits the
-cross-stack self-test to one OCPP version.
+self-tests need Docker and jq. `OCPP_VERSIONS=2.1 make interop` limits the
+cross-stack self-test to one OCPP version (default: 1.6, 2.0.1 and 2.1).
 
 ## Security
 

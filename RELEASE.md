@@ -21,6 +21,54 @@ The `Upstream candidates` workflow runs every Monday. It compares each pin
 with the latest upstream release and keeps an issue open while a pin is
 behind. It never changes a pin.
 
+## Unreleased
+
+### Summary
+
+OCPP 2.1 (PLAN.md, Phase 6) in `mobilityhouse`, the one adapter whose pinned
+upstream release has it, with a 2.1 baseline fixture and self-tests. The
+container contract is draft 0.4. Java-OCA-OCPP has 2.1 on its master only,
+after the pinned v2.0 release; ocpp-go v0.19.0 has none. No pinned upstream
+release implements the 2.1 SEND and CALLRESULTERROR frames, so no adapter
+declares them.
+
+### Added
+
+- OCPP 2.1 in `mobilityhouse` (ocpp.v21 of ocpp 2.1.0), CSMS and station,
+  security profiles 0 and 1, subprotocol `ocpp2.1`
+- `fixtures/v21/baseline`: every 2.0.1 baseline sample and answer, and the
+  2.1 additions tariffs (SetDefaultTariff, GetTariffs, ClearTariffs), DER
+  control (SetDERControl, GetDERControl, ClearDERControl, NotifyDERAlarm,
+  NotifyDERStartStop, ReportDERControl), periodic event streams
+  (OpenPeriodicEventStream, ClosePeriodicEventStream, GetPeriodicEventStream,
+  AdjustPeriodicEventStream, and NotifyPeriodicEventStream as a SEND) and
+  battery swap (BatterySwap, RequestBatterySwap). Every payload validates
+  against the OCA OCPP 2.1 Edition 2 JSON schemas
+- `scripts/validate-fixtures.py`: the 2.1 action directions from OCPP 2.1
+  Edition 2 Part 2; an answer to a SEND action is an error; id tokens of
+  2.1 may have 255 characters
+- `scripts/validate-payloads.py`: the schema of a SEND (`<Action>.json`)
+- Self-tests for 2.1: `scripts/smoke.sh` runs its version checks for 2.1
+  (new: a fixture that answers a SEND, a SEND action refused with exit 5,
+  `print-fixture --version 2.1`); `scripts/interop.sh` runs 2.1 by default
+  (`OCPP_VERSIONS` default `1.6 2.0.1 2.1`), with the test ids
+  `v21.send.*` and `v21.rpc.call-result-error`, which run only where both
+  ends declare `send` or `callResultError`
+- `tests/known-bugs.tsv`: ocpp 2.1.0 does not answer a 2.1 CALL whose
+  action has no handler (no NotImplemented; fixed on its master)
+
+### Changed
+
+- Container contract 0.4: `--version 2.1`; the section "OCPP 2.1: SEND and
+  CALLRESULTERROR" (a SEND action is refused without the `send` feature,
+  never sent as a CALL; frames of type 5 and 6 an upstream cannot read are
+  `protocol-error`); a fixture answer to a SEND is invalid; the gaps for
+  2.1 per adapter
+- The fixture schema allows id tokens of up to 255 characters (the limit
+  per version is a cross-field rule) and limits a token type to 20
+- versions.yaml: `interop_version` 0.2.0, the next planned release;
+  `mobilityhouse` verifies 2.1; the `chargetime` note says where its 2.1 is
+
 ## v0.1.0
 
 **Date:** 2026-10-18

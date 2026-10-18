@@ -1,11 +1,12 @@
 # Container contract
 
-Version: **0.3 (draft)**. `contract_version` in [versions.yaml](../versions.yaml).
+Version: **0.4 (draft)**. `contract_version` in [versions.yaml](../versions.yaml).
 
 > Implemented by `mobilityhouse`, `chargetime` and `lorenzodonini` for OCPP
-> 1.6J and 2.0.1. It stays a draft (0.x) until every adapter implements every
-> part of it; [Gaps before 1.0](#gaps-before-10) lists what is missing. Until
-> 1.0 it may change without a major version bump.
+> 1.6J and 2.0.1, and by `mobilityhouse` for OCPP 2.1. It stays a draft (0.x)
+> until every adapter implements every part of it;
+> [Gaps before 1.0](#gaps-before-10) lists what is missing. Until 1.0 it may
+> change without a major version bump.
 
 Every adapter image exposes the same commands, flags, JSON documents and exit
 codes. Consumers depend on this document, not on any adapter's source. After
@@ -22,6 +23,7 @@ compatible line and changes only with the major version.
 - [`client`](#client)
 - [`call`](#call)
 - [Answers](#answers)
+- [OCPP 2.1: SEND and CALLRESULTERROR](#ocpp-21-send-and-callresulterror)
 - [Events](#events)
 - [Result document](#result-document)
 - [`print-capabilities`](#print-capabilities)
@@ -104,7 +106,7 @@ SIGINT.
 
 | Flag | Default | Meaning |
 |------|---------|---------|
-| `--version V` | required | `1.6`, `2.0.1` or `2.1`: the subprotocol offered (`ocpp1.6`, ...) |
+| `--version V` | required | `1.6`, `2.0.1` or `2.1`: the subprotocol offered (`ocpp1.6`, `ocpp2.0.1`, `ocpp2.1`) |
 | `--fixture PATH` | `/fixtures/<version>/baseline/fixture.json` | Fixture to serve |
 | `--bind-address ADDR` | `0.0.0.0` | Listen address |
 | `--port N` | 9000 | Listen port |
@@ -206,8 +208,33 @@ deserialisation, and the upstream sends it.
   refused with exit 5, also by an adapter that declares `fixtureCallErrors`.
 - An upstream may answer a CALL it cannot route itself, without the adapter
   seeing it. Such CALLs have no `call-received` or `call-answered` event.
+- An action that the version sends as a SEND (OCPP 2.1:
+  NotifyPeriodicEventStream) has no answer; a fixture that gives one is
+  invalid (exit 4).
 
 Known exceptions are listed per adapter in the `notes` of its capabilities.
+
+## OCPP 2.1: SEND and CALLRESULTERROR
+
+OCPP 2.1 (Part 4, OCPP-J) adds two message types to CALL (2), CALLRESULT (3)
+and CALLERROR (4):
+
+- **CALLRESULTERROR** (5): the answer to a CALLRESULT that the receiver
+  cannot process;
+- **SEND** (6): a message that is never answered and may be sent while a
+  CALL is outstanding. NotifyPeriodicEventStream is sent as a SEND.
+
+The features `send` and `callResultError` say whether an adapter sends and
+receives them ([CAPABILITIES.md](CAPABILITIES.md)). No upstream release this
+repository pins implements either, so every adapter declares both `false`,
+and this version of the contract has no operation that sends a SEND or
+provokes a CALLRESULTERROR (see [Gaps before 1.0](#gaps-before-10)). Until
+it has:
+
+- an adapter without `send` never sends a SEND action as a CALL: `client
+  <Action>` and `call` refuse it with `error.code` `unsupported` (exit 5);
+- a frame of type 5 or 6 that the upstream cannot read is reported as
+  `protocol-error`, where the upstream exposes it.
 
 ## Events
 
@@ -327,7 +354,9 @@ from what the image serves. A fixture the image does not have exits 1.
 | Gap | Adapter |
 |---|---|
 | Security profiles 2 and 3 (TLS); `--tls-dir` exits 5 | all |
-| OCPP 2.1 | all (PLAN.md, Phase 6) |
+| OCPP 2.1 | chargetime: the pinned release (v2.0, the latest on Maven Central) has no 2.1; the upstream's master added it after that release. lorenzodonini: ocpp-go v0.19.0 has no 2.1 |
+| An operation to send a SEND and to provoke a CALLRESULTERROR; the features `send` and `callResultError` | all: The Mobility House ocpp 2.1.0 knows the message types 2 to 4 only; the other upstreams have no 2.1 in their pinned releases |
+| `NotImplemented` for an OCPP 2.1 action the fixture does not answer | mobilityhouse: ocpp 2.1.0 does not answer such a CALL at all (tests/known-bugs.tsv) |
 | `callError` answers from the fixture (`fixtureCallErrors`) | chargetime: Java-OCA-OCPP answers a failed handler with `InternalError` only |
 | `NotImplemented` for a Core profile action the fixture does not answer | chargetime, OCPP 1.6: JSONServer and JSONClient always register the Core profile, so such an action reaches the adapter, which can only fail it (`InternalError`) |
 | Message ids of sent CALLs (`messageIds`), subprotocol and close code in events | chargetime: not exposed by Java-OCA-OCPP. lorenzodonini: the station does not see the negotiated subprotocol, the server not the close code |
@@ -338,6 +367,12 @@ from what the image serves. A fixture the image does not have exits 1.
 
 ## Changes
 
+- **0.4** (unreleased): OCPP 2.1, in `mobilityhouse`. The section
+  [OCPP 2.1: SEND and CALLRESULTERROR](#ocpp-21-send-and-callresulterror):
+  without the `send` feature a SEND action is refused (exit 5), never sent as
+  a CALL; a frame of type 5 or 6 the upstream cannot read is a
+  `protocol-error`; a fixture answer to a SEND is invalid. No operation for
+  SEND or CALLRESULTERROR yet: no pinned upstream release implements them.
 - **0.3** (unreleased): OCPP 2.0.1, and the third adapter. The derived
   answer `variables` (GetVariables, SetVariables) is part of the answers. A
   `callError` answer whose code the upstream cannot send is refused (exit

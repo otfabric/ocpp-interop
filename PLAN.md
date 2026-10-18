@@ -69,10 +69,24 @@ interoperability. First slice: OCPP 1.6J only (2026-10-18).
 
 ## Phase 6 - OCPP 2.1 (open)
 
-- [ ] 2.1 fixtures, once the action list is verified against Edition 2
-- [ ] 2.1 in `chargetime`, and in `mobilityhouse` if its 2.1.0 support
-      holds up in tests
-- [ ] SEND and CALLRESULTERROR features in the capabilities
+- [x] The 2.1 action directions, from OCPP 2.1 Edition 2 Part 2, in
+      scripts/validate-fixtures.py; NotifyPeriodicEventStream is a SEND and
+      has no answer
+- [x] `fixtures/v21/baseline`: the 2.0.1 baseline and the 2.1 additions
+      tariffs, DER control, periodic event streams and battery swap; every
+      payload valid against the OCA 2.1 schemas
+- [x] 2.1 in `mobilityhouse` (ocpp.v21), both roles, self-tested (smoke,
+      and interop with itself). Its upstream defects are recorded: no
+      answer to an unanswered 2.1 action, BatterySwap cannot be sent
+- [x] Contract 0.4: `--version 2.1`; SEND actions are refused without the
+      `send` feature; type 5 and 6 frames an upstream cannot read are
+      `protocol-error`
+- [ ] 2.1 in `chargetime`: Java-OCA-OCPP has 2.1 (with SEND and
+      CALLRESULTERROR) on master since 2025-12-13, after its v2.0 release,
+      the latest on Maven Central. Waits for a release (R2.2)
+- [ ] SEND and CALLRESULTERROR: a contract operation and the features
+      `send` and `callResultError`, once a pinned upstream release
+      implements them
 
 ## Later
 

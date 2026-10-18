@@ -70,8 +70,8 @@ DECLARED=$(jq -r '.versions | keys[]' <<<"${caps}" 2>/dev/null | tr '\n' ' ')
 log "declared OCPP versions: ${DECLARED}"
 
 # ---- the baked fixtures are the repository's ----
-for v in 1.6 2.0.1; do
-    dir=$([[ "${v}" == 1.6 ]] && echo v16 || echo v201)
+for v in 1.6 2.0.1 2.1; do
+    dir=$(jq -rn --arg v "${v}" '{"1.6": "v16", "2.0.1": "v201", "2.1": "v21"}[$v]')
     if diff -q <(docker run --rm "${IMAGE}" print-fixture --version "${v}" baseline 2>/dev/null) "${ROOT}/fixtures/${dir}/baseline/fixture.json" >/dev/null
     then ok "print-fixture --version ${v} baseline"; else fail "print-fixture --version ${v} baseline differs from fixtures/${dir}/baseline/fixture.json"; fi
 done
@@ -134,17 +134,24 @@ version_checks() {
     # Each invalid fixture sits at <dir>/${VDIR}/baseline/fixture.json, so that it
     # breaks exactly one rule and not also "name is the directory name".
     bad="${WORK}/fixtures"
-    for case in good json name role token version derived callerror badcode untyped; do mkdir -p "${bad}/${case}/${VDIR}/baseline"; done
+    for case in good json name role token version derived callerror badcode untyped send; do mkdir -p "${bad}/${case}/${VDIR}/baseline"; done
     mkdir -p "${bad}/name/${VDIR}/other"
     cp "${FIXTURE}" "${bad}/good/${VDIR}/baseline/fixture.json"
     echo '{ not json' > "${bad}/json/${VDIR}/baseline/fixture.json"
     cp "${FIXTURE}" "${bad}/name/${VDIR}/other/fixture.json"
     jq '.answers.csms.Reset = {"payload": {"status": "Accepted"}}' "${FIXTURE}" > "${bad}/role/${VDIR}/baseline/fixture.json"
-    if [[ "${V}" == 1.6 ]]; then long="0123456789ABCDEF01234" other="2.0.1"; else long="0123456789ABCDEF0123456789ABCDEF01234" other="1.6"; fi
+    # One character more than the version allows: 20 (1.6), 36 (2.0.1), 255 (2.1).
+    case "${V}" in
+        1.6) long="0123456789ABCDEF01234" other="2.0.1" ;;
+        2.0.1) long="0123456789ABCDEF0123456789ABCDEF01234" other="1.6" ;;
+        *) long=$(printf 'A%.0s' $(seq 1 256)) other="2.0.1" ;;
+    esac
     jq --arg t "${long}" '.idTokens[0].idToken = $t' "${FIXTURE}" > "${bad}/token/${VDIR}/baseline/fixture.json"
     jq --arg v "${other}" '.ocppVersion = $v' "${FIXTURE}" > "${bad}/version/${VDIR}/baseline/fixture.json"
     jq 'del(.idTokens[0].type)' "${FIXTURE}" > "${bad}/untyped/${VDIR}/baseline/fixture.json"
     jq '.answers.station.Reset = {"derived": "idTokens"}' "${FIXTURE}" > "${bad}/derived/${VDIR}/baseline/fixture.json"
+    # A SEND is never answered (OCPP 2.1: NotifyPeriodicEventStream).
+    jq '.answers.csms.NotifyPeriodicEventStream = {"payload": {}}' "${FIXTURE}" > "${bad}/send/${VDIR}/baseline/fixture.json"
     jq '.answers.csms.Heartbeat = {"callError": {"code": "GenericError", "description": "fixture says no"}}' "${FIXTURE}" \
         > "${bad}/callerror/${VDIR}/baseline/fixture.json"
     jq '.answers.csms.Heartbeat = {"callError": {"code": "NoSuchErrorCode", "description": "not an OCPP-J error code"}}' "${FIXTURE}" \
@@ -158,6 +165,7 @@ version_checks() {
     [[ "${V}" != 1.6 ]] && expect_exit 4 "server with an id token without a type" "${mount[@]}" "${IMAGE}" server --version "${V}" --fixture /bad/untyped/${VDIR}/baseline/fixture.json
     expect_exit 4 "server with a fixture of another OCPP version" "${mount[@]}" "${IMAGE}" server --version "${V}" --fixture /bad/version/${VDIR}/baseline/fixture.json
     expect_exit 4 "server with a derived answer that does not fit the action" "${mount[@]}" "${IMAGE}" server --version "${V}" --fixture /bad/derived/${VDIR}/baseline/fixture.json
+    [[ "${V}" == 2.1 ]] && expect_exit 4 "server with an answer to a SEND" "${mount[@]}" "${IMAGE}" server --version "${V}" --fixture /bad/send/${VDIR}/baseline/fixture.json
     expect_exit 5 "server with a callError answer that is not an OCPP-J error code" "${mount[@]}" "${IMAGE}" server --version "${V}" --fixture /bad/badcode/${VDIR}/baseline/fixture.json
     expect_exit 4 "server with a missing fixture" "${IMAGE}" server --version "${V}" --fixture /no/such/fixture.json
     expect_exit 4 "client with a missing fixture" "${IMAGE}" client Heartbeat --version "${V}" --url ws://nowhere:9000/ocpp --fixture /no/such/fixture.json
@@ -171,6 +179,14 @@ version_checks() {
         if [[ "${got}" == ready ]]; then ok "server with a callError answer: ready (fixtureCallErrors)"; else fail "server with a callError answer: ${got}"; fi
     else
         if [[ "${got}" == "exit 5" ]]; then ok "server with a callError answer: exit 5 (no fixtureCallErrors)"; else fail "server with a callError answer: ${got}, want exit 5"; fi
+    fi
+
+    # ---- SEND (OCPP 2.1): without the send feature it is never sent as a CALL ----
+    if [[ "${V}" == 2.1 ]] && ! has_feature send && has_role client; then
+        doc=$(run_client "${ADAPTER}" NotifyPeriodicEventStream --version "${V}" --url ws://nowhere:9000/ocpp \
+            --payload "$(jq -c '.samples.notifyPeriodicEventStream.payload' "${FIXTURE}")"); code=$?
+        if [[ "${code}" == 5 ]] && jq -e '.ok == false and .error.code == "unsupported"' <<<"${doc}" >/dev/null 2>&1
+        then ok "a SEND action without the send feature: unsupported, exit 5"; else fail "SEND action without the send feature: exit ${code}, ${doc}"; fi
     fi
 
     # ---- a connection that cannot be made ----

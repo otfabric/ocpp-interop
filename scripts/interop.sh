@@ -4,7 +4,7 @@
 #
 # Usage: interop.sh <adapter> [<adapter> ...]      e.g. interop.sh mobilityhouse chargetime lorenzodonini
 #
-# For each OCPP version both adapters declare (1.6 and 2.0.1), and each pairing
+# For each OCPP version both adapters declare (1.6, 2.0.1, 2.1), and each pairing
 # of a station (`client run`, or a one-shot `client <Action>`) and a CSMS
 # (`server`), on a private Docker network:
 #
@@ -16,7 +16,9 @@
 #                  (`docker exec <csms> ocpp-interop call --station ...`), with
 #                  the station's fixture answer;
 #   derived        answers the fixture derives: an unknown id token, unknown
-#                  configuration keys (1.6) or device model variables (2.0.1);
+#                  configuration keys (1.6) or device model variables (2.x);
+#   send, rpc      OCPP 2.1 SEND samples and CALLRESULTERROR: run only where
+#                  both ends declare the features send and callResultError;
 #   connectivity   one-shot client, an unknown identity, the close of a session;
 #   profile 1      Basic authentication: accepted, no credentials, wrong password;
 #   errors         NotImplemented for an action without an answer, the fixture's
@@ -32,7 +34,7 @@
 #
 # Environment: REGISTRY, VERSION (image tag, default dev), VERBOSE=1,
 #              REPORT_DIR (keeps every result document and the report),
-#              OCPP_VERSIONS (default "1.6 2.0.1").
+#              OCPP_VERSIONS (default "1.6 2.0.1 2.1").
 
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -43,7 +45,11 @@ source "${SCRIPT_DIR}/lib.sh"
 [[ $# -ge 1 ]] || { echo "usage: interop.sh <adapter> [<adapter> ...]" >&2; exit 2; }
 ADAPTERS=("$@")
 # The OCPP versions to test, in order; OCPP_VERSIONS="2.0.1" limits a run.
-read -r -a VERSIONS <<<"${OCPP_VERSIONS:-1.6 2.0.1}"
+read -r -a VERSIONS <<<"${OCPP_VERSIONS:-1.6 2.0.1 2.1}"
+# Actions that a version sends as a SEND (message type 6), never answered:
+# OCPP 2.1 Part 2, 1.54; scripts/validate-fixtures.py SEND_ACTIONS.
+SEND_ACTIONS='{"1.6": [], "2.0.1": [], "2.1": ["NotifyPeriodicEventStream"]}'
+is_send() { jq -e --arg v "${OCPP}" --arg a "$1" '.[$v] | index($a) != null' <<<"${SEND_ACTIONS}" >/dev/null; }
 KNOWN_BUGS="${ROOT}/tests/known-bugs.tsv"
 # Set per version by use_version: the version, its fixture directory name
 # (also the prefix of the test ids), the baseline fixture and its station.
@@ -143,6 +149,25 @@ FEATURE_OF='{
   "UnlockConnector":"remote-commands","ChangeAvailability":"remote-commands","TriggerMessage":"remote-commands",
   "ClearCache":"remote-commands","SetChargingProfile":"smart-charging","ClearChargingProfile":"smart-charging",
   "CancelReservation":"reservation","ReservationStatusUpdate":"reservation","GetLocalListVersion":"local-auth-list"
+ },
+ "2.1": {
+  "BootNotification":"provisioning","Heartbeat":"provisioning","StatusNotification":"provisioning",
+  "Authorize":"authorization","TransactionEvent":"transactions","MeterValues":"meter-values",
+  "DataTransfer":"data-transfer","FirmwareStatusNotification":"firmware-diagnostics",
+  "LogStatusNotification":"firmware-diagnostics","SecurityEventNotification":"security",
+  "NotifyReport":"device-model","NotifyEvent":"device-model","GetBaseReport":"device-model",
+  "GetVariables":"device-model","SetVariables":"device-model",
+  "RequestStartTransaction":"remote-commands","RequestStopTransaction":"remote-commands","Reset":"remote-commands",
+  "UnlockConnector":"remote-commands","ChangeAvailability":"remote-commands","TriggerMessage":"remote-commands",
+  "ClearCache":"remote-commands","SetChargingProfile":"smart-charging","ClearChargingProfile":"smart-charging",
+  "CancelReservation":"reservation","ReservationStatusUpdate":"reservation","GetLocalListVersion":"local-auth-list",
+  "SetDefaultTariff":"tariff-cost","GetTariffs":"tariff-cost","ClearTariffs":"tariff-cost",
+  "SetDERControl":"der-control","GetDERControl":"der-control","ClearDERControl":"der-control",
+  "NotifyDERAlarm":"der-control","NotifyDERStartStop":"der-control","ReportDERControl":"der-control",
+  "OpenPeriodicEventStream":"periodic-event-streams","ClosePeriodicEventStream":"periodic-event-streams",
+  "GetPeriodicEventStream":"periodic-event-streams","AdjustPeriodicEventStream":"periodic-event-streams",
+  "NotifyPeriodicEventStream":"periodic-event-streams",
+  "BatterySwap":"battery-swap","RequestBatterySwap":"battery-swap"
  }
 }'
 
@@ -337,6 +362,21 @@ one_shot() {
     ONE_SHOT_PROBLEM="${problem}"; ONE_SHOT_MS="${ms}"; ONE_SHOT_DOC="${doc}"
 }
 
+# send_sample <id> <client> <server> <initiator> <action>: a sample the
+# version sends as a SEND. It runs only where both ends declare `send`; the
+# contract has no operation for it until an upstream release supports SEND.
+send_sample() {
+    local id="$1" client="$2" server="$3" initiator="$4" action="$5" feat
+    feat=$(jq -r --arg v "${OCPP}" --arg a "${action}" '.[$v][$a] // "other"' <<<"${FEATURE_OF}")
+    if feature "${client}" send && feature "${server}" send; then
+        record "${id}" "${client}" "${server}" "${initiator}" "${feat}" "${action}" INFRA_ERROR 0 \
+            "both declare send, but the contract has no operation to send a SEND yet (docs/CONTAINER_CONTRACT.md, Gaps before 1.0)"
+    else
+        record "${id}" "${client}" "${server}" "${initiator}" "${feat}" "${action}" SKIP_UNSUPPORTED 0 \
+            "${action} is a SEND in OCPP ${OCPP}, and send is not declared by both ${client} and ${server}"
+    fi
+}
+
 pairing() {  # pairing <client adapter> <server adapter>
     local client="$1" server="$2" srv sta name action payload id doc problem
     srv="csms-${server}-${RUN_ID}"; sta="station-${client}-${RUN_ID}"
@@ -363,8 +403,13 @@ pairing() {  # pairing <client adapter> <server adapter>
         record "${VDIR}.connect.client-run" "${client}" "${server}" client connectivity "" FAIL 0 "the server reported no connection-opened event"
     fi
 
-    # Station -> CSMS, every station sample, in the fixture's order.
+    # Station -> CSMS, every station sample, in the fixture's order. A SEND
+    # sample is a test of its own (below).
     while IFS=$'\t' read -r name action payload; do
+        if is_send "${action}"; then
+            send_sample "${VDIR}.send.$(kebab "${name}")" "${client}" "${server}" client "${action}"
+            continue
+        fi
         exchange "${VDIR}.from-station.$(kebab "${name}")" "${client}" "${server}" client "${sta}" "${srv}" "${action}" "${payload}"
     done < <(jq -r '.samples | to_entries[] | select(.value.from == "station") | [.key, .value.action, (.value.payload | tojson)] | @tsv' "${FIXTURE}")
     # A token the fixture does not know: derived answer Invalid.
@@ -374,6 +419,10 @@ pairing() {  # pairing <client adapter> <server adapter>
 
     # CSMS -> station, every CSMS sample.
     while IFS=$'\t' read -r name action payload; do
+        if is_send "${action}"; then
+            send_sample "${VDIR}.send.$(kebab "${name}")" "${client}" "${server}" server "${action}"
+            continue
+        fi
         exchange "${VDIR}.from-csms.$(kebab "${name}")" "${client}" "${server}" server "${srv}" "${sta}" "${action}" "${payload}" --station "${STATION}"
     done < <(jq -r '.samples | to_entries[] | select(.value.from == "csms") | [.key, .value.action, (.value.payload | tojson)] | @tsv' "${FIXTURE}")
     if [[ "${OCPP}" == 1.6 ]]; then
@@ -389,6 +438,20 @@ pairing() {  # pairing <client adapter> <server adapter>
         exchange "${VDIR}.from-csms.set-variables-read-only" "${client}" "${server}" server "${srv}" "${sta}" SetVariables \
             '{"setVariableData":[{"component":{"name":"ChargingStation"},"variable":{"name":"AvailabilityState"},"attributeValue":"Unavailable"}]}' \
             --station "${STATION}"
+    fi
+
+    # OCPP 2.1 CALLRESULTERROR (message type 5): the answer to a CALLRESULT
+    # that the receiver cannot process (Part 4).
+    if [[ "${OCPP}" == 2.1 ]]; then
+        for initiator in client server; do
+            if feature "${client}" callResultError && feature "${server}" callResultError; then
+                record "${VDIR}.rpc.call-result-error" "${client}" "${server}" "${initiator}" rpc "" INFRA_ERROR 0 \
+                    "both declare callResultError, but the contract has no operation to provoke a CALLRESULTERROR yet (docs/CONTAINER_CONTRACT.md, Gaps before 1.0)"
+            else
+                record "${VDIR}.rpc.call-result-error" "${client}" "${server}" "${initiator}" rpc "" SKIP_UNSUPPORTED 0 \
+                    "callResultError is not declared by both ${client} and ${server}"
+            fi
+        done
     fi
 
     # The station closes its connection; the CSMS reports it.
@@ -501,7 +564,7 @@ pairing() {  # pairing <client adapter> <server adapter>
     fi
 }
 
-# A Reset the fixture's station answers: Hard in 1.6, Immediate in 2.0.1.
+# A Reset the fixture's station answers: Hard in 1.6, Immediate in 2.x.
 reset_payload() { if [[ "${OCPP}" == 1.6 ]]; then echo '{"type":"Hard"}'; else echo '{"type":"Immediate"}'; fi; }
 
 # Fixtures for the error cases, mounted read-only into the containers. The
