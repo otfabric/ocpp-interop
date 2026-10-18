@@ -41,7 +41,7 @@ export REGISTRY VERSION
 
 # image-%, smoke-%, run-% and candidate-% are pattern rules, which make
 # ignores for .PHONY targets: they depend on FORCE instead.
-.PHONY: help all ci validate versions schemas fixtures lint documents images smoke interop matrix \
+.PHONY: help all ci validate versions schemas fixtures lint documents images smoke interop matrix release-prep release-check \
         capabilities buildx-setup buildx publish publish-arch publish-manifest digests clean FORCE
 FORCE:
 
@@ -228,6 +228,12 @@ digests: ## Print "<adapter> <digest>" of the published multi-arch images of VER
 	done
 
 # ── Clean ─────────────────────────────────────────────────────────────────────
+
+release-prep: ## Date the "## Unreleased" notes as VERSION and set interop_version (VERSION=vX.Y.Z)
+	@scripts/release-prep.py "$(VERSION)"
+
+release-check: ## Check that the tree can be released as VERSION, as the Release workflow will (VERSION=vX.Y.Z)
+	@scripts/release-check.sh "$(VERSION)"
 
 clean: ## Remove test containers, networks, local images and reports
 	@docker ps -aq --filter "label=ocpp-interop.run" | xargs -r docker rm -f >/dev/null 2>&1 || true

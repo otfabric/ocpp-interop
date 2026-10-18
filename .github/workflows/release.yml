@@ -47,9 +47,7 @@ jobs:
       - name: Validate
         run: |
           make validate
-          want="interop_version: \"${VERSION#v}\""
-          grep -qF "$want" versions.yaml || { echo "::error::versions.yaml does not say $want"; exit 1; }
-          grep -qE "^## ${VERSION}\$" RELEASE.md || { echo "::error::RELEASE.md has no section ## ${VERSION}"; exit 1; }
+          scripts/release-check.sh "${VERSION}"
 
       - name: Every built adapter is in the Makefile
         run: |

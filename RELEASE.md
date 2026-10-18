@@ -2,11 +2,14 @@
 
 ## How a release is made
 
-1. Set `interop_version` in versions.yaml to the new version, and add a
-   `## vX.Y.Z` section to this file.
-2. Push the tag `vX.Y.Z`. The `Release` workflow validates the repository,
-   checks both of the above, and creates the GitHub release with
-   `manifest.json` and `checksums.txt`.
+1. `make release-prep VERSION=vX.Y.Z` turns "## Unreleased" into
+   "## vX.Y.Z" with today's date and sets `interop_version` in versions.yaml.
+   Commit it through a pull request.
+2. `make release-check VERSION=vX.Y.Z` on the merged `main` runs the checks
+   the Release workflow will run on the tag.
+3. Tag that commit `vX.Y.Z` and push the tag. The `Release` workflow
+   validates the repository, runs the same checks, and creates the GitHub
+   release with `manifest.json` and `checksums.txt`.
 
 The release also builds and self-tests the images natively on amd64 and
 arm64. It then publishes per-architecture tags and a multi-arch index to
@@ -18,10 +21,9 @@ The `Upstream candidates` workflow runs every Monday. It compares each pin
 with the latest upstream release and keeps an issue open while a pin is
 behind. It never changes a pin.
 
-## Unreleased
+## v0.1.0
 
-Planned as v0.1.0 (`interop_version` in versions.yaml); the maintainer
-decides when to release it.
+**Date:** 2026-10-18
 
 ### Summary
 
