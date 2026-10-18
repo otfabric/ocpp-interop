@@ -28,7 +28,8 @@ jobs:
   candidate:
     name: ${{ matrix.adapter }}
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # everest compiles libocpp twice (the pin and the candidate): about 30 minutes.
+    timeout-minutes: 150
     strategy:
       fail-fast: false
       matrix:
@@ -109,7 +110,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
       ISSUE_TITLE: "Upstream releases: pins behind the latest"
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      ADAPTER_COUNT: "3"
+      ADAPTER_COUNT: "4"
     steps:
       - uses: actions/download-artifact@v8
         with:
