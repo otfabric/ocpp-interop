@@ -21,7 +21,10 @@ The `Upstream candidates` workflow runs every Monday. It compares each pin
 with the latest upstream release and keeps an issue open while a pin is
 behind. It never changes a pin.
 
-## Unreleased
+## v0.3.0
+
+**Date:** 2026-10-18
+**Previous release:** v0.2.0
 
 ### Summary
 
