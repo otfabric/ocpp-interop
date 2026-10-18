@@ -86,6 +86,15 @@ Whether compression was negotiated is not exposed: `connection-opened` has
 `compression` `null` where it may have been, `false` where it cannot have
 been.
 
+## Actions
+
+The v2.0 jars have a `*Feature` class, with request and confirmation types,
+for every OCPP 1.6 action (39, with the Security Whitepaper extensions in
+`eu.chargetime.ocpp.feature.securityext`) and every OCPP 2.0.1 action (64,
+in `eu.chargetime.ocpp.v201.feature`). The adapter therefore declares every
+action of both versions in the direction the specification gives it, both
+roles; the baseline fixtures have a sample and an answer for each.
+
 ## Limitations of the upstream
 
 - **No OCPP 2.1 in the release.** The v2.0 tag's `ocpp-v2` module holds

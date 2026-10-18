@@ -84,6 +84,12 @@ interoperability. First slice: OCPP 1.6J only (2026-10-18).
 - [x] Contract 0.4: `--version 2.1`; SEND actions are refused without the
       `send` feature; type 5 and 6 frames an upstream cannot read are
       `protocol-error`
+- [x] Every action of 1.6 (39), 2.0.1 (64) and 2.1 (91) in a baseline
+      sample, with an answer; every adapter declares every action its
+      upstream can exchange, and the self-tests send each one. Not
+      exchangeable: 2.1 BatterySwap (upstream defect) and
+      NotifyPeriodicEventStream (SEND). NotImplemented is tested with a
+      fixture copy that leaves one action per side unanswered
 - [ ] 2.1 in `chargetime`: Java-OCA-OCPP has 2.1 (with SEND and
       CALLRESULTERROR) on master since 2025-12-13, after its v2.0 release,
       the latest on Maven Central. Waits for a release (R2.2)

@@ -27,8 +27,10 @@
 #                  from both ends; the CA and the certificates are generated for
 #                  the run. They run where both ends declare the profile or
 #                  compression;
-#   errors         NotImplemented for an action without an answer, the fixture's
-#                  own CALLERROR answers.
+#   errors         NotImplemented for an action without an answer (from both
+#                  ends, with a copy of the fixture that leaves one action of
+#                  each side unanswered: the baseline answers every action), the
+#                  fixture's own CALLERROR answers.
 #
 # Every result is a report result (schemas/report.schema.json) with the
 # status PASS, FAIL, SKIP_UNSUPPORTED (a capability one side does not declare),
@@ -56,6 +58,14 @@ read -r -a VERSIONS <<<"${OCPP_VERSIONS:-1.6 2.0.1 2.1}"
 # OCPP 2.1 Part 2, 1.54; scripts/validate-fixtures.py SEND_ACTIONS.
 SEND_ACTIONS='{"1.6": [], "2.0.1": [], "2.1": ["NotifyPeriodicEventStream"]}'
 is_send() { jq -e --arg v "${OCPP}" --arg a "$1" '.[$v] | index($a) != null' <<<"${SEND_ACTIONS}" >/dev/null; }
+# The action each end sends in the NotImplemented tests, and that the other
+# end's fixture copy leaves unanswered. Not a Core profile action in 1.6:
+# Java-OCA-OCPP always registers the Core profile, and fails an unanswered
+# Core action with InternalError (docs/CONTAINER_CONTRACT.md).
+UNANSWERED='{"1.6": {"station": "DiagnosticsStatusNotification", "csms": "ClearChargingProfile"},
+ "2.0.1": {"station": "LogStatusNotification", "csms": "ClearChargingProfile"},
+ "2.1": {"station": "LogStatusNotification", "csms": "ClearChargingProfile"}}'
+unanswered() { jq -r --arg v "${OCPP}" --arg r "$1" '.[$v][$r]' <<<"${UNANSWERED}"; }
 KNOWN_BUGS="${ROOT}/tests/known-bugs.tsv"
 # Set per version by use_version: the version, its fixture directory name
 # (also the prefix of the test ids), the baseline fixture and its station.
@@ -142,7 +152,12 @@ FEATURE_OF='{
   "SetChargingProfile":"smart-charging","ClearChargingProfile":"smart-charging","GetCompositeSchedule":"smart-charging",
   "ReserveNow":"reservation","CancelReservation":"reservation",
   "GetLocalListVersion":"local-auth-list","SendLocalList":"local-auth-list",
-  "SecurityEventNotification":"security-extensions","ExtendedTriggerMessage":"security-extensions"
+  "SecurityEventNotification":"security-extensions","ExtendedTriggerMessage":"security-extensions",
+  "LogStatusNotification":"security-extensions","GetLog":"security-extensions",
+  "SignCertificate":"security-extensions","CertificateSigned":"security-extensions",
+  "InstallCertificate":"security-extensions","DeleteCertificate":"security-extensions",
+  "GetInstalledCertificateIds":"security-extensions","SignedUpdateFirmware":"security-extensions",
+  "SignedFirmwareStatusNotification":"security-extensions"
  },
  "2.0.1": {
   "BootNotification":"provisioning","Heartbeat":"provisioning","StatusNotification":"provisioning",
@@ -154,7 +169,19 @@ FEATURE_OF='{
   "RequestStartTransaction":"remote-commands","RequestStopTransaction":"remote-commands","Reset":"remote-commands",
   "UnlockConnector":"remote-commands","ChangeAvailability":"remote-commands","TriggerMessage":"remote-commands",
   "ClearCache":"remote-commands","SetChargingProfile":"smart-charging","ClearChargingProfile":"smart-charging",
-  "CancelReservation":"reservation","ReservationStatusUpdate":"reservation","GetLocalListVersion":"local-auth-list"
+  "CancelReservation":"reservation","ReservationStatusUpdate":"reservation","GetLocalListVersion":"local-auth-list",
+  "ClearedChargingLimit":"smart-charging","NotifyChargingLimit":"smart-charging","NotifyEVChargingNeeds":"smart-charging",
+  "NotifyEVChargingSchedule":"smart-charging","ReportChargingProfiles":"smart-charging","GetChargingProfiles":"smart-charging",
+  "GetCompositeSchedule":"smart-charging","ReserveNow":"reservation","SendLocalList":"local-auth-list",
+  "GetReport":"device-model","SetNetworkProfile":"device-model","GetTransactionStatus":"transactions","CostUpdated":"tariff-cost",
+  "NotifyMonitoringReport":"monitoring","GetMonitoringReport":"monitoring","SetMonitoringBase":"monitoring",
+  "SetMonitoringLevel":"monitoring","SetVariableMonitoring":"monitoring","ClearVariableMonitoring":"monitoring",
+  "NotifyCustomerInformation":"diagnostics","CustomerInformation":"diagnostics","GetLog":"firmware-diagnostics",
+  "NotifyDisplayMessages":"display","SetDisplayMessage":"display","GetDisplayMessages":"display","ClearDisplayMessage":"display",
+  "UpdateFirmware":"firmware-diagnostics","PublishFirmware":"firmware-diagnostics","UnpublishFirmware":"firmware-diagnostics",
+  "PublishFirmwareStatusNotification":"firmware-diagnostics",
+  "SignCertificate":"security","CertificateSigned":"security","InstallCertificate":"security","DeleteCertificate":"security",
+  "GetInstalledCertificateIds":"security","Get15118EVCertificate":"iso15118","GetCertificateStatus":"iso15118"
  },
  "2.1": {
   "BootNotification":"provisioning","Heartbeat":"provisioning","StatusNotification":"provisioning",
@@ -167,6 +194,22 @@ FEATURE_OF='{
   "UnlockConnector":"remote-commands","ChangeAvailability":"remote-commands","TriggerMessage":"remote-commands",
   "ClearCache":"remote-commands","SetChargingProfile":"smart-charging","ClearChargingProfile":"smart-charging",
   "CancelReservation":"reservation","ReservationStatusUpdate":"reservation","GetLocalListVersion":"local-auth-list",
+  "ClearedChargingLimit":"smart-charging","NotifyChargingLimit":"smart-charging","NotifyEVChargingNeeds":"smart-charging",
+  "NotifyEVChargingSchedule":"smart-charging","ReportChargingProfiles":"smart-charging","GetChargingProfiles":"smart-charging",
+  "GetCompositeSchedule":"smart-charging","ReserveNow":"reservation","SendLocalList":"local-auth-list",
+  "GetReport":"device-model","SetNetworkProfile":"device-model","GetTransactionStatus":"transactions","CostUpdated":"tariff-cost",
+  "NotifyMonitoringReport":"monitoring","GetMonitoringReport":"monitoring","SetMonitoringBase":"monitoring",
+  "SetMonitoringLevel":"monitoring","SetVariableMonitoring":"monitoring","ClearVariableMonitoring":"monitoring",
+  "NotifyCustomerInformation":"diagnostics","CustomerInformation":"diagnostics","GetLog":"firmware-diagnostics",
+  "NotifyDisplayMessages":"display","SetDisplayMessage":"display","GetDisplayMessages":"display","ClearDisplayMessage":"display",
+  "UpdateFirmware":"firmware-diagnostics","PublishFirmware":"firmware-diagnostics","UnpublishFirmware":"firmware-diagnostics",
+  "PublishFirmwareStatusNotification":"firmware-diagnostics",
+  "SignCertificate":"security","CertificateSigned":"security","InstallCertificate":"security","DeleteCertificate":"security",
+  "GetInstalledCertificateIds":"security","Get15118EVCertificate":"iso15118","GetCertificateStatus":"iso15118",
+  "GetCertificateChainStatus":"security","ChangeTransactionTariff":"tariff-cost","NotifySettlement":"payment",
+  "VatNumberValidation":"payment","NotifyWebPaymentStarted":"payment","AFRRSignal":"afrr",
+  "NotifyAllowedEnergyTransfer":"smart-charging","NotifyPriorityCharging":"smart-charging","UsePriorityCharging":"smart-charging",
+  "PullDynamicScheduleUpdate":"smart-charging","UpdateDynamicSchedule":"smart-charging",
   "SetDefaultTariff":"tariff-cost","GetTariffs":"tariff-cost","ClearTariffs":"tariff-cost",
   "SetDERControl":"der-control","GetDERControl":"der-control","ClearDERControl":"der-control",
   "NotifyDERAlarm":"der-control","NotifyDERStartStop":"der-control","ReportDERControl":"der-control",
@@ -571,6 +614,39 @@ pairing() {  # pairing <client adapter> <server adapter>
         record ${VDIR}.fixture-callerror.from-csms "${client}" "${server}" server errors Reset SKIP_UNSUPPORTED 0 \
             "${client} does not declare fixtureCallErrors: its upstream cannot answer with a chosen CALLERROR"
     fi
+
+    # ---- NotImplemented for an action the fixture does not answer ----
+    not_implemented "${client}" "${server}"
+}
+
+# not_implemented <client> <server>: each end sends an action that the
+# other end's fixture copy (unanswered/) does not answer: NotImplemented.
+not_implemented() {
+    local client="$1" server="$2" srv="csms-$2-${RUN_ID}" sta="station-$1-${RUN_ID}" saved="${FIXTURE}" initiator action
+    local alt=/alt/unanswered/${VDIR}/baseline/fixture.json
+    start "${srv}" "${server}" -v "${WORK}/fixtures:/alt:ro" -- server --version "${OCPP}" --fixture "${alt}"
+    # The station connects only once the server listens.
+    wait_ready "${srv}" && start "${sta}" "${client}" -v "${WORK}/fixtures:/alt:ro" -- client run --version "${OCPP}" \
+        --url "ws://${srv}:9000/ocpp" --fixture "${alt}"
+    if wait_ready "${srv}" && wait_ready "${sta}"; then
+        # expected() reads the answers from the copy.
+        FIXTURE="${WORK}/fixtures/unanswered/${VDIR}/baseline/fixture.json"
+        action=$(unanswered station)
+        exchange "${VDIR}.not-implemented.from-station" "${client}" "${server}" client "${sta}" "${srv}" "${action}" \
+            "$(jq -c --arg a "${action}" 'first(.samples[] | select(.action == $a and .from == "station")) | .payload' "${FIXTURE}")"
+        action=$(unanswered csms)
+        exchange "${VDIR}.not-implemented.from-csms" "${client}" "${server}" server "${srv}" "${sta}" "${action}" \
+            "$(jq -c --arg a "${action}" 'first(.samples[] | select(.action == $a and .from == "csms")) | .payload' "${FIXTURE}")" \
+            --station "${STATION}"
+        FIXTURE="${saved}"
+    else
+        for initiator in client server; do
+            record "${VDIR}.not-implemented.from-$([[ ${initiator} == client ]] && echo station || echo csms)" "${client}" "${server}" \
+                "${initiator}" errors "$(unanswered "$([[ ${initiator} == client ]] && echo station || echo csms)")" INFRA_ERROR 0 \
+                "server or client run did not become ready"
+        done
+    fi
+    stop_container "${sta}"; stop_container "${srv}"
 }
 
 # session <id> <client> <server> <feature> <server flags...> -- <client run flags...>
@@ -661,6 +737,9 @@ for v in "${VERSIONS[@]}"; do
     jq '.answers.csms.Heartbeat = {"callError": {"code": "GenericError", "description": "fixture says no"}}
         | .answers.station.Reset = {"callError": {"code": "GenericError", "description": "fixture says no"}}' "${FIXTURE}" \
         > "${WORK}/fixtures/callerror/${VDIR}/baseline/fixture.json"
+    mkdir -p "${WORK}/fixtures/unanswered/${VDIR}/baseline"
+    jq --arg s "$(unanswered station)" --arg c "$(unanswered csms)" 'del(.answers.csms[$s]) | del(.answers.station[$c])' "${FIXTURE}" \
+        > "${WORK}/fixtures/unanswered/${VDIR}/baseline/fixture.json"
 done
 # The TLS material of docs/CONTAINER_CONTRACT.md (Transport security), from
 # CAs made for this run: RSA keys for profile 2, ECDSA P-256 keys for profile

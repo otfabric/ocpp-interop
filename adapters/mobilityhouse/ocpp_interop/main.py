@@ -36,56 +36,31 @@ USAGE = """usage:
   ocpp-interop version"""
 
 # What the self-tests exercise (scripts/smoke.sh, scripts/interop.sh), per
-# version. Nothing else is declared (REQUIREMENTS.md R4.2).
-STATION_SENDS = {
-    "1.6": [
-        "Authorize", "BootNotification", "DataTransfer", "DiagnosticsStatusNotification",
-        "FirmwareStatusNotification", "Heartbeat", "MeterValues", "SecurityEventNotification",
-        "StartTransaction", "StatusNotification", "StopTransaction",
-    ],
-    "2.0.1": [
-        "Authorize", "BootNotification", "DataTransfer", "FirmwareStatusNotification", "Heartbeat",
-        "LogStatusNotification", "MeterValues", "NotifyEvent", "NotifyReport", "ReservationStatusUpdate",
-        "SecurityEventNotification", "StatusNotification", "TransactionEvent",
-    ],
-    "2.1": [
-        "Authorize", "BootNotification", "ClosePeriodicEventStream", "DataTransfer",
-        "FirmwareStatusNotification", "Heartbeat", "LogStatusNotification", "MeterValues", "NotifyDERAlarm",
-        "NotifyDERStartStop", "NotifyEvent", "NotifyReport", "OpenPeriodicEventStream", "ReportDERControl",
-        "ReservationStatusUpdate", "SecurityEventNotification", "StatusNotification", "TransactionEvent",
-    ],
-}
-CSMS_SENDS = {
-    "1.6": [
-        "CancelReservation", "ChangeAvailability", "ChangeConfiguration", "ClearCache",
-        "ClearChargingProfile", "DataTransfer", "ExtendedTriggerMessage", "GetCompositeSchedule",
-        "GetConfiguration", "GetDiagnostics", "GetLocalListVersion", "RemoteStartTransaction",
-        "RemoteStopTransaction", "ReserveNow", "Reset", "SendLocalList", "SetChargingProfile",
-        "TriggerMessage", "UnlockConnector", "UpdateFirmware",
-    ],
-    "2.0.1": [
-        "CancelReservation", "ChangeAvailability", "ClearCache", "ClearChargingProfile", "DataTransfer",
-        "GetBaseReport", "GetLocalListVersion", "GetVariables", "RequestStartTransaction",
-        "RequestStopTransaction", "Reset", "SetChargingProfile", "SetVariables", "TriggerMessage",
-        "UnlockConnector",
-    ],
-    "2.1": [
-        "AdjustPeriodicEventStream", "CancelReservation", "ChangeAvailability", "ClearCache",
-        "ClearChargingProfile", "ClearDERControl", "ClearTariffs", "DataTransfer", "GetBaseReport",
-        "GetDERControl", "GetLocalListVersion", "GetPeriodicEventStream", "GetTariffs", "GetVariables",
-        "RequestBatterySwap", "RequestStartTransaction", "RequestStopTransaction", "Reset", "SetChargingProfile",
-        "SetDERControl", "SetDefaultTariff", "SetVariables", "TriggerMessage", "UnlockConnector",
-    ],
-}
-# Sent by the self-tests, and answered NotImplemented: the baseline fixtures
-# have no answer for them.
-UNANSWERED = {
-    "1.6": {"station": "SecurityEventNotification", "csms": "ExtendedTriggerMessage"},
-    "2.0.1": {"station": "ReservationStatusUpdate", "csms": "CancelReservation"},
-    "2.1": {"station": "ReservationStatusUpdate", "csms": "CancelReservation"},
-}
-STATION_HANDLES = {v: sorted(set(a) - {UNANSWERED[v]["csms"]}) for v, a in CSMS_SENDS.items()}
-CSMS_HANDLES = {v: sorted(set(a) - {UNANSWERED[v]["station"]}) for v, a in STATION_SENDS.items()}
+# version: every action of the version, in the direction the specification
+# gives it (validate_fixtures.ACTIONS, scripts/validate-fixtures.py), less
+# what ocpp 2.1.0 cannot exchange. The baseline fixtures have a sample and an
+# answer for each. Nothing else is declared (REQUIREMENTS.md R4.2).
+#
+# Not sent, by the station of OCPP 2.1:
+# - BatterySwap: ocpp 2.1.0 writes the battery fields soC and soH as SoC and
+#   soh (charge_point.snake_to_camel_case), which its own validation refuses;
+# - NotifyPeriodicEventStream: a SEND, which ocpp 2.1.0 has no frame for.
+NOT_SENT = {"1.6": {"station": set(), "csms": set()},
+            "2.0.1": {"station": set(), "csms": set()},
+            "2.1": {"station": {"BatterySwap", "NotifyPeriodicEventStream"}, "csms": set()}}
+
+
+def declared(version: str) -> dict:
+    """{"station"|"csms": {"sends": [...], "handles": [...]}} for a version.
+
+    An end handles what the other end sends: an action that no adapter sends
+    (BatterySwap) is not exercised, so it is not declared as handled either.
+    """
+    from validate_fixtures import ACTIONS  # pylint: disable=import-outside-toplevel
+
+    sends = {role: sorted(ACTIONS[version][role] - NOT_SENT[version][role]) for role in ("station", "csms")}
+    return {"station": {"sends": sends["station"], "handles": sends["csms"]},
+            "csms": {"sends": sends["csms"], "handles": sends["station"]}}
 
 
 class UsageError(Exception):
@@ -250,9 +225,10 @@ def version_capabilities(version: str) -> dict:
             "BatterySwap is not sent: ocpp 2.1.0 writes the battery fields soC and soH as SoC and soh "
             "(charge_point.snake_to_camel_case), which its own schema validation refuses.",
         ]
+    actions = declared(version)
     return {
-        "client": {"supported": True, "sends": STATION_SENDS[version], "handles": STATION_HANDLES[version]},
-        "server": {"supported": True, "sends": CSMS_SENDS[version], "handles": CSMS_HANDLES[version]},
+        "client": {"supported": True, "sends": actions["station"]["sends"], "handles": actions["station"]["handles"]},
+        "server": {"supported": True, "sends": actions["csms"]["sends"], "handles": actions["csms"]["handles"]},
         "features": {
             "securityProfiles": [0, 1, 2, 3],
             "compression": True,
