@@ -69,13 +69,14 @@ upstream and what the upstream cannot do.
 
 ## Using the images from a library's tests
 
-Once images are published, a consumer pins them by digest and drives them
-through the [contract](docs/CONTAINER_CONTRACT.md). Until then, build them
-with `make images` (tag `dev`). For example, a library's CSMS can be tested
-with a reference station, with CALLs in both directions:
+Each release publishes multi-arch images to GHCR
+([RELEASE.md](RELEASE.md)). A consumer pins them by digest and drives them
+through the [contract](docs/CONTAINER_CONTRACT.md); to test local changes,
+build them with `make images` (tag `dev`). For example, a library's CSMS can
+be tested with a reference station, with CALLs in both directions:
 
 ```bash
-IMAGE=ghcr.io/otfabric/ocpp-interop-mobilityhouse:dev    # or @sha256:... once published
+IMAGE=ghcr.io/otfabric/ocpp-interop-mobilityhouse@sha256:...    # or :dev for a local build
 docker run -d --name station "$IMAGE" \
   client run --version 1.6 --url ws://host.docker.internal:9000/ocpp
 # station -> CSMS
