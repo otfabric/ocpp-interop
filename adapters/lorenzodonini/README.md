@@ -132,9 +132,17 @@ Recorded in [tests/known-bugs.tsv](../../tests/known-bugs.tsv), with the
 evidence:
 
 - OCPP 2.0.1 `ResetResponse` and `SetNetworkProfileResponse` declare
-  `statusInfo` without `omitempty`, so the station sends
-  `"statusInfo": null`, which the OCA schema does not allow: a CSMS that
-  validates responses (mobilityhouse) rejects the answer.
+  `statusInfo` without `omitempty`
+  ([reset.go](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/provisioning/reset.go#L61-L64),
+  [set_network_profile.go](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/provisioning/set_network_profile.go#L170-L173)),
+  so the station sends `"statusInfo": null`, which the OCA schema does not
+  allow: a CSMS that validates responses (mobilityhouse, CitrineOS) rejects
+  the answer. The fixture's answer is `{"status": "Accepted"}`; the adapter
+  reads it into ocpp-go's response struct and ocpp-go's `encoding/json`
+  writes the null, so neither the fixture nor the adapter can avoid it
+  without inventing a `statusInfo`. They are the only two `*StatusInfo`
+  fields of ocpp-go's 2.0.1 package without `omitempty`. Unchanged on
+  ocpp-go's master (b22429c, 2025-08-17); no release after v0.19.0.
 - OCPP 2.0.1 `GetCompositeScheduleResponse` does not have the OCA structure
   ([source](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/smartcharging/get_composite_schedule.go#L31-L50)):
   a top-level `evseId`, always written, which the schema does not allow; no
@@ -146,7 +154,11 @@ evidence:
   reads an empty schedule), and the CSMS
   drops the schedule of a correct answer. GetCompositeSchedule stays
   declared: the request goes out and an answer comes back; the test is
-  KNOWN_ISSUE with every peer.
+  KNOWN_ISSUE with every peer. ocpp-go's master removed the top-level
+  `evseId` and added `statusInfo` after v0.19.0
+  ([9356607](https://github.com/lorenzodonini/ocpp-go/commit/9356607e1ec2a128184064317c2ea719b550d003),
+  2025-03-28), but kept the `schedule` of `{startDateTime,
+  chargingSchedule}`; it is not released.
 - OCPP 2.0.1 `NotifyReportRequest` declares `tbc` as a `bool` with
   `omitempty`, so the station cannot send an explicit `"tbc": false`; the
   field is left out (false is its default).

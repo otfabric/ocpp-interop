@@ -23,6 +23,85 @@ The `Upstream candidates` workflow runs every Monday. It compares each pin
 with the latest upstream release and keeps an issue open while a pin is
 behind. It never changes a pin.
 
+## v0.4.1
+
+**Date:** 2026-10-19
+
+**Previous release:** v0.4.0
+
+### Summary
+
+The everest station declares every action libocpp can exchange, so the
+self-tests now run them: 2444 PASS, 31 KNOWN_ISSUE, 308 SKIP_UNSUPPORTED,
+0 FAIL (v0.4.0: 2196, 29, 558). BatterySwap is exchanged for the first time
+(everest station, mobilityhouse CSMS): 90 of the 91 OCPP 2.1 actions pass
+in at least one pairing. No upstream pin changes: there is no later release
+of any pinned upstream (ocpp-go v0.19.0, ocpp 2.1.0, everest-core 2026.02.1
+are the latest, checked 2026-10-19).
+
+This release follows the findings of an interoperability run of another
+OCPP implementation against the v0.3.1 images. Each was traced to its root
+cause; the ones in the upstreams are documented with their evidence, and
+the adapters do not work around them.
+
+### Changed
+
+- `everest`: `print-capabilities` declares every action of the version in
+  the station's direction (`sends`) and in the CSMS's (`handles`), less
+  NotifyPeriodicEventStream (a SEND), GetCertificateChainStatus and
+  NotifyWebPaymentStarted (not in libocpp's `ocpp::v2::MessageType`):
+  14/26 in 1.6, 25/40 in 2.0.1, 35/54 in 2.1, up from 11/19, 13/14 and
+  18/23. The adapter already sent and answered all of them through
+  libocpp; it declared the lists the other adapters had before the
+  baseline fixtures covered every action (v0.2.0). ReportDERControl stays
+  declared, a known upstream bug
+- `mobilityhouse`: the CSMS declares BatterySwap in 2.1 (`handles`, 36
+  actions). The station still cannot send it (below); the everest station
+  sends it, and the mobilityhouse CSMS answers it (PASS)
+
+### Known upstream defects
+
+- New in `tests/known-bugs.tsv`: the mobilityhouse CSMS (ocpp 2.1.0)
+  validates the draft-06 OCA 2.0.1 schemas with jsonschema's
+  `Draft4Validator`
+  ([messages.py](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/messages.py#L130-L173)),
+  so it answers a NotifyEVChargingNeeds whose integer `energyAmount` is
+  written `20000.0` (as libocpp's `float` writes it; a valid integer in
+  draft-06) with `TypeConstraintViolation`. Shown by the everest station,
+  now that it declares NotifyEVChargingNeeds; it passes with the
+  chargetime and lorenzodonini CSMSs
+- lorenzodonini (ocpp-go v0.19.0), 2.0.1 station: `"statusInfo": null` in
+  the Reset and SetNetworkProfile responses comes from ocpp-go's response
+  structs
+  ([reset.go L61-L64](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/provisioning/reset.go#L61-L64),
+  [set_network_profile.go L170-L173](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/provisioning/set_network_profile.go#L170-L173):
+  a `*StatusInfo` without `omitempty`), not from the fixture
+  (`{"status": "Accepted"}`) or the adapter; still so on ocpp-go's master
+  (b22429c). The top-level `evseId` of GetCompositeScheduleResponse
+  ([get_composite_schedule.go L46-L50](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/smartcharging/get_composite_schedule.go#L46-L50))
+  is removed on master by
+  [9356607](https://github.com/lorenzodonini/ocpp-go/commit/9356607e1ec2a128184064317c2ea719b550d003)
+  (2025-03-28), unreleased, which keeps the wrong `schedule` type
+- mobilityhouse (ocpp 2.1.0), 2.1 station: the BatterySwap sample is right
+  (`soC`, `soH`, as in the OCA 2.1 schema, which the upstream bundles
+  unchanged). The upstream reads them as `soc`, `soh` and writes them back
+  as `SoC`, `soh`
+  ([charge_point.py L57](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/charge_point.py#L57),
+  [L399](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/charge_point.py#L399)),
+  and its own validation refuses the request: "Additional properties are
+  not allowed ('SoC', 'soh' were unexpected)". Still so on master
+- No SEND (OCPP-J message type 6) in mobilityhouse/ocpp (2.1.0 and master,
+  `ocpp.messages.MessageType` has 2 to 4) nor in libocpp (2026.02.1 and
+  everest-core's main, `ocpp::MessageTypeId` has 2 to 4 and `UNKNOWN`):
+  neither has an API an adapter could send NotifyPeriodicEventStream with
+- libocpp (everest-core 2026.02.1): no GetCertificateChainStatus,
+  ReportDERControl or NotifyWebPaymentStarted in `ocpp::v2::MessageType`,
+  which both its message queue and its dispatcher convert every action to;
+  no other path for a CALL, and no handler or device-model setting adds
+  one. everest-core's main added ReportDERControl
+  ([04ebcd2a](https://github.com/EVerest/everest-core/commit/04ebcd2aaaaa4bfa59c5a33ec1f743002b31117c),
+  #2100), in no release yet; the other two are still missing on main
+
 ## v0.4.0
 
 **Date:** 2026-10-19
