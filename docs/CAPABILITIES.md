@@ -34,23 +34,31 @@ declared action and check its answer.
 
 | Declared actions | OCPP 1.6 (39) | OCPP 2.0.1 (64) | OCPP 2.1 (91) |
 |---|---|---|---|
-| Station sends | 14, all three adapters | 25, all three adapters | 35, mobilityhouse |
-| Station handles | 26, all three adapters | 40, all three adapters | 55, mobilityhouse |
+| Station sends | 14, all four stations | 25, all four stations | 35, mobilityhouse and everest |
+| Station handles | 26, all four stations | 40, all four stations | 55, mobilityhouse; 54, everest |
 | CSMS sends | 26, all three adapters | 40, all three adapters | 55, mobilityhouse |
-| CSMS handles | 14, all three adapters | 25, all three adapters | 35, mobilityhouse |
+| CSMS handles | 14, all three adapters | 25, all three adapters | 36, mobilityhouse |
+
+The 2.1 station lists differ: mobilityhouse does not send BatterySwap
+(below), everest does not send GetCertificateChainStatus nor answer
+NotifyWebPaymentStarted (libocpp's message queue does not know them,
+[adapters/everest/README.md](../adapters/everest/README.md)); neither
+sends NotifyPeriodicEventStream (a SEND).
 
 DataTransfer goes both ways and is counted in each direction. The pinned
 releases of Java-OCA-OCPP (v2.0) and ocpp-go (v0.19.0) have a request and a
 response type for every 1.6 and 2.0.1 action; ocpp 2.1.0 has one for every
 action of the three versions except NotifyPeriodicEventStream.
 
-Not declared, in OCPP 2.1 (the station's 37 actions less these two):
+Not declared by mobilityhouse, in OCPP 2.1 (the station's 37 actions less
+these two):
 
-- BatterySwap: ocpp 2.1.0 cannot send it (it writes the battery fields
-  `soC` and `soH` as `SoC` and `soh`), so no self-test reaches a CSMS with
-  it; the CSMS does not declare it either.
+- BatterySwap, by the station: ocpp 2.1.0 cannot send it (it writes the
+  battery fields `soC` and `soH` as `SoC` and `soh`). The CSMS handles it
+  (since v0.4.1): the everest station sends it.
 - NotifyPeriodicEventStream: a SEND
-  ([CONTAINER_CONTRACT.md](CONTAINER_CONTRACT.md#ocpp-21-send-and-callresulterror)).
+  ([CONTAINER_CONTRACT.md](CONTAINER_CONTRACT.md#ocpp-21-send-and-callresulterror)),
+  neither sent nor handled.
 
 A declared action can still fail with a particular peer, or with any peer,
 because of an upstream defect; those are in
@@ -74,11 +82,12 @@ an endpoint for, whose baseline sample it sends), and handles 8 in 1.6 and
 other action is left out.
 
 `everest` (EVerest libocpp) is a station only: it declares `client` for
-1.6, 2.0.1 and 2.1 with the station lists above; its `server` is
-`supported: false` with empty lists. It can send BatterySwap (libocpp
-writes the battery fields `soC` and `soH` as the schema names them, and the
-mobilityhouse CSMS accepts the request), but does not declare it: no
-CSMS declares that it handles BatterySwap, so no self-test runs it.
+1.6, 2.0.1 and 2.1 with the station lists above (in 2.1 less
+GetCertificateChainStatus and NotifyWebPaymentStarted); its `server` is
+`supported: false` with empty lists. It sends BatterySwap (libocpp writes
+the battery fields `soC` and `soH` as the schema names them), which the
+mobilityhouse CSMS answers. Up to v0.4.0 it declared only 11 and 19, 13
+and 14, 18 and 23 actions (sends and handles in 1.6, 2.0.1, 2.1).
 
 The features differ per adapter; they are the same in every version it
 declares, except `compression` for chargetime:

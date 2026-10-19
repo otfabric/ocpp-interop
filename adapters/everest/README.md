@@ -38,7 +38,8 @@ being added. For this adapter, what matters is in the source of the tag:
   CALLRESULT (3) and CALLERROR (4) only, and 5 is `UNKNOWN`
   ([call_types.hpp](https://github.com/EVerest/everest-core/blob/b61bb12b8cb89ee9d0fab037b05c3bb8cea9b13e/lib/everest/ocpp/include/ocpp/common/call_types.hpp#L47-L52)).
   NotifyPeriodicEventStream, a SEND in 2.1, is one struct without a response
-  in libocpp and nothing sends it as a SEND.
+  in libocpp and nothing sends it as a SEND. Still so on everest-core's main
+  (0da38568, 2026-10-16).
 
 ## How the upstream is used
 
@@ -92,6 +93,23 @@ libocpp's response struct (`invalid-response` when that throws) and written
 back by it. The message id is libocpp's (a UUID). Only the actions the
 station sends in the version are sent (others `unsupported`, exit 5).
 
+## Declared actions
+
+`print-capabilities` declares, per version, every action the station sends
+and every action it answers in the direction the specification gives it
+(the lists of `scripts/validate-fixtures.py`), less what libocpp's protocol
+layer cannot exchange: in 2.1, NotifyPeriodicEventStream (a SEND), and
+GetCertificateChainStatus and NotifyWebPaymentStarted (not in
+`ocpp::v2::MessageType`, below). ReportDERControl has the same defect and
+stays declared, as a known upstream bug. That is 14 sent and 26 answered in
+1.6, 25 and 40 in 2.0.1, 35 and 54 in 2.1; the baseline fixtures have a
+sample and an answer for each.
+
+Up to v0.4.0 the adapter declared the shorter lists the other adapters had
+before the baseline fixtures covered every action (11 and 19, 13 and 14,
+18 and 23), although libocpp's queue and message structs take the others as
+well; the self-tests therefore skipped them.
+
 ## Security profiles and compression
 
 Profiles 0 to 3 are declared. Profiles 2 and 3 use
@@ -128,6 +146,16 @@ Listed in the `notes` of the capabilities:
   MessageType") nor read one it receives (answered `NotImplemented`).
   ReportDERControl stays declared; `v21.from-station.report-dercontrol` is a
   KNOWN_ISSUE ([tests/known-bugs.tsv](../../tests/known-bugs.tsv)).
+  everest-core's main added `ReportDERControl` to the enum with the R04 DER
+  control functional block
+  ([04ebcd2a](https://github.com/EVerest/everest-core/commit/04ebcd2aaaaa4bfa59c5a33ec1f743002b31117c),
+  #2100, 2026-06-03), which is not in the 2026.02.1 release branch and in
+  no later release; `GetCertificateChainStatus` and
+  `NotifyWebPaymentStarted` are still missing on main (0da38568,
+  2026-10-16). libocpp has no other path for a CALL: no generic or raw
+  message API, and no callback or device-model setting that adds an action
+  to the enum. Sending these frames past the queue would be the adapter's
+  OCPP, not libocpp's.
 
 `OCPP_INTEROP_LOG_LEVEL` (`info`, `debug`) makes libocpp's logging on stderr
 more verbose; the default is warnings. At `debug`, libocpp logs the Basic

@@ -33,7 +33,7 @@ with the actions it declares
 | Tariffs (2.1): SetDefaultTariff, GetTariffs, ClearTariffs | — | — | tested |
 | DER control (2.1): SetDERControl, GetDERControl, ClearDERControl, NotifyDERAlarm, NotifyDERStartStop, ReportDERControl | — | — | tested |
 | Periodic event streams (2.1): OpenPeriodicEventStream, ClosePeriodicEventStream, GetPeriodicEventStream, AdjustPeriodicEventStream | — | — | tested |
-| Battery swap (2.1): RequestBatterySwap; BatterySwap | — | — | RequestBatterySwap tested; BatterySwap not sendable (upstream defect) |
+| Battery swap (2.1): RequestBatterySwap; BatterySwap | — | — | tested (BatterySwap from the everest station; the mobilityhouse station cannot send it, upstream defect) |
 | Payment and settlement (2.1): NotifySettlement, VatNumberValidation, NotifyWebPaymentStarted, ChangeTransactionTariff | — | — | tested |
 | Priority and dynamic charging (2.1): UsePriorityCharging, NotifyPriorityCharging, UpdateDynamicSchedule, PullDynamicScheduleUpdate, NotifyAllowedEnergyTransfer, AFRRSignal | — | — | tested |
 | Security profile 1 (Basic): accepted, no credentials, wrong password | tested | tested | tested |
@@ -47,22 +47,22 @@ with the actions it declares
 Every action of every version has at least one sample in the baseline
 fixture, and an answer from the role that receives it (docs/FIXTURES.md).
 Actions that appear in a sample, and the actions each adapter declares
-(the same for the three adapters in 1.6 and 2.0.1; 2.1 is mobilityhouse
-only):
+(mobilityhouse; the same for chargetime, lorenzodonini and the everest
+station in 1.6 and 2.0.1; in 2.1 the everest station sends 35 and handles
+54, docs/CAPABILITIES.md):
 
 | | 1.6 | 2.0.1 | 2.1 |
 |---|---|---|---|
 | Actions of the version | 39 | 64 | 91 |
 | In a sample (before: v0.2.0) | 39 (30) | 64 (27) | 91 (43) |
 | Station sends / handles | 14 / 26 (11 / 19) | 25 / 40 (13 / 14) | 35 / 55 (18 / 23) |
-| CSMS sends / handles | 26 / 14 (20 / 10) | 40 / 25 (15 / 12) | 55 / 35 (24 / 17) |
-| Exchanged with a PASS between at least one pairing | 39 | 64 | 89 |
+| CSMS sends / handles | 26 / 14 (20 / 10) | 40 / 25 (15 / 12) | 55 / 36 (24 / 17) |
+| Exchanged with a PASS between at least one pairing | 39 | 64 | 90 |
 
 Not exchanged by any pairing, with the reason:
 
 | Version | Action | Why |
 |---|---|---|
-| 2.1 | BatterySwap | ocpp 2.1.0 (the only 2.1 adapter) cannot send it: `snake_to_camel_case` writes `soC` and `soH` as `SoC` and `soh` (adapters/mobilityhouse/README.md) |
 | 2.1 | NotifyPeriodicEventStream | a SEND; no pinned upstream release implements SEND frames |
 
 Exchanged, but not with every adapter: 2.0.1 GetCompositeSchedule fails

@@ -96,7 +96,8 @@ dataclass for every action of their version (39, 64 and 90 of 91: not
 NotifyPeriodicEventStream), and the upstream routes any action to a
 handler. The adapter therefore declares every action in the direction the
 specification gives it, both roles, all three versions, except in 2.1
-BatterySwap and NotifyPeriodicEventStream (below). The baseline fixtures
+NotifyPeriodicEventStream (a SEND, below), and BatterySwap, which the
+station does not send (below) but the CSMS handles. The baseline fixtures
 have a sample and an answer for each.
 
 ## OCPP 2.1
@@ -133,11 +134,22 @@ The features `send` and `callResultError` are therefore `false`.
   writes the fields `soc` and `soh` of
   [`BatteryDataType`](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/v21/datatypes.py#L129-L133)
   as `SoC` and `soh`, where the schema wants `soC` and `soH`, and the
-  upstream's own validation refuses the request (`invalid-request`). Still
-  so on master (2026-10-04). The station therefore does not declare
-  BatterySwap. The CSMS answers one (checked by hand with a raw frame), but
-  without a station that can send it no self-test does, so the CSMS does
-  not declare it either.
+  upstream's own validation refuses the request (`invalid-request`). The
+  baseline sample is right: it has `soC` and `soH`, as the OCA 2.1 schema
+  (`urn:OCPP:Cp:2:2025:1:BatterySwapRequest`) that the upstream bundles,
+  identical to the OCA's, names them. The adapter reads it with the
+  upstream's `camel_to_snake_case` (`soC` becomes `soc`, `soH` `soh`, the
+  dataclass's names), and `ChargePoint.call` writes it with
+  `snake_to_camel_case`
+  ([L399](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/charge_point.py#L399))
+  and validates the result
+  ([L414](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/charge_point.py#L414)):
+  "Additional properties are not allowed ('SoC', 'soh' were unexpected)".
+  Still so on master (b39291d,
+  2026-10-04). The station therefore does not declare BatterySwap. The CSMS
+  answers one: the everest station sends it in the self-tests (since
+  v0.4.1; before, no adapter declared sending it, so the CSMS did not
+  declare handling it).
 - OCPP 2.1: more field names that `snake_to_camel_case` does not write as
   the OCA schema spells them, so a payload with one of them fails the
   upstream's own validation, whichever end builds it: `receiptUrl` of
