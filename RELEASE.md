@@ -12,8 +12,10 @@
    release with `manifest.json` and `checksums.txt`.
 
 The release also builds and self-tests the images natively on amd64 and
-arm64. It then publishes per-architecture tags and a multi-arch index to
-GHCR, and lists the index digests in the release. Consumers pin the
+arm64, with the same jobs as CI (.github/workflows/selftest.yml: a build and
+a smoke job per adapter, an interop job per CSMS and OCPP version). It then
+pushes exactly the tested images as per-architecture tags, joins them into a
+multi-arch index on GHCR, and lists the index digests in the release. Consumers pin the
 digests. Every adapter with a Dockerfile must be in the Makefile's
 `ADAPTERS`, or the release fails.
 
@@ -75,7 +77,15 @@ CSMS, with security profiles 0 to 3 and compression (contract 0.5).
   2.x `authorize-unknown` test is `04000000000001`. **Consumers** that copied
   these values rather than reading them with `print-fixture` must update
   them. The 1.6 fixture is unchanged
-- CI: the self-test job may take 120 minutes (five adapters)
+- CI and Release run the self-tests in parallel jobs
+  (.github/workflows/selftest.yml, called by both): per architecture, one
+  build and one smoke job per adapter, and one interop job per CSMS and OCPP
+  version (`scripts/ci-plan.py`), so the time grows with the slowest job,
+  not with the number of adapters. The images are passed between the jobs as
+  artifacts, and the Release workflow pushes the tested ones.
+  `scripts/interop.sh` runs one shard with `INTEROP_PAIRS`
+  (`<server>@<version>`); `scripts/merge-reports.py` joins the shards'
+  reports and decides over all of them whether a known bug is stale
 
 ### Verification
 

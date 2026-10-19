@@ -21,34 +21,19 @@ env:
   VERSION: ${{ github.ref_name }}
 
 jobs:
-  # One job per architecture on a runner of that architecture: the images are
-  # built natively, self-tested, and exactly those are pushed, as
-  # <image>:<version>-<arch>. Every adapter in the Makefile's ADAPTERS is
-  # built; none can be left out.
-  build:
-    name: Build, test, push (${{ matrix.arch }})
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 120
-    strategy:
-      fail-fast: true
-      matrix:
-        include:
-          - arch: amd64
-            runner: ubuntu-24.04
-          - arch: arm64
-            runner: ubuntu-24.04-arm
+  check:
+    name: Release check
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install jsonschema
-
       - name: Validate
         run: |
           make validate
           scripts/release-check.sh "${VERSION}"
-
       - name: Every built adapter is in the Makefile
         run: |
           adapters=" $(sed -nE 's/^ADAPTERS \?= //p' Makefile) "
@@ -57,10 +42,36 @@ jobs:
             [[ "${adapters}" == *" ${name} "* ]] || { echo "::error::${name} has a Dockerfile but is not in ADAPTERS"; exit 1; }
           done
 
-      - name: Build for linux/${{ matrix.arch }} and self-test
-        run: |
-          make images
-          make documents
+  # The images of every adapter, built natively on amd64 and arm64 runners and
+  # self-tested there, one job per adapter, smoke test and interop shard
+  # (.github/workflows/selftest.yml). Every adapter in the Makefile's
+  # ADAPTERS is built; none can be left out.
+  selftest:
+    name: Self-test
+    needs: check
+    uses: ./.github/workflows/selftest.yml
+    with:
+      version: ${{ github.ref_name }}
+
+  # Pushes exactly the images the self-test tested (its image artifacts) as
+  # <image>:<version>-<arch>, once every self-test job has passed.
+  push:
+    name: Push ${{ matrix.adapter }} (${{ matrix.arch }})
+    needs: selftest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: true
+      matrix:
+        adapter: ${{ fromJSON(needs.selftest.outputs.adapters) }}
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: image-${{ matrix.adapter }}-${{ matrix.arch }}
+      - name: Load the tested image
+        run: docker load --quiet --input image.tar.gz
 
       - name: Login to GHCR
         env:
@@ -72,16 +83,8 @@ jobs:
             "${{ github.actor }}" "${RUNNER_TEMP}/ghcr-token"
           rm -f "${RUNNER_TEMP}/ghcr-token"
 
-      - name: Push the tested images as ${{ github.ref_name }}-${{ matrix.arch }}
-        run: make publish-arch ARCH=${{ matrix.arch }}
-
-      - name: Upload documents
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-documents-${{ matrix.arch }}
-          path: reports/
-          if-no-files-found: ignore
+      - name: Push the tested image as ${{ github.ref_name }}-${{ matrix.arch }}
+        run: make publish-arch ARCH=${{ matrix.arch }} ADAPTERS=${{ matrix.adapter }}
 
   # Joins the per-architecture images into the multi-arch tag and publishes
   # the release. Nothing is built here.
@@ -89,7 +92,7 @@ jobs:
     name: Multi-arch manifest and release
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    needs: build
+    needs: push
     steps:
       - uses: actions/checkout@v7
 

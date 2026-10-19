@@ -1,0 +1,220 @@
+name: Self-test
+
+# The images' build and self-test, called by the CI and Release workflows.
+# Everything runs natively on amd64 and arm64 runners (no emulation), split so
+# that the time grows with the slowest job, not with the number of adapters:
+#
+#   plan      the adapters (Makefile ADAPTERS) and the interop shards
+#             (scripts/ci-plan.py: one per CSMS and OCPP version it serves)
+#   build     one job per adapter and architecture; the image is an artifact
+#             (image-<adapter>-<arch>), which the Release workflow pushes
+#   smoke     one job per adapter and architecture (scripts/smoke.sh)
+#   interop   one job per shard and architecture (scripts/interop.sh with
+#             INTEROP_PAIRS): every adapter as a station of that CSMS
+#   report    per architecture: the shards' reports merged into one
+#             (scripts/merge-reports.py), every document validated against
+#             schemas/, the compatibility matrix in the job summary
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Image tag (VERSION of the Makefile)
+        type: string
+        required: true
+    outputs:
+      adapters:
+        description: JSON list of the adapters built and tested
+        value: ${{ jobs.plan.outputs.adapters }}
+
+permissions:
+  contents: read
+
+env:
+  # Nothing is pulled from Docker Hub: anonymous pulls are rate limited per
+  # runner address and its token service times out under load. Base images
+  # (pinned by digest) and build tooling come from Google's mirror of it, and
+  # every registry operation is retried on transient failures (scripts/retry.sh).
+  BASE_REGISTRY: mirror.gcr.io/library
+  TOOLS_REGISTRY: mirror.gcr.io
+  VERSION: ${{ inputs.version }}
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    outputs:
+      adapters: ${{ steps.plan.outputs.adapters }}
+      shards: ${{ steps.plan.outputs.shards }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: plan
+        run: scripts/ci-plan.py | tee -a "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.adapter }} (${{ matrix.arch }})
+    needs: plan
+    runs-on: ${{ matrix.runner }}
+    # The everest image compiles libocpp (C++): about 15 minutes.
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        adapter: ${{ fromJSON(needs.plan.outputs.adapters) }}
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build
+        run: make image-${{ matrix.adapter }}
+      - name: The image is linux/${{ matrix.arch }}
+        run: |
+          got=$(docker image inspect --format '{{.Architecture}}' "ghcr.io/otfabric/ocpp-interop-${{ matrix.adapter }}:${VERSION}")
+          [[ "${got}" == "${{ matrix.arch }}" ]] || { echo "::error::the image is ${got}"; exit 1; }
+      - name: Capabilities
+        run: |
+          {
+            echo "### ${{ matrix.adapter }} (${{ matrix.arch }})"
+            echo '```json'
+            docker run --rm "ghcr.io/otfabric/ocpp-interop-${{ matrix.adapter }}:${VERSION}" print-capabilities | jq -c '.versions | map_values({server: .server.supported, client: .client.supported, features})'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Save the image
+        run: docker save "ghcr.io/otfabric/ocpp-interop-${{ matrix.adapter }}:${VERSION}" | gzip -1 > image.tar.gz
+      - uses: actions/upload-artifact@v7
+        with:
+          name: image-${{ matrix.adapter }}-${{ matrix.arch }}
+          path: image.tar.gz
+          compression-level: 0
+          retention-days: 3
+
+  smoke:
+    name: Smoke ${{ matrix.adapter }} (${{ matrix.arch }})
+    needs: [plan, build]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        adapter: ${{ fromJSON(needs.plan.outputs.adapters) }}
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      # The adapter, and mobilityhouse: the peer of an adapter with one role
+      # (SMOKE_PEER of scripts/smoke.sh).
+      - uses: actions/download-artifact@v8
+        with:
+          name: image-${{ matrix.adapter }}-${{ matrix.arch }}
+          path: images/${{ matrix.adapter }}
+      - uses: actions/download-artifact@v8
+        if: matrix.adapter != 'mobilityhouse'
+        with:
+          name: image-mobilityhouse-${{ matrix.arch }}
+          path: images/mobilityhouse
+      - name: Load the images
+        run: for f in images/*/image.tar.gz; do docker load --quiet --input "${f}"; done
+      - name: Smoke test
+        run: REPORT_DIR=reports scripts/smoke.sh "${{ matrix.adapter }}"
+      - name: Collect container logs on failure
+        if: failure()
+        run: |
+          mkdir -p logs
+          for c in $(docker ps -aq --filter "label=ocpp-interop.run"); do docker logs "$c" > "logs/${c}.log" 2>&1 || true; done
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: smoke-${{ matrix.adapter }}-${{ matrix.arch }}
+          path: |
+            reports/
+            logs/
+          if-no-files-found: ignore
+
+  interop:
+    name: Interop ${{ matrix.shard.name }} (${{ matrix.arch }})
+    needs: [plan, build]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      # Every adapter is a station of every pairing.
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: image-*-${{ matrix.arch }}
+          path: images
+      - name: Load the images
+        run: for f in images/*/image.tar.gz; do docker load --quiet --input "${f}"; done
+      - name: Cross-stack self-test, CSMS and version ${{ matrix.shard.pairs }}
+        env:
+          INTEROP_PAIRS: ${{ matrix.shard.pairs }}
+        run: REPORT_DIR=reports make interop
+      - name: Collect container logs on failure
+        if: failure()
+        run: |
+          mkdir -p logs
+          for c in $(docker ps -aq --filter "label=ocpp-interop.run"); do docker logs "$c" > "logs/${c}.log" 2>&1 || true; done
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: interop-${{ matrix.shard.name }}-${{ matrix.arch }}
+          path: |
+            reports/
+            logs/
+          if-no-files-found: ignore
+
+  report:
+    name: Report (${{ matrix.arch }})
+    needs: [smoke, interop]
+    if: always() && needs.interop.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install jsonschema
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: smoke-*-${{ matrix.arch }}
+          path: shards
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: interop-*-${{ matrix.arch }}
+          path: shards
+      - name: Merge the shards' documents
+        run: |
+          mkdir -p reports
+          find shards -path '*/reports/*.json' ! -name report-interop.json -exec cp {} reports/ \;
+          mapfile -t parts < <(find shards -path '*/reports/report-interop.json' | sort)
+          [[ ${#parts[@]} -gt 0 ]] || { echo "::error::no interop report"; exit 1; }
+          scripts/merge-reports.py reports/report-interop.json "${parts[@]}"
+      - name: Validate the documents
+        run: python scripts/validate-documents.py reports
+      - name: Compatibility matrix
+        run: make -s matrix | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: selftest-documents-${{ matrix.arch }}
+          path: reports/

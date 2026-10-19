@@ -119,7 +119,7 @@ smoke: $(addprefix smoke-,$(ADAPTERS)) ## Container-contract smoke test of every
 smoke-%: FORCE ## Smoke test one adapter, e.g. smoke-chargetime
 	@scripts/smoke.sh $*
 
-interop: ## Cross-stack self-test: every client against every server, CALLs from both ends
+interop: ## Cross-stack self-test: every client against every server, CALLs from both ends (INTEROP_PAIRS="<server>@<version> ..." runs a shard)
 	@scripts/interop.sh $(ADAPTERS)
 
 matrix: ## Print the compatibility matrix of reports/report-interop.json (make documents first)

@@ -153,7 +153,10 @@ make matrix      # the compatibility matrix of reports/report-interop.json
 missing, the target runs in a `python:3.12-slim` container instead. The
 self-tests need Docker, jq and OpenSSL (the TLS tests generate their CA and
 certificates with it for every run). `OCPP_VERSIONS=2.1 make interop` limits the
-cross-stack self-test to one OCPP version (default: 1.6, 2.0.1 and 2.1).
+cross-stack self-test to one OCPP version (default: 1.6, 2.0.1 and 2.1), and
+`INTEROP_PAIRS="citrineos@2.1" REPORT_DIR=reports make interop` to the
+pairings of one CSMS and version, as each CI job runs them
+(`scripts/merge-reports.py` joins the reports of such runs).
 
 ## Security
 

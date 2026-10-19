@@ -42,7 +42,12 @@
 #
 # Environment: REGISTRY, VERSION (image tag, default dev), VERBOSE=1,
 #              REPORT_DIR (keeps every result document and the report),
-#              OCPP_VERSIONS (default "1.6 2.0.1 2.1").
+#              OCPP_VERSIONS (default "1.6 2.0.1 2.1"),
+#              INTEROP_PAIRS: run only the pairings whose CSMS and version
+#              are listed, as "<server>@<version>" separated by spaces or
+#              commas (default: every one). Every adapter is still a station
+#              of each pairing. CI runs one shard per CSMS and version and
+#              merges the reports (scripts/merge-reports.py).
 
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -54,6 +59,20 @@ source "${SCRIPT_DIR}/lib.sh"
 ADAPTERS=("$@")
 # The OCPP versions to test, in order; OCPP_VERSIONS="2.0.1" limits a run.
 read -r -a VERSIONS <<<"${OCPP_VERSIONS:-1.6 2.0.1 2.1}"
+INTEROP_PAIRS="${INTEROP_PAIRS:-}"
+read -r -a PAIRS <<<"${INTEROP_PAIRS//,/ }"
+for pair in ${PAIRS[@]+"${PAIRS[@]}"}; do
+    [[ " ${ADAPTERS[*]} " == *" ${pair%@*} "* && " ${VERSIONS[*]} " == *" ${pair#*@} "* ]] \
+        || { echo "INTEROP_PAIRS: ${pair} is not <adapter>@<version> of the adapters and versions of this run" >&2; exit 2; }
+done
+# A shard cannot tell a stale known bug by itself (it may reproduce in another
+# shard): it writes what it saw to ${REPORT_DIR}/known-bugs-seen.tsv, and
+# scripts/merge-reports.py decides over every shard.
+if [[ ${#PAIRS[@]} -gt 0 && -z "${REPORT_DIR:-}" ]]; then
+    echo "INTEROP_PAIRS needs REPORT_DIR: scripts/merge-reports.py checks the known bugs of the shards" >&2; exit 2
+fi
+# selected <server> <version>: the pairings of this CSMS and version run.
+selected() { [[ ${#PAIRS[@]} -eq 0 || " ${PAIRS[*]} " == *" $1@$2 "* ]]; }
 # Actions that a version sends as a SEND (message type 6), never answered:
 # OCPP 2.1 Part 2, 1.54; scripts/validate-fixtures.py SEND_ACTIONS.
 SEND_ACTIONS='{"1.6": [], "2.0.1": [], "2.1": ["NotifyPeriodicEventStream"]}'
@@ -761,10 +780,11 @@ for v in "${VERSIONS[@]}"; do
 done
 chmod -R a+rX "${WORK}"
 
-log "adapters: ${ADAPTERS[*]} (${VERSION}), OCPP ${VERSIONS[*]}"
+log "adapters: ${ADAPTERS[*]} (${VERSION}), OCPP ${VERSIONS[*]}${INTEROP_PAIRS:+, CSMS and version: ${INTEROP_PAIRS}}"
 for v in "${VERSIONS[@]}"; do
     use_version "${v}"
     for server in "${ADAPTERS[@]}"; do
+        selected "${server}" "${OCPP}" || continue
         for client in "${ADAPTERS[@]}"; do
             pairing "${client}" "${server}"
         done
@@ -781,6 +801,12 @@ while IFS=$'\t' read -r bug_adapter bug_role bug_regex _ bug_text; do
                and (($r != "server" and .client.name == $a and ($p == "" or .server.name == $p))
                     or ($r != "client" and .server.name == $a and ($p == "" or .client.name == $p))))' \
         "${WORK}/results.jsonl" >/dev/null 2>&1 || continue
+    if [[ ${#PAIRS[@]} -gt 0 ]]; then
+        mkdir -p "${REPORT_DIR}"
+        printf '%s\t%s\n' "$(grep -qxF "${bug_text}" "${WORK}/reproduced" && echo reproduced || echo absent)" "${bug_text}" \
+            >> "${REPORT_DIR}/known-bugs-seen.tsv"
+        continue
+    fi
     if ! grep -qxF "${bug_text}" "${WORK}/reproduced"; then
         fail "known bug of ${bug_adapter} (${bug_role}) did not reproduce: ${bug_text}"
         log "    remove it from tests/known-bugs.tsv; the pin can move to this version"
