@@ -8,7 +8,7 @@
 # (EVerest libocpp) is a station for OCPP 1.6J, 2.0.1 and 2.1, and citrineos
 # (CitrineOS) a CSMS for the same three.
 
-interop_version: "0.3.1"
+interop_version: "0.4.0"
 contract_version: "0.5"        # docs/CONTAINER_CONTRACT.md (draft until 1.0); documents carry schemaVersion "1.0"
 fixture_schema: "1.0"          # fixtures/schema/ocpp-fixture.schema.json
 

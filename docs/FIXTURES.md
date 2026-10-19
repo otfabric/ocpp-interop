@@ -101,7 +101,10 @@ the lifetime of the process. Nothing else changes values.
 describe the station `OT-FABRIC-TEST-001`, vendor `OTFabric`, model
 `TestStation`. It has two connectors in 1.6, and two EVSEs with one connector
 each in 2.x. The id
-tokens are one accepted, one blocked and one expired. Samples cover
+tokens are one accepted, one blocked and one expired. In 2.x they are of type
+ISO14443 and, as OCPP 2.x defines that type, a 7 byte UID in hexadecimal
+(14 characters: `04A1B2C3D4E5F6`, `04B10C0ED00001`, `04E0B1D0000001`); before
+v0.4.0 the blocked and expired tokens were not hexadecimal. Samples cover
 provisioning, authorization, the transaction lifecycle, meter values,
 remote start and stop, configuration or the device model, reset, triggers
 and a TxDefault charging profile.

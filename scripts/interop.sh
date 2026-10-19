@@ -463,7 +463,7 @@ pairing() {  # pairing <client adapter> <server adapter>
     done < <(jq -r '.samples | to_entries[] | select(.value.from == "station") | [.key, .value.action, (.value.payload | tojson)] | @tsv' "${FIXTURE}")
     # A token the fixture does not know: derived answer Invalid.
     if [[ "${OCPP}" == 1.6 ]]; then payload='{"idTag":"04UNKNOWN00001"}'
-    else payload='{"idToken":{"idToken":"04UNKNOWN00001","type":"ISO14443"}}'; fi
+    else payload='{"idToken":{"idToken":"04000000000001","type":"ISO14443"}}'; fi
     exchange "${VDIR}.from-station.authorize-unknown" "${client}" "${server}" client "${sta}" "${srv}" Authorize "${payload}"
 
     # CSMS -> station, every CSMS sample.

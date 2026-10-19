@@ -99,11 +99,15 @@ with reason `unknown-station`, `authentication` or `subprotocol`).
     service is configured).
   - NotifyEVChargingNeeds: `Rejected`; NotifySettlement: no `receiptId`;
     VatNumberValidation: `Rejected`.
-  - Authorize in 2.0.1 and 2.1: CitrineOS refuses an ISO14443 token that is
-    not 8 or 14 hexadecimal characters with `PropertyConstraintViolation`
-    (OCPP 2.x defines ISO14443 as a 4 or 7 byte UID in hexadecimal). The
-    baseline's accepted token is one; its blocked and expired tokens
-    (`04BLOCKED00001`, `04EXPIRED00001`) are not.
+  - Authorize in 2.0.1 and 2.1: CitrineOS answers the baseline's accepted,
+    blocked and expired tokens with the fixture's status, but a token it does
+    not know with `Unknown`, a valid OCPP 2.x status, where the fixture
+    derives `Invalid`
+    ([authorize-request-ocpp-21-handler.ts](https://github.com/citrineos/citrineos-core/blob/1a83638c31eebdb1dd8d6cdb0f5b8a9f142a1372/packages/ocpp/src/handlers/requests/2/authorize-request-ocpp-21-handler.ts#L292-L293)).
+    It refuses an ISO14443 token that is not 8 or 14 hexadecimal characters
+    with `PropertyConstraintViolation` (OCPP 2.x defines ISO14443 as a 4 or 7
+    byte UID in hexadecimal); the baseline's tokens are valid ones since
+    v0.4.0.
   - NotifyCustomerInformation, NotifyDisplayMessages:
     `PropertyConstraintViolation` for a `requestId` CitrineOS did not send.
   - SignCertificate: `FormatViolation` (CitrineOS parses the CSR).

@@ -198,10 +198,10 @@ about conformance to the specification.
 | citrineos (CSMS, 2.1) | CitrineOS v2.0.1 | `OCPP2_1_CALL_SCHEMA_RECORD` has no schema for NotifyDERAlarm, NotifyDERStartStop, ReportDERControl, OpenPeriodicEventStream, ClosePeriodicEventStream, NotifyPriorityCharging, PullDynamicScheduleUpdate and GetCertificateChainStatus; `validateOCPPRequest` returns "invalid" when it finds no schema, so the router answers a valid CALL with `FormatViolation`, not `NotImplemented` (OCPP-J). Not in known-bugs.tsv: citrineos does not declare these actions, so no test runs them | [source](https://github.com/citrineos/citrineos-core/blob/1a83638c31eebdb1dd8d6cdb0f5b8a9f142a1372/packages/base/src/interfaces/modules/ocpp-validator.ts#L129-L190) |
 
 Not defects, but why citrineos declares fewer actions: CitrineOS answers by
-itself, from its own data and policy. It refuses ISO14443 id tokens that are
-not 8 or 14 hexadecimal characters (OCPP 2.x defines ISO14443 as a 4 or 7
-byte UID in hexadecimal; the baseline's `04BLOCKED00001` and
-`04EXPIRED00001` are not), so Authorize is not declared in 2.0.1 and 2.1; it
+itself, from its own data and policy. It answers an id token it does not
+know with `Unknown` (a valid OCPP 2.x status), where the fixture derives
+`Invalid`, so Authorize is not declared in 2.0.1 and 2.1 (the accepted,
+blocked and expired tokens get the fixture's status); it
 numbers 1.6 transactions itself; and it answers DataTransfer,
 Get15118EVCertificate, GetCertificateStatus, NotifyEVChargingNeeds,
 NotifySettlement and VatNumberValidation otherwise than the fixture. The

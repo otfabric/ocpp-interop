@@ -19,8 +19,8 @@
   ],
   "idTokens": [
     {"idToken": "04A1B2C3D4E5F6", "type": "ISO14443", "status": "Accepted"},
-    {"idToken": "04BLOCKED00001", "type": "ISO14443", "status": "Blocked"},
-    {"idToken": "04EXPIRED00001", "type": "ISO14443", "status": "Expired"}
+    {"idToken": "04B10C0ED00001", "type": "ISO14443", "status": "Blocked"},
+    {"idToken": "04E0B1D0000001", "type": "ISO14443", "status": "Expired"}
   ],
   "variables": [
     {"component": {"name": "OCPPCommCtrlr"}, "variable": {"name": "HeartbeatInterval"}, "value": "300", "mutability": "ReadWrite"},
@@ -138,7 +138,7 @@
     "authorizeAccepted": {"action": "Authorize", "from": "station", "payload": {
       "idToken": {"idToken": "04A1B2C3D4E5F6", "type": "ISO14443"}}},
     "authorizeBlocked": {"action": "Authorize", "from": "station", "payload": {
-      "idToken": {"idToken": "04BLOCKED00001", "type": "ISO14443"}}},
+      "idToken": {"idToken": "04B10C0ED00001", "type": "ISO14443"}}},
     "transactionStarted": {"action": "TransactionEvent", "from": "station", "payload": {
       "eventType": "Started", "timestamp": "2026-01-01T10:00:00Z", "triggerReason": "Authorized", "seqNo": 0,
       "transactionInfo": {"transactionId": "OTF-TX-0001"},

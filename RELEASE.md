@@ -21,7 +21,11 @@ The `Upstream candidates` workflow runs every Monday. It compares each pin
 with the latest upstream release and keeps an issue open while a pin is
 behind. It never changes a pin.
 
-## Unreleased
+## v0.4.0
+
+**Date:** 2026-10-19
+
+**Previous release:** v0.3.1
 
 ### Summary
 
@@ -64,6 +68,13 @@ CSMS, with security profiles 0 to 3 and compression (contract 0.5).
 
 ### Changed
 
+- Fixtures (2.0.1 and 2.1 baselines): the blocked and expired id tokens are
+  valid ISO14443 UIDs, 7 bytes in hexadecimal as OCPP 2.x defines the type:
+  `04BLOCKED00001` is now `04B10C0ED00001`, `04EXPIRED00001` is now
+  `04E0B1D0000001` (CitrineOS refused the old ones). The unknown token of the
+  2.x `authorize-unknown` test is `04000000000001`. **Consumers** that copied
+  these values rather than reading them with `print-fixture` must update
+  them. The 1.6 fixture is unchanged
 - CI: the self-test job may take 120 minutes (five adapters)
 
 ### Verification
