@@ -50,17 +50,30 @@ NOT_SENT = {"1.6": {"station": set(), "csms": set()},
             "2.1": {"station": {"BatterySwap", "NotifyPeriodicEventStream"}, "csms": set()}}
 
 
+# Not answered, by the CSMS of OCPP 2.1:
+# - NotifyPeriodicEventStream: a SEND, which ocpp 2.1.0 cannot read.
+# The CSMS answers BatterySwap (its incoming conversion is camel_to_snake_case,
+# whose result the handler does not use; the schema validation is of the
+# payload as received): the everest station sends it in the self-tests.
+NOT_HANDLED = {"1.6": {"station": set(), "csms": set()},
+               "2.0.1": {"station": set(), "csms": set()},
+               "2.1": {"station": set(), "csms": {"NotifyPeriodicEventStream"}}}
+
+
 def declared(version: str) -> dict:
     """{"station"|"csms": {"sends": [...], "handles": [...]}} for a version.
 
-    An end handles what the other end sends: an action that no adapter sends
-    (BatterySwap) is not exercised, so it is not declared as handled either.
+    An end sends what the specification gives its role, less NOT_SENT, and
+    handles what the other role sends, less NOT_HANDLED.
     """
     from validate_fixtures import ACTIONS  # pylint: disable=import-outside-toplevel
 
-    sends = {role: sorted(ACTIONS[version][role] - NOT_SENT[version][role]) for role in ("station", "csms")}
-    return {"station": {"sends": sends["station"], "handles": sends["csms"]},
-            "csms": {"sends": sends["csms"], "handles": sends["station"]}}
+    def other(role):
+        return "csms" if role == "station" else "station"
+
+    return {role: {"sends": sorted(ACTIONS[version][role] - NOT_SENT[version][role]),
+                   "handles": sorted(ACTIONS[version][other(role)] - NOT_HANDLED[version][role])}
+            for role in ("station", "csms")}
 
 
 class UsageError(Exception):

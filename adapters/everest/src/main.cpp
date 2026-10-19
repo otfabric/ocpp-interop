@@ -38,41 +38,50 @@ const char* usage_text = R"(usage:
   ocpp-interop print-fixture --version V [NAME]
   ocpp-interop version)";
 
-// What the self-tests exercise, per version (REQUIREMENTS.md R4.2): the
-// actions the station sends, and those it answers from the fixture.
+// What the self-tests exercise, per version (REQUIREMENTS.md R4.2): every
+// action the station sends, and every action it answers from the fixture, of
+// the version (actions_from, scripts/validate-fixtures.py), less what
+// libocpp's protocol layer cannot exchange. Every one of them has a sample in
+// the baseline fixtures.
+//
+// Not declared, in OCPP 2.1:
+// - NotifyPeriodicEventStream: a SEND (message type 6), which libocpp does not
+//   have (ocpp::MessageTypeId);
+// - GetCertificateChainStatus (sent) and NotifyWebPaymentStarted (answered):
+//   ocpp::v2::MessageType has no such value, so libocpp's MessageQueue can
+//   neither send the CALL nor read a received one.
+// ReportDERControl has the same defect but stays declared, as before: the
+// failure is a known upstream bug (tests/known-bugs.tsv).
 struct Declared {
     std::vector<std::string> sends;
     std::vector<std::string> handles;
 };
 
+const std::map<std::string, std::set<std::string>> not_declared = {
+    {"1.6", {}},
+    {"2.0.1", {}},
+    {"2.1", {"NotifyPeriodicEventStream", "GetCertificateChainStatus", "NotifyWebPaymentStarted"}},
+};
+
+std::vector<std::string> declared_from(const std::string& version, const std::string& role) {
+    std::vector<std::string> out;
+    const auto& excluded = not_declared.at(version);
+    for (const auto& action : actions_from(version, role)) {
+        if (excluded.count(action) == 0) {
+            out.push_back(action);
+        }
+    }
+    return out; // sorted: actions_from is a std::set
+}
+
 const std::map<std::string, Declared>& declared() {
-    static const std::map<std::string, Declared> table = {
-        {"1.6",
-         {{"Authorize", "BootNotification", "DataTransfer", "DiagnosticsStatusNotification",
-           "FirmwareStatusNotification", "Heartbeat", "MeterValues", "SecurityEventNotification", "StartTransaction",
-           "StatusNotification", "StopTransaction"},
-          {"CancelReservation", "ChangeAvailability", "ChangeConfiguration", "ClearCache", "ClearChargingProfile",
-           "DataTransfer", "GetCompositeSchedule", "GetConfiguration", "GetDiagnostics", "GetLocalListVersion",
-           "RemoteStartTransaction", "RemoteStopTransaction", "ReserveNow", "Reset", "SendLocalList",
-           "SetChargingProfile", "TriggerMessage", "UnlockConnector", "UpdateFirmware"}}},
-        {"2.0.1",
-         {{"Authorize", "BootNotification", "DataTransfer", "FirmwareStatusNotification", "Heartbeat",
-           "LogStatusNotification", "MeterValues", "NotifyEvent", "NotifyReport", "ReservationStatusUpdate",
-           "SecurityEventNotification", "StatusNotification", "TransactionEvent"},
-          {"ChangeAvailability", "ClearCache", "ClearChargingProfile", "DataTransfer", "GetBaseReport",
-           "GetLocalListVersion", "GetVariables", "RequestStartTransaction", "RequestStopTransaction", "Reset",
-           "SetChargingProfile", "SetVariables", "TriggerMessage", "UnlockConnector"}}},
-        {"2.1",
-         {{"Authorize", "BootNotification", "ClosePeriodicEventStream", "DataTransfer",
-           "FirmwareStatusNotification", "Heartbeat", "LogStatusNotification", "MeterValues", "NotifyDERAlarm",
-           "NotifyDERStartStop", "NotifyEvent", "NotifyReport", "OpenPeriodicEventStream", "ReportDERControl",
-           "ReservationStatusUpdate", "SecurityEventNotification", "StatusNotification", "TransactionEvent"},
-          {"AdjustPeriodicEventStream", "ChangeAvailability", "ClearCache", "ClearChargingProfile", "ClearDERControl",
-           "ClearTariffs", "DataTransfer", "GetBaseReport", "GetDERControl", "GetLocalListVersion",
-           "GetPeriodicEventStream", "GetTariffs", "GetVariables", "RequestBatterySwap", "RequestStartTransaction",
-           "RequestStopTransaction", "Reset", "SetChargingProfile", "SetDERControl", "SetDefaultTariff",
-           "SetVariables", "TriggerMessage", "UnlockConnector"}}},
-    };
+    static const std::map<std::string, Declared> table = [] {
+        std::map<std::string, Declared> t;
+        for (const std::string version : {"1.6", "2.0.1", "2.1"}) {
+            t[version] = {declared_from(version, "station"), declared_from(version, "csms")};
+        }
+        return t;
+    }();
     return table;
 }
 
