@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Checks that the repository is ready to be released as VERSION (vX.Y.Z):
-# versions.yaml says so, and RELEASE.md has a section for it. The Release
+# versions.yaml says so, and RELEASE.md has its notes (scripts/release-notes.sh). The Release
 # workflow runs this on the tag; run it before tagging with
 #   make release-check VERSION=vX.Y.Z
 # and prepare both with make release-prep VERSION=vX.Y.Z.
@@ -16,8 +16,8 @@ if ! grep -qF "${want}" versions.yaml; then
     echo "FAIL versions.yaml does not say ${want}"
     status=1
 fi
-if ! grep -qE "^## ${version//./\\.}\$" RELEASE.md; then
-    echo "FAIL RELEASE.md has no section \"## ${version}\" (run make release-prep VERSION=${version})"
+if ! scripts/release-notes.sh "${version}" > /dev/null; then
+    echo "FAIL RELEASE.md has no notes \"## ${version}\" closed by --- (run make release-prep VERSION=${version})"
     status=1
 fi
 if grep -qE '^## Unreleased$' RELEASE.md; then
