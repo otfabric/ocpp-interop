@@ -8,8 +8,19 @@
 2. `make release-check VERSION=vX.Y.Z` on the merged `main` runs the checks
    the Release workflow will run on the tag.
 3. Tag that commit `vX.Y.Z` and push the tag. The `Release` workflow
-   validates the repository, runs the same checks, and creates the GitHub
-   release with `manifest.json` and `checksums.txt`.
+   validates the repository, runs the same checks (including the notes of
+   the tag), and creates the GitHub release with `manifest.json` and
+   `checksums.txt`.
+
+The notes are the body of the GitHub release, followed by the image digests:
+everything after the heading `## vX.Y.Z` up to the next line that is exactly
+`---` (`scripts/release-notes.sh vX.Y.Z` prints it). This is the format of
+every otfabric repository and the rule of the shared release workflow, so:
+one section per version, newest first, each ending with a `---` line, and no
+`---` line inside a section. Close "## Unreleased" with `---` as well, so
+that it is ready when release-prep renames it. `make validate`, CI and the
+release workflow fail when the section of `interop_version` (or of the tag)
+is missing, empty or not closed.
 
 The release also builds and self-tests the images natively on amd64 and
 arm64, with the same jobs as CI (.github/workflows/selftest.yml: a build and
@@ -22,6 +33,8 @@ digests. Every adapter with a Dockerfile must be in the Makefile's
 The `Upstream candidates` workflow runs every Monday. It compares each pin
 with the latest upstream release and keeps an issue open while a pin is
 behind. It never changes a pin.
+
+---
 
 ## v0.4.1
 
@@ -101,6 +114,8 @@ the adapters do not work around them.
   one. everest-core's main added ReportDERControl
   ([04ebcd2a](https://github.com/EVerest/everest-core/commit/04ebcd2aaaaa4bfa59c5a33ec1f743002b31117c),
   #2100), in no release yet; the other two are still missing on main
+
+---
 
 ## v0.4.0
 
@@ -421,6 +436,8 @@ container contract is draft 0.3.
 - versions.yaml: `interop_version` 0.1.0, the next planned release;
   `lorenzodonini` built, with its base images
 
+---
+
 ## v0.0.1
 
 **Date:** 2026-10-18
@@ -468,3 +485,5 @@ before 1.0.
 - The station password of the baseline fixtures is now
   `OTFabricTestPass0001` (20 characters): Java-OCA-OCPP's 1.6 server
   accepts Basic passwords of 16 to 20 bytes only
+
+---

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Writes manifest.json and the body of the GitHub release.
+"""Writes manifest.json and the images part of the body of the GitHub release
+(the release workflow puts the notes from scripts/release-notes.sh in front).
 
     scripts/release-manifest.py <version> <commit> <digests file> <manifest out> <body out>
 

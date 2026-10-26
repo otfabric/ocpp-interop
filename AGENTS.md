@@ -30,4 +30,6 @@ make ci
 ```
 
 Update the document that owns the topic, and add an entry to RELEASE.md
-under "Unreleased".
+under "Unreleased" (create it above the newest version if it is missing,
+and close it with a `---` line: the section up to `---` becomes the body of
+the GitHub release).

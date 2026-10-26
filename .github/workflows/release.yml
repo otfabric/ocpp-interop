@@ -34,6 +34,8 @@ jobs:
         run: |
           make validate
           scripts/release-check.sh "${VERSION}"
+          # The notes of this version become the body of the GitHub release.
+          scripts/release-notes.sh "${VERSION}" > /dev/null || { echo "::error::RELEASE.md has no notes for ${VERSION}"; exit 1; }
       - name: Every built adapter is in the Makefile
         run: |
           adapters=" $(sed -nE 's/^ADAPTERS \?= //p' Makefile) "
@@ -117,9 +119,16 @@ jobs:
           done < digests.txt
           [[ -s digests.txt ]] || { echo "::error::no image digests"; exit 1; }
 
-      - name: Write manifest.json and the release notes
+      # The body is the section of this version in RELEASE.md (up to its
+      # "---", as in every otfabric repository), followed by the images.
+      - name: Write manifest.json and the release body
         run: |
-          scripts/release-manifest.py "${VERSION}" "${GITHUB_SHA}" digests.txt manifest.json release-body.md
+          scripts/release-manifest.py "${VERSION}" "${GITHUB_SHA}" digests.txt manifest.json images.md
+          {
+            scripts/release-notes.sh "${VERSION}"
+            echo
+            cat images.md
+          } > release-body.md
           cat manifest.json release-body.md
           sha256sum manifest.json > checksums.txt
 

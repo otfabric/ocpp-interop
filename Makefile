@@ -41,7 +41,7 @@ export REGISTRY VERSION
 
 # image-%, smoke-%, run-% and candidate-% are pattern rules, which make
 # ignores for .PHONY targets: they depend on FORCE instead.
-.PHONY: help all ci validate versions schemas fixtures lint documents images smoke interop matrix release-prep release-check \
+.PHONY: help all ci validate versions notes schemas fixtures lint documents images smoke interop matrix release-prep release-check \
         capabilities buildx-setup buildx publish publish-arch publish-manifest digests clean FORCE
 FORCE:
 
@@ -56,7 +56,10 @@ ci: validate lint images documents ## Full local CI: validate, lint, build, smok
 
 # ── Validation ───────────────────────────────────────────────────────────────
 
-validate: versions schemas fixtures ## Validate versions.yaml, the schemas and every fixture
+validate: versions notes schemas fixtures ## Validate versions.yaml, the release notes, the schemas and every fixture
+
+notes: ## Check that RELEASE.md has the notes of interop_version, closed by ---
+	@scripts/release-notes.sh > /dev/null && echo "ok   RELEASE.md has the notes of interop_version"
 
 versions: ## Check that versions.yaml agrees with the Dockerfiles
 	@scripts/check-versions.sh
