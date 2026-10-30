@@ -36,4 +36,4 @@ the GitHub release).
 
 ## Organisation standards
 
-This repository follows **otfabric/engineering policy 1.0**, profile **interoperability** (`.otfabric/policy.yaml`, mode `baseline`). Where this file and the organisation standards disagree, this file wins here — say so in your report.
+This repository follows **otfabric/engineering policy 1.1**, profile **interoperability** (`.otfabric/policy.yaml`, mode `enforce`). Where this file and the organisation standards disagree, this file wins here — say so in your report.
