@@ -210,6 +210,10 @@ jobs:
           mapfile -t parts < <(find shards -path '*/reports/report-interop.json' | sort)
           [[ ${#parts[@]} -gt 0 ]] || { echo "::error::no interop report"; exit 1; }
           scripts/merge-reports.py reports/report-interop.json "${parts[@]}"
+          # Every shard's view of the known bugs, for the waivers of results.json.
+          find shards -path '*/reports/known-bugs-seen.tsv' -exec cat {} + > reports/known-bugs-seen.tsv
+      - name: Results (interop-result-v1)
+        run: python scripts/report-to-results.py reports/report-interop.json reports/results.json
       - name: Validate the documents
         run: python scripts/validate-documents.py reports
       - name: Compatibility matrix
