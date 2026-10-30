@@ -801,17 +801,22 @@ while IFS=$'\t' read -r bug_adapter bug_role bug_regex _ bug_text; do
                and (($r != "server" and .client.name == $a and ($p == "" or .server.name == $p))
                     or ($r != "client" and .server.name == $a and ($p == "" or .client.name == $p))))' \
         "${WORK}/results.jsonl" >/dev/null 2>&1 || continue
-    if [[ ${#PAIRS[@]} -gt 0 ]]; then
+    if [[ -n "${REPORT_DIR:-}" ]]; then
         mkdir -p "${REPORT_DIR}"
         printf '%s\t%s\n' "$(grep -qxF "${bug_text}" "${WORK}/reproduced" && echo reproduced || echo absent)" "${bug_text}" \
             >> "${REPORT_DIR}/known-bugs-seen.tsv"
-        continue
     fi
+    [[ ${#PAIRS[@]} -gt 0 ]] && continue
     if ! grep -qxF "${bug_text}" "${WORK}/reproduced"; then
         fail "known bug of ${bug_adapter} (${bug_role}) did not reproduce: ${bug_text}"
         log "    remove it from tests/known-bugs.tsv; the pin can move to this version"
     fi
 done < "${WORK}/active"
+
+# ---- an all-skipped run is not green ----
+# A shard may legitimately have nothing to pass; scripts/report-to-results.py
+# judges the merged run.
+[[ ${#PAIRS[@]} -gt 0 || "${PASS}" -gt 0 ]] || fail "no test passed: this run proves nothing"
 
 # ---- the report ----
 REPORT=$(jq -s --arg id "interop-${RUN_ID}" --arg started "${STARTED}" --arg finished "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -821,6 +826,12 @@ REPORT=$(jq -s --arg id "interop-${RUN_ID}" --arg started "${STARTED}" --arg fin
 if [[ -n "${REPORT_DIR:-}" ]]; then
     mkdir -p "${REPORT_DIR}"
     printf '%s\n' "${REPORT}" > "${REPORT_DIR}/report-interop.json"
+    # A shard's results.json would judge a part of the run: CI derives it after
+    # scripts/merge-reports.py.
+    if [[ ${#PAIRS[@]} -eq 0 ]]; then
+        python3 "${ROOT}/scripts/report-to-results.py" "${REPORT_DIR}/report-interop.json" "${REPORT_DIR}/results.json" \
+            || fail "results.json: the run failed (see above)"
+    fi
 fi
 log "results by version, pairing and initiator:"
 jq -r '.results | group_by([.version, .client.name, .server.name, .initiator])[]

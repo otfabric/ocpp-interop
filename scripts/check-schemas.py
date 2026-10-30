@@ -27,7 +27,8 @@ def main():
             print(f"FAIL {rel}: {str(e)[:200]}")
             failed += 1
             continue
-        if schema.get("$id") != BASE + rel:
+        # A verbatim copy from otfabric/engineering keeps its own $id.
+        if rel != "schemas/interop-result-v1.schema.json" and schema.get("$id") != BASE + rel:
             print(f"FAIL {rel}: $id is {schema.get('$id')!r}, expected {BASE + rel!r}")
             failed += 1
             continue

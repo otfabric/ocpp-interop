@@ -41,7 +41,7 @@ export REGISTRY VERSION
 
 # image-%, smoke-%, run-% and candidate-% are pattern rules, which make
 # ignores for .PHONY targets: they depend on FORCE instead.
-.PHONY: help all ci validate versions notes schemas fixtures lint documents images smoke interop matrix release-prep release-check \
+.PHONY: unittests help all ci validate versions notes schemas fixtures lint documents images smoke interop matrix release-prep release-check \
         capabilities buildx-setup buildx publish publish-arch publish-manifest digests clean FORCE
 FORCE:
 
@@ -56,7 +56,7 @@ ci: validate lint images documents ## Full local CI: validate, lint, build, smok
 
 # ── Validation ───────────────────────────────────────────────────────────────
 
-validate: versions notes schemas fixtures ## Validate versions.yaml, the release notes, the schemas and every fixture
+validate: versions notes schemas fixtures unittests ## Validate versions.yaml, the release notes, the schemas and every fixture
 
 notes: ## Check that RELEASE.md has the notes of interop_version, closed by ---
 	@scripts/release-notes.sh > /dev/null && echo "ok   RELEASE.md has the notes of interop_version"
@@ -102,6 +102,9 @@ documents: ## Run the self-tests keeping every document, and validate them again
 	@REPORT_DIR=reports $(MAKE) --no-print-directory smoke interop
 	@echo "Validating documents..."
 	$(call with_jsonschema,scripts/validate-documents.py reports)
+
+unittests: ## Unit tests of the result scripts
+	@python3 -m unittest discover -q -s scripts -p 'test_*.py'
 
 # ── Local single-arch images (loaded into Docker; used by smoke and interop) ──
 

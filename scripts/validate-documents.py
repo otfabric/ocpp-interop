@@ -4,8 +4,9 @@
 Usage: validate-documents.py <directory>
 
 The self-tests keep every document they produce when REPORT_DIR is set. A
-file with "versions" is a capability document, one with "operation" a result
-document, and one with "results" a test report. Needs the jsonschema package.
+file with "repository" is an interop-result-v1 document (results.json), one
+with "versions" a capability document, one with "operation" a result document,
+and one with "results" a test report. Needs the jsonschema package.
 """
 
 import json
@@ -16,6 +17,7 @@ import jsonschema
 
 ROOT = Path(__file__).resolve().parent.parent
 KINDS = (
+    ("repository", "interop results", "interop-result-v1.schema.json"),
     ("results", "reports", "report.schema.json"),
     ("operation", "results", "client-result.schema.json"),
     ("versions", "capabilities", "capabilities.schema.json"),

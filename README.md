@@ -150,6 +150,10 @@ make documents   # smoke and interop, keeping every document in reports/, valida
 make matrix      # the compatibility matrix of reports/report-interop.json
 ```
 
+`make documents` also writes `reports/results.json`, the organisation's
+[interop-result-v1](schemas/interop-result-v1.schema.json), derived from the
+report. A run with no pass, or with a known bug that no longer reproduces, fails.
+
 `make validate` needs Python 3 with `jsonschema`. If `jsonschema` is
 missing, the target runs in a `python:3.12-slim` container instead. The
 self-tests need Docker, jq and OpenSSL (the TLS tests generate their CA and
