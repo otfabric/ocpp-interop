@@ -128,7 +128,7 @@ interop: ## Cross-stack self-test: every client against every server, CALLs from
 matrix: ## Print the compatibility matrix of reports/report-interop.json (make documents first)
 	@$(PYTHON) scripts/compat-matrix.py reports/report-interop.json
 
-# ── Upstream candidates ───────────────────────────────────────────────────────
+# ── Upstream candidates (the Upstream workflow) ───────────────────────────────
 # Builds one adapter on another upstream version than the release pin and runs
 # the self-tests on it, against the other adapters at their pins. Bugs of that
 # version listed in tests/known-bugs.tsv are reported as known, so the run

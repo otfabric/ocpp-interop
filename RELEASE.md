@@ -30,9 +30,9 @@ multi-arch index on GHCR, and lists the index digests in the release. Consumers 
 digests. Every adapter with a Dockerfile must be in the Makefile's
 `ADAPTERS`, or the release fails.
 
-The `Upstream candidates` workflow runs every Monday. It compares each pin
-with the latest upstream release and keeps an issue open while a pin is
-behind. It never changes a pin.
+The `Upstream` workflow runs daily. It compares each pin with the latest
+upstream release, self-tests a built adapter at that release, and keeps an
+issue open while a pin is behind. It never changes a pin.
 
 ---
 
