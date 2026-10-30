@@ -33,3 +33,7 @@ Update the document that owns the topic, and add an entry to RELEASE.md
 under "Unreleased" (create it above the newest version if it is missing,
 and close it with a `---` line: the section up to `---` becomes the body of
 the GitHub release).
+
+## Organisation standards
+
+This repository follows **otfabric/engineering policy 1.0**, profile **interoperability** (`.otfabric/policy.yaml`, mode `baseline`). Where this file and the organisation standards disagree, this file wins here — say so in your report.
