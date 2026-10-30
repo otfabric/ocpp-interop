@@ -88,7 +88,7 @@
             "type": "object",
             "minProperties": 1,
             "additionalProperties": { "type": "string" },
-            "description": "role → implementation name, e.g. {\"client\":\"go-ocpp\",\"server\":\"mobilityhouse\"}"
+            "description": "role → implementation name, e.g. {\"client\":\"implementation-a\",\"server\":\"mobilityhouse\"}"
           },
           "platform": { "type": "string" },
           "outcome": { "enum": ["pass", "fail", "unsupported", "not-tested", "known-difference", "infra-error"] },
