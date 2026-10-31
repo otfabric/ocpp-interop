@@ -7,7 +7,9 @@
    Commit it through a pull request.
 2. `make release-check VERSION=vX.Y.Z` on the merged `main` runs the checks
    the Release workflow will run on the tag.
-3. Tag that commit `vX.Y.Z` and push the tag. The `Release` workflow
+3. Run the `Release` workflow on `main` from the Actions tab and pick the
+   bump (`patch` by default, `minor` or `major`) that gives `vX.Y.Z`, or tag
+   that commit `vX.Y.Z` and push the tag. The workflow
    validates the repository, runs the same checks (including the notes of
    the tag), and creates the GitHub release with `manifest.json` and
    `checksums.txt`.
