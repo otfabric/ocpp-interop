@@ -59,7 +59,7 @@ wait_ready() {
     while true; do
         state=$(docker inspect --format '{{.State.Status}}' "${name}" 2>/dev/null || echo absent)
         if [[ "${state}" != "running" ]]; then
-            log "${name} is ${state}"; docker logs --tail 20 "${name}" >&2 2>/dev/null; return 1
+            log "${name} is ${state}"; docker logs --tail 20 "${name}" >&2 2>&1; return 1
         fi
         docker exec "${name}" test -f "${READY_FILE}" 2>/dev/null && return 0
         if (( waited >= WAIT_TIMEOUT * 5 )); then
