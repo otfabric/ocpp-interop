@@ -38,6 +38,17 @@ issue open while a pin is behind. It never changes a pin.
 
 ---
 
+## v0.5.3
+
+**Date:** 2026-11-01
+**Previous release:** v0.5.2
+
+### Fixed
+
+- The citrineos adapter could exit during startup: it asked the kernel for two ports by opening and closing a socket twice, and the kernel can hand out the same port twice, about 1 start in 6700 measured in the container. The callback server then failed with `EADDRINUSE`, and it had no error handler, so Node.js ended the container with exit code 1. The callback server now keeps the port the kernel gives it, and CitrineOS's API uses a fixed port below the ephemeral range. A callback server that cannot listen now fails startup with the adapter's own exit code 3.
+
+---
+
 ## v0.5.2
 
 **Date:** 2026-11-01

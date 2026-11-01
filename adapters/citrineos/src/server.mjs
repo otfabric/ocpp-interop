@@ -41,6 +41,11 @@ const TENANT_ID = 1;
 const PG_DATA = '/var/lib/ocpp-interop/postgres';
 const PG_PORT = 5432;
 const AMQP_PORT = 5672;
+// CitrineOS's REST message API, on 127.0.0.1 inside the container. CitrineOS's
+// configuration takes a port number, not 0, so this is a fixed one: below the
+// ephemeral range, where nothing in the container is given a port by the
+// kernel. The second one is for a server asked to run on the first.
+const API_PORTS = [8080, 8081];
 const STARTUP_TIMEOUT_MS = 60000;
 
 // ---- arguments ----
@@ -94,17 +99,6 @@ function portFree(host, port) {
     const probe = net.createServer();
     probe.once('error', () => resolve(false));
     probe.listen({ host, port, exclusive: true }, () => probe.close(() => resolve(true)));
-  });
-}
-
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const probe = net.createServer();
-    probe.once('error', reject);
-    probe.listen({ host: '127.0.0.1', port: 0 }, () => {
-      const { port } = probe.address();
-      probe.close(() => resolve(port));
-    });
   });
 }
 
@@ -231,8 +225,7 @@ class Csms {
   async start() {
     this.postgres = await startPostgres(this.runDir);
     this.rabbitmq = await startRabbitMQ(this.runDir);
-    this.callbackPort = await freePort();
-    this.apiPort = await freePort();
+    this.apiPort = API_PORTS.find((port) => port !== this.options.port);
     this.writeWebsocketConfig();
     await this.startCitrineOS();
     await this.startCallbackServer();
@@ -523,7 +516,15 @@ class Csms {
         this.complete(call);
       });
     });
-    await new Promise((resolve) => this.callbackServer.listen({ host: '127.0.0.1', port: this.callbackPort }, resolve));
+    // Port 0: the kernel gives a port that is free, and this socket holds it.
+    await new Promise((resolve, reject) => {
+      this.callbackServer.once('error', reject);
+      this.callbackServer.listen({ host: '127.0.0.1', port: 0 }, () => {
+        this.callbackServer.off('error', reject);
+        resolve();
+      });
+    });
+    this.callbackPort = this.callbackServer.address().port;
   }
 
   startControlSocket() {
