@@ -38,6 +38,17 @@ issue open while a pin is behind. It never changes a pin.
 
 ---
 
+## v0.5.1
+
+**Date:** 2026-11-01
+**Previous release:** v0.5.0
+
+### Changed
+
+- Policy 1.2: build output in `bin/` and `release/`, and shared CI at v3.3.0.
+
+---
+
 ## v0.5.0
 
 **Date:** 2026-10-31
