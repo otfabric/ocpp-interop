@@ -38,6 +38,17 @@ issue open while a pin is behind. It never changes a pin.
 
 ---
 
+## v0.5.2
+
+**Date:** 2026-11-01
+**Previous release:** v0.5.1
+
+### Changed
+
+- Interop diagnostics only: a container that exits before it is ready now shows its error output. The adapters, the container contract and the fixtures do not change.
+
+---
+
 ## v0.5.1
 
 **Date:** 2026-11-01
