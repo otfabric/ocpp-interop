@@ -207,3 +207,43 @@ func asCallError(err error, target **ocpp.CallError) bool {
 	}
 	return ok
 }
+
+// TestCompressionReported: the station's connection and the CSMS's session
+// report what the handshake negotiated (connection-opened's compression).
+func TestCompressionReported(t *testing.T) {
+	fx, err := loadFixture(fixturePath(t, "2.0.1"), "2.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, offer := range []bool{true, false} {
+		csms := &endpoint{version: "2.0.1", fixture: fx, role: "csms", tracker: newTracker(false)}
+		sessions := make(chan *server.Session, 1)
+		srv, err := server.New(server.WithHandler(versions["2.0.1"].version, csms.dispatcher()),
+			server.WithoutAuthentication(), server.WithSessionHandler(func(s *server.Session) { sessions <- s }, nil))
+		if err != nil {
+			t.Fatal(err)
+		}
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		go func() { _ = srv.Serve(ln) }()
+		station := &endpoint{version: "2.0.1", fixture: fx, role: "station", tracker: newTracker(false)}
+		conn, err := connectStation("ws://"+ln.Addr().String()+"/ocpp/"+fx.firstStation, fx.firstStation, station,
+			connectOptions{compression: offer}, 5*time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		conn.mu.Lock()
+		got := conn.compression
+		conn.mu.Unlock()
+		if got != offer {
+			t.Errorf("--compression %v: the station reports %v", offer, got)
+		}
+		if s := <-sessions; s.Compression() != offer {
+			t.Errorf("--compression %v: the CSMS reports %v", offer, s.Compression())
+		}
+		conn.client.Close()
+		_ = srv.Close()
+	}
+}

@@ -164,11 +164,18 @@ func (t *tracker) outcome(station, id string) (sent json.RawMessage, result bool
 }
 
 // metrics is the go-ocpp Metrics of an endpoint: protocol errors become
-// protocol-error events, and a lost connection is passed on.
+// protocol-error events, and an opened and a lost connection are passed on.
 type metrics struct {
 	ocpp.NopMetrics
 	t            *tracker
+	connected    func(ocpp.ConnInfo)
 	disconnected func(ocpp.ConnInfo, error)
+}
+
+func (m *metrics) OnConnect(info ocpp.ConnInfo) {
+	if m.connected != nil {
+		m.connected(info)
+	}
 }
 
 func (m *metrics) OnProtocolError(info ocpp.ConnInfo, err error) {

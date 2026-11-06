@@ -91,9 +91,9 @@ func runServer(version string, fx *fixture, bind string, port, profile int, tlsD
 		if remote == "" {
 			remote = remotes[info.StationID]
 		}
-		// go-ocpp accepts permessage-deflate whenever a station offers it, but
-		// does not say whether it was negotiated.
-		event("connection-opened", info.StationID, "subprotocol", subprotocol, "remote", remote, "compression", nil)
+		// go-ocpp accepts permessage-deflate whenever a station offers it.
+		event("connection-opened", info.StationID, "subprotocol", subprotocol, "remote", remote,
+			"compression", info.Compression)
 	}
 	// The first frame of a session can arrive before go-ocpp calls the
 	// session handler: the events of a session start with connection-opened.
@@ -152,8 +152,8 @@ func runServer(version string, fx *fixture, bind string, port, profile int, tlsD
 		server.WithLogger(logger()),
 		server.WithSessionHandler(
 			func(s *server.Session) {
-				announce(ocpp.ConnInfo{StationID: s.ID(), Version: s.Version(), Role: ocpp.CSMS, SessionID: s.SessionID()},
-					s.RemoteAddr())
+				announce(ocpp.ConnInfo{StationID: s.ID(), Version: s.Version(), Role: ocpp.CSMS, SessionID: s.SessionID(),
+					Compression: s.Compression()}, s.RemoteAddr())
 			},
 			func(s *server.Session, err error) {
 				mu.Lock()

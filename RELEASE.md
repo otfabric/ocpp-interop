@@ -41,6 +41,19 @@ manual workflow and no releases (`own/go-ocpp/README.md`).
 
 ---
 
+## v0.6.2
+
+**Date:** 2026-11-06
+**Previous release:** v0.6.1
+
+### Changed
+
+- `ocpp-interop-otfabric` (own image, not in releases): `connection-opened` reports `compression` as go-ocpp negotiated it (`ocpp.ConnInfo.Compression`, `server.Session.Compression`, go-ocpp v0.3.0), not `null`. The harness's compression checks, which accepted `null`, now check a real value in both roles. `own/go-ocpp/README.md` says why `send` and `callResultError` stay `false`: no reference implements SEND or CALLRESULTERROR.
+
+The reference images, the container contract and the fixtures do not change.
+
+---
+
 ## v0.6.1
 
 **Date:** 2026-11-06
