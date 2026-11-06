@@ -177,6 +177,11 @@ def fixture_of(given: dict, version: str):
             code = answer.get("callError", {}).get("code")
             if code is not None and error_class(code) is None:
                 raise Unsupported(f"answers.{role}.{action}: the ocpp package has no CALLERROR {code!r}")
+    # The ocpp package has no CALLRESULTERROR (callResultError false): it
+    # cannot take part in the exchange an invalid answer provokes.
+    for role, table in fixture.doc.get("invalidAnswers", {}).items():
+        for action in table:
+            raise Unsupported(f"invalidAnswers.{role}.{action}: the ocpp package has no CALLRESULTERROR (callResultError)")
     return fixture
 
 

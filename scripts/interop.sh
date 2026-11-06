@@ -445,19 +445,119 @@ one_shot() {
     ONE_SHOT_PROBLEM="${problem}"; ONE_SHOT_MS="${ms}"; ONE_SHOT_DOC="${doc}"
 }
 
-# send_sample <id> <client> <server> <initiator> <action>: a sample the
-# version sends as a SEND. It runs only where both ends declare `send`; the
-# contract has no operation for it until an upstream release supports SEND.
+# send_sample <id> <client> <server> <initiator> <sender container> <receiver container> <action> <payload> [call flags...]
+# A sample the version sends as a SEND (OCPP 2.1, contract 0.6), where both
+# ends declare `send`: it is sent through the control socket of the sender,
+# reported by both ends (send-sent, send-received) and never answered.
 send_sample() {
-    local id="$1" client="$2" server="$3" initiator="$4" action="$5" feat
+    local id="$1" client="$2" server="$3" initiator="$4" sender="$5" receiver="$6" action="$7" payload="$8"; shift 8
+    local feat sender_adapter receiver_adapter sender_role receiver_role doc code t0 ms problems=()
     feat=$(jq -r --arg v "${OCPP}" --arg a "${action}" '.[$v][$a] // "other"' <<<"${FEATURE_OF}")
-    if feature "${client}" send && feature "${server}" send; then
-        record "${id}" "${client}" "${server}" "${initiator}" "${feat}" "${action}" INFRA_ERROR 0 \
-            "both declare send, but the contract has no operation to send a SEND yet (docs/CONTAINER_CONTRACT.md, Gaps before 1.0)"
-    else
+    if ! { feature "${client}" send && feature "${server}" send; }; then
         record "${id}" "${client}" "${server}" "${initiator}" "${feat}" "${action}" SKIP_UNSUPPORTED 0 \
             "${action} is a SEND in OCPP ${OCPP}, and send is not declared by both ${client} and ${server}"
+        return
     fi
+    if [[ "${initiator}" == client ]]; then
+        sender_adapter="${client}"; receiver_adapter="${server}"; sender_role=client; receiver_role=server
+    else
+        sender_adapter="${server}"; receiver_adapter="${client}"; sender_role=server; receiver_role=client
+    fi
+    if ! sends "${sender_adapter}" "${sender_role}" "${action}" || ! handles "${receiver_adapter}" "${receiver_role}" "${action}"; then
+        record "${id}" "${client}" "${server}" "${initiator}" "${feat}" "${action}" SKIP_UNSUPPORTED 0 \
+            "${sender_adapter} does not declare that its ${sender_role} sends ${action}, or ${receiver_adapter} that its ${receiver_role} receives it"
+        return
+    fi
+    t0=$(now_ms)
+    doc=$(docker exec "${sender}" ocpp-interop call "$@" "${action}" --payload "${payload}" 2>/dev/null); code=$?
+    ms=$(( $(now_ms) - t0 ))
+    keep "${id}-${client}-${server}" "${doc}"
+    [[ "${code}" == 0 ]] || problems+=("exit ${code}, want 0")
+    jq -e --arg a "${action}" '.operation == $a and .ok == true and .response == null and .callError == null and .error == null' <<<"${doc}" >/dev/null 2>&1 \
+        || problems+=("not a sent SEND: ${doc:0:300}")
+    if [[ ${#problems[@]} -eq 0 ]]; then
+        local message_id
+        message_id=$(jq -c '.messageId // null' <<<"${doc}")
+        wait_event "${receiver}" "${JQ_LIB}"'.event == "send-received" and .station == $s and .action == $a and within($p; .payload)
+            and ($m == null or .messageId == null or .messageId == $m)' \
+            --arg s "${STATION}" --arg a "${action}" --argjson p "${payload}" --argjson m "${message_id}" >/dev/null \
+            || problems+=("${receiver_adapter} reported no send-received event for this SEND")
+        wait_event "${sender}" '.event == "send-sent" and .station == $s and .action == $a' --arg s "${STATION}" --arg a "${action}" >/dev/null \
+            || problems+=("${sender_adapter} reported no send-sent event")
+        sleep 1
+        if events "${receiver}" | jq -e --arg a "${action}" 'select(.event == "call-answered" and .action == $a)' >/dev/null 2>&1; then
+            problems+=("${receiver_adapter} answered the SEND")
+        fi
+        if events "${sender}" | jq -e --arg a "${action}" 'select(.event == "call-result" and .action == $a)' >/dev/null 2>&1; then
+            problems+=("${sender_adapter} received an answer to the SEND")
+        fi
+    fi
+    if [[ ${#problems[@]} -eq 0 ]]; then
+        record "${id}" "${client}" "${server}" "${initiator}" "${feat}" "${action}" PASS "${ms}"
+    else
+        record "${id}" "${client}" "${server}" "${initiator}" "${feat}" "${action}" FAIL "${ms}" "$(IFS='; '; echo "${problems[*]}")"
+    fi
+}
+
+# call_result_error <client> <server>: OCPP 2.1 CALLRESULTERROR (contract
+# 0.6), where both declare callResultError. The callresulterror fixture goes
+# to one end at a time, on a session of its own: the CSMS answers Heartbeat
+# with an invalid payload, which the station must answer with a
+# CALLRESULTERROR (initiator client); the station answers GetTransactionStatus
+# with one, which the CSMS must answer with a CALLRESULTERROR (initiator
+# server). The end that sent the invalid answer reports it (call-result-error).
+call_result_error() {
+    local client="$1" server="$2"
+    local srv="crr-${server}-${RUN_ID}" sta="crrsta-${client}-${RUN_ID}" fx="/fixtures/v21/callresulterror/fixture.json"
+    local initiator sender receiver action doc code t0 ms problems id="${VDIR}.rpc.call-result-error" srv_fx sta_fx
+    if ! { feature "${client}" callResultError && feature "${server}" callResultError; }; then
+        for initiator in client server; do
+            record "${id}" "${client}" "${server}" "${initiator}" rpc "" SKIP_UNSUPPORTED 0 \
+                "callResultError is not declared by both ${client} and ${server}"
+        done
+        return
+    fi
+    for initiator in client server; do
+        problems=()
+        if [[ "${initiator}" == client ]]; then
+            srv_fx=(--fixture "${fx}") sta_fx=() sender="${sta}" receiver="${srv}" action=Heartbeat
+        else
+            srv_fx=() sta_fx=(--fixture "${fx}") sender="${srv}" receiver="${sta}" action=GetTransactionStatus
+        fi
+        start "${srv}" "${server}" -- server --version "${OCPP}" ${srv_fx[@]+"${srv_fx[@]}"}
+        if ! wait_ready "${srv}"; then
+            record "${id}" "${client}" "${server}" "${initiator}" rpc "${action}" INFRA_ERROR 0 "the server did not become ready"
+            stop_container "${srv}"; continue
+        fi
+        start "${sta}" "${client}" -- client run --version "${OCPP}" --url "ws://${srv}:9000/ocpp" ${sta_fx[@]+"${sta_fx[@]}"}
+        if ! wait_ready "${sta}"; then
+            record "${id}" "${client}" "${server}" "${initiator}" rpc "${action}" INFRA_ERROR 0 "client run did not connect"
+            stop_container "${sta}"; stop_container "${srv}"; continue
+        fi
+        t0=$(now_ms)
+        if [[ "${initiator}" == client ]]; then
+            doc=$(docker exec "${sta}" ocpp-interop call Heartbeat 2>/dev/null); code=$?
+        else
+            doc=$(docker exec "${srv}" ocpp-interop call --station "${STATION}" GetTransactionStatus --payload '{}' 2>/dev/null); code=$?
+        fi
+        ms=$(( $(now_ms) - t0 ))
+        keep "${id}-${initiator}-${client}-${server}" "${doc}"
+        [[ "${code}" == 1 ]] || problems+=("exit ${code}, want 1")
+        jq -e '.ok == false and .error.code == "invalid-response" and (.callResultError.code | type == "string")' <<<"${doc}" >/dev/null 2>&1 \
+            || problems+=("no CALLRESULTERROR sent for the invalid ${action} result: ${doc:0:300}")
+        if [[ ${#problems[@]} -eq 0 ]]; then
+            wait_event "${receiver}" '.event == "call-result-error" and .station == $s and .error.code == $c and (.action == null or .action == $a)
+                and ($m == null or .messageId == $m)' --arg s "${STATION}" --arg a "${action}" \
+                --arg c "$(jq -r .callResultError.code <<<"${doc}")" --argjson m "$(jq -c '.messageId // null' <<<"${doc}")" >/dev/null \
+                || problems+=("the end that sent the invalid ${action} result reported no call-result-error event")
+        fi
+        stop_container "${sta}"; stop_container "${srv}"
+        if [[ ${#problems[@]} -eq 0 ]]; then
+            record "${id}" "${client}" "${server}" "${initiator}" rpc "${action}" PASS "${ms}"
+        else
+            record "${id}" "${client}" "${server}" "${initiator}" rpc "${action}" FAIL "${ms}" "$(IFS='; '; echo "${problems[*]}")"
+        fi
+    done
 }
 
 pairing() {  # pairing <client adapter> <server adapter>
@@ -490,7 +590,7 @@ pairing() {  # pairing <client adapter> <server adapter>
     # sample is a test of its own (below).
     while IFS=$'\t' read -r name action payload; do
         if is_send "${action}"; then
-            send_sample "${VDIR}.send.$(kebab "${name}")" "${client}" "${server}" client "${action}"
+            send_sample "${VDIR}.send.$(kebab "${name}")" "${client}" "${server}" client "${sta}" "${srv}" "${action}" "${payload}"
             continue
         fi
         exchange "${VDIR}.from-station.$(kebab "${name}")" "${client}" "${server}" client "${sta}" "${srv}" "${action}" "${payload}"
@@ -503,7 +603,7 @@ pairing() {  # pairing <client adapter> <server adapter>
     # CSMS -> station, every CSMS sample.
     while IFS=$'\t' read -r name action payload; do
         if is_send "${action}"; then
-            send_sample "${VDIR}.send.$(kebab "${name}")" "${client}" "${server}" server "${action}"
+            send_sample "${VDIR}.send.$(kebab "${name}")" "${client}" "${server}" server "${srv}" "${sta}" "${action}" "${payload}" --station "${STATION}"
             continue
         fi
         exchange "${VDIR}.from-csms.$(kebab "${name}")" "${client}" "${server}" server "${srv}" "${sta}" "${action}" "${payload}" --station "${STATION}"
@@ -523,20 +623,6 @@ pairing() {  # pairing <client adapter> <server adapter>
             --station "${STATION}"
     fi
 
-    # OCPP 2.1 CALLRESULTERROR (message type 5): the answer to a CALLRESULT
-    # that the receiver cannot process (Part 4).
-    if [[ "${OCPP}" == 2.1 ]]; then
-        for initiator in client server; do
-            if feature "${client}" callResultError && feature "${server}" callResultError; then
-                record "${VDIR}.rpc.call-result-error" "${client}" "${server}" "${initiator}" rpc "" INFRA_ERROR 0 \
-                    "both declare callResultError, but the contract has no operation to provoke a CALLRESULTERROR yet (docs/CONTAINER_CONTRACT.md, Gaps before 1.0)"
-            else
-                record "${VDIR}.rpc.call-result-error" "${client}" "${server}" "${initiator}" rpc "" SKIP_UNSUPPORTED 0 \
-                    "callResultError is not declared by both ${client} and ${server}"
-            fi
-        done
-    fi
-
     # The station closes its connection; the CSMS reports it.
     docker stop -t 15 "${sta}" >/dev/null 2>&1
     if [[ "$(docker inspect -f '{{.State.ExitCode}}' "${sta}")" == 0 ]] \
@@ -547,6 +633,10 @@ pairing() {  # pairing <client adapter> <server adapter>
             "client run exit $(docker inspect -f '{{.State.ExitCode}}' "${sta}"), or no connection-closed event on the server"
     fi
     stop_container "${sta}"
+
+    # OCPP 2.1 CALLRESULTERROR (message type 5), on a session of its own with
+    # the callresulterror fixture at both ends.
+    [[ "${OCPP}" == 2.1 ]] && call_result_error "${client}" "${server}"
 
     # One-shot client: connect, one CALL, disconnect.
     one_shot ${VDIR}.one-shot.boot "${client}" "${server}" provisioning BootNotification ok "${srv}" \

@@ -47,6 +47,10 @@ func defaultFixturePath(version string) string {
 // callErrorAnswer: the fixture answers with this CALLERROR.
 type callErrorAnswer struct{ code, description string }
 
+// invalidAnswer: the fixture's invalidAnswers entry (OCPP 2.1), sent as it
+// is although it breaks the response schema, to provoke a CALLRESULTERROR.
+type invalidAnswer struct{ payload map[string]any }
+
 type fixture struct {
 	doc          map[string]any
 	name         string
@@ -77,6 +81,13 @@ func (f *fixture) password(station string) string {
 func (f *fixture) answer(role, action string, request map[string]any) any {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if invalid, ok := f.doc["invalidAnswers"].(map[string]any); ok {
+		if table, ok := invalid[role].(map[string]any); ok {
+			if e, ok := table[action].(map[string]any); ok {
+				return invalidAnswer{substitute(deepCopy(e["payload"])).(map[string]any)}
+			}
+		}
+	}
 	entry, ok := f.answers(role)[action].(map[string]any)
 	if !ok {
 		return nil
@@ -338,7 +349,7 @@ func intOf(o map[string]any, key string) (int64, bool) {
 func validate(doc map[string]any, path, version string, errs *[]string) {
 	add := func(format string, args ...any) { *errs = append(*errs, fmt.Sprintf(format, args...)) }
 	allowed := set("schemaVersion", "name", "ocppVersion", "description", "stations", "idTokens",
-		"configuration", "variables", "answers", "samples")
+		"configuration", "variables", "answers", "samples", "invalidAnswers")
 	for k := range doc {
 		if !allowed[k] {
 			add("unknown property %s", k)
@@ -515,6 +526,39 @@ func validate(doc map[string]any, path, version string, errs *[]string) {
 				add("variables: %s/%s appears twice", str(c["name"]), str(n["name"]))
 			}
 			seen[key] = true
+		}
+	}
+
+	// Invalid answers (CALLRESULTERROR): OCPP 2.1 only, by the role that
+	// receives the action, never for a SEND.
+	if v, present := doc["invalidAnswers"]; present {
+		invalid, ok := v.(map[string]any)
+		if !ok {
+			add("invalidAnswers must be an object")
+		}
+		for role, t := range invalid {
+			table, ok := t.(map[string]any)
+			if (role != "csms" && role != "station") || !ok {
+				add("invalidAnswers.%s: not csms or station", role)
+				continue
+			}
+			receives := info.fromStation
+			if role == "station" {
+				receives = info.fromCSMS
+			}
+			for action, a := range table {
+				where := "invalidAnswers." + role + "." + action
+				e, ok := a.(map[string]any)
+				if _, isObject := e["payload"].(map[string]any); !ok || !isObject || len(e) != 1 {
+					add("%s: must be {\"payload\": {...}}", where)
+				} else if version != "2.1" {
+					add("%s: invalid answers are for OCPP 2.1 only (CALLRESULTERROR)", where)
+				} else if !receives[action] {
+					add("%s: the %s does not receive %s in OCPP %s", where, role, action, version)
+				} else if info.sendActions[action] {
+					add("%s: %s is a SEND in OCPP %s, which has no answer", where, action, version)
+				}
+			}
 		}
 	}
 

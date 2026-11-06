@@ -111,17 +111,15 @@ make -f own/go-ocpp/Makefile image smoke interop    # from the repository root
 
 ## What it cannot do
 
-Declared `false`:
-
-- `send`, `callResultError`: go-ocpp sends and receives SEND and
-  CALLRESULTERROR (OCPP 2.1, message types 6 and 5), but no reference can: The
-  Mobility House ocpp 2.1.0 and EVerest libocpp know the message types 2 to 4
-  only, and the other references have no OCPP 2.1 in their pinned releases.
-  The contract has no operation to send either yet
-  ([Gaps before 1.0](../../docs/CONTAINER_CONTRACT.md#gaps-before-10)), and one
-  would only test go-ocpp against itself. A SEND action
-  (NotifyPeriodicEventStream) is refused with `unsupported`, as for every other
-  adapter.
+`send` and `callResultError` are declared in OCPP 2.1 (contract 0.6,
+[OCPP 2.1: SEND and CALLRESULTERROR](../../docs/CONTAINER_CONTRACT.md#ocpp-21-send-and-callresulterror)):
+a SEND action (NotifyPeriodicEventStream) is sent with `Client.Send` or
+`Session.Send` and received through `ocpp.SendDispatcher`; a response is read
+into a type that validates itself with `ValidateResponse`, so go-ocpp answers
+an invalid one with a CALLRESULTERROR; an `invalidAnswers` entry of the
+fixture is sent as it is. The independent peer is the `cbsigma` reference
+(cB-Sigma/ocpp); the other references know the message types 2 to 4 only, or
+have no OCPP 2.1.
 
 `compression` in `connection-opened` is what the handshake negotiated:
 go-ocpp's `ocpp.ConnInfo.Compression` and `server.Session.Compression` (from

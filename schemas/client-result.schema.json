@@ -28,6 +28,16 @@
         }
       ]
     },
+    "callResultError": {
+      "description": "OCPP 2.1: the CALLRESULTERROR this endpoint sent for a CALLRESULT it could not process (contract 0.6)",
+      "type": "object",
+      "required": ["code", "description"],
+      "properties": {
+        "code": {"type": "string"},
+        "description": {"type": "string"},
+        "details": {}
+      }
+    },
     "error": {
       "oneOf": [
         {"type": "null"},

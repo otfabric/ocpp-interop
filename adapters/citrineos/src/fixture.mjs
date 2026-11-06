@@ -148,6 +148,17 @@ function semanticErrors(fx, file) {
       if (derived && !(fx[derived]?.length)) errors.push(`answers.${role}.${action}: derived from ${derived}, which is empty`);
     }
   }
+  for (const [role, table] of Object.entries(fx.invalidAnswers ?? {})) {
+    for (const action of Object.keys(table ?? {})) {
+      if (version !== '2.1') {
+        errors.push(`invalidAnswers.${role}.${action}: invalid answers are for OCPP 2.1 only (CALLRESULTERROR)`);
+      } else if (!receives[role]?.has(action)) {
+        errors.push(`invalidAnswers.${role}.${action}: the ${role} does not receive ${action} in OCPP ${version}`);
+      } else if (SEND_ACTIONS[version].has(action)) {
+        errors.push(`invalidAnswers.${role}.${action}: ${action} is a SEND in OCPP ${version}, which has no answer`);
+      }
+    }
+  }
   for (const [name, sample] of Object.entries(fx.samples ?? {})) {
     if (!ACTIONS[version][sample.from]?.has(sample.action)) {
       errors.push(`samples.${name}: the ${sample.from} does not send ${sample.action} in OCPP ${version}`);
@@ -173,6 +184,12 @@ export function loadFixture(file, version) {
       if (answer.callError && !OCPPJ_ERROR_CODES.has(answer.callError.code)) {
         throw unsupported(`answers.${role}.${action}: ${answer.callError.code} is not an OCPP-J error code`);
       }
+    }
+  }
+  // CitrineOS knows the message types 2 to 4 only (callResultError false).
+  for (const [role, table] of Object.entries(fixture.invalidAnswers ?? {})) {
+    for (const action of Object.keys(table ?? {})) {
+      throw unsupported(`invalidAnswers.${role}.${action}: CitrineOS has no CALLRESULTERROR (callResultError)`);
     }
   }
   return fixture;

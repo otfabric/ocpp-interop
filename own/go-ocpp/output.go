@@ -120,6 +120,7 @@ type resultDoc struct {
 	request            any
 	response           any
 	callError          *object
+	callResultError    *object // OCPP 2.1: the CALLRESULTERROR this end sent (contract 0.6)
 	errCode, errMsg    string
 	elapsedMs          int64
 }
@@ -142,6 +143,9 @@ func (r resultDoc) object() *object {
 		o.set("callError", r.callError)
 	} else {
 		o.set("callError", nil)
+	}
+	if r.callResultError != nil {
+		o.set("callResultError", r.callResultError)
 	}
 	if r.errCode == "" {
 		o.set("error", nil)

@@ -1,12 +1,14 @@
 # Container contract
 
-Version: **0.5 (draft)**. `contract_version` in [versions.yaml](../versions.yaml).
+Version: **0.6 (draft)**. `contract_version` in [versions.yaml](../versions.yaml).
 
 > Implemented by `mobilityhouse`, `chargetime` and `lorenzodonini` for OCPP
 > 1.6J and 2.0.1, and by `mobilityhouse` for OCPP 2.1, with security
 > profiles 0 to 3 everywhere; compression as each adapter declares it; and by `everest`
 > (a station only: `client` and `call`) for OCPP 1.6J, 2.0.1 and 2.1, and by
-> `citrineos` (a CSMS only: `server` and `call`) for the same three. It stays a draft (0.x)
+> `citrineos` (a CSMS only: `server` and `call`) for the same three, and by
+> `cbsigma` (cB-Sigma/ocpp) for all three in both roles, with OCPP 2.1 SEND
+> and CALLRESULTERROR. It stays a draft (0.x)
 > until every adapter implements every part of it;
 > [Gaps before 1.0](#gaps-before-10) lists what is missing. Until 1.0 it may
 > change without a major version bump.
@@ -222,6 +224,12 @@ deserialisation, and the upstream sends it.
 - An action that the version sends as a SEND (OCPP 2.1:
   NotifyPeriodicEventStream) has no answer; a fixture that gives one is
   invalid (exit 4).
+- An answer in the fixture's `invalidAnswers` (OCPP 2.1 only) is sent as it
+  is, although it does not validate against the action's response schema, so
+  that the peer answers it with a CALLRESULTERROR
+  ([OCPP 2.1: SEND and CALLRESULTERROR](#ocpp-21-send-and-callresulterror)).
+  An adapter that does not declare `callResultError` refuses such a fixture
+  (exit 5).
 
 Known exceptions are listed per adapter in the `notes` of its capabilities.
 
@@ -240,17 +248,45 @@ and CALLERROR (4):
 - **CALLRESULTERROR** (5): the answer to a CALLRESULT that the receiver
   cannot process;
 - **SEND** (6): a message that is never answered and may be sent while a
-  CALL is outstanding. NotifyPeriodicEventStream is sent as a SEND.
+  CALL is outstanding. NotifyPeriodicEventStream (station to CSMS) is sent as
+  a SEND.
 
 The features `send` and `callResultError` say whether an adapter sends and
-receives them ([CAPABILITIES.md](CAPABILITIES.md)). No upstream release this
-repository pins implements either, so every adapter declares both `false`,
-and this version of the contract has no operation that sends a SEND or
-provokes a CALLRESULTERROR (see [Gaps before 1.0](#gaps-before-10)). Until
-it has:
+receives them, in both roles it supports ([CAPABILITIES.md](CAPABILITIES.md)).
+
+**SEND**, with `send`:
+
+- `client <Action>` and `call` send an action that the version sends as a
+  SEND as a SEND frame. The result document has `ok` `true`, `response`
+  `null` and `callError` `null` once the frame is written; there is nothing
+  to wait for.
+- The sender writes the event `send-sent`, the receiver `send-received`
+  (`messageId`, `action`, `payload`). The receiver never answers it: no
+  `call-answered`, and the sender gets no `call-result`.
+
+**CALLRESULTERROR**, with `callResultError`:
+
+- It is provoked with a fixture whose `invalidAnswers` (OCPP 2.1 only) holds
+  answers that do not validate against their response schema
+  ([FIXTURES.md](FIXTURES.md#invalid-answers)); the image has one, named
+  `callresulterror`. The endpoint that answers from such a fixture sends the
+  answer as it is. The self-tests give it to one end of a session at a time:
+  an upstream may have to turn its own schema checks off to send an invalid
+  answer, and then cannot refuse one.
+- The endpoint that receives such a CALLRESULT answers it with a
+  CALLRESULTERROR. Its result document has `error.code` `invalid-response`
+  and the field `callResultError` (`{code, description, details}`): the
+  CALLRESULTERROR it sent.
+- The endpoint that receives a CALLRESULTERROR writes the event
+  `call-result-error` (`messageId`, `action` where it knows it, `error`). It
+  answers nothing.
+
+Without the features:
 
 - an adapter without `send` never sends a SEND action as a CALL: `client
   <Action>` and `call` refuse it with `error.code` `unsupported` (exit 5);
+- an adapter without `callResultError` refuses a fixture with
+  `invalidAnswers` (exit 5);
 - a frame of type 5 or 6 that the upstream cannot read is reported as
   `protocol-error`, where the upstream exposes it.
 
@@ -342,6 +378,9 @@ stdout. Every event has these fields:
 | `call-answered` | `messageId`, `action`, `payload` or `error` |
 | `call-sent` | `messageId`, `action`, `payload` |
 | `call-result` | `messageId`, `action`, `payload` or `error` |
+| `call-result-error` | `messageId`, `action` (`null` where the upstream does not say), `error`: a CALLRESULTERROR received (2.1) |
+| `send-sent` | `messageId`, `action`, `payload`: a SEND sent (2.1) |
+| `send-received` | `messageId`, `action`, `payload`: a SEND received (2.1) |
 | `protocol-error` | `detail`, and the raw frame up to 4 KiB in `frame` |
 | `stopped` | — |
 
@@ -384,7 +423,10 @@ the upstream does not expose it.
 
 `callError` is `{code, description, details}` when the peer answered with a
 CALLERROR. That is still a protocol success, so the exit code is 1 with
-`error.code` `call-error`.
+`error.code` `call-error`. `callResultError` is `{code, description,
+details}` when the endpoint answered an invalid CALLRESULT with a
+CALLRESULTERROR (2.1), with `error.code` `invalid-response`; it is left out
+otherwise. A SEND has `response` `null`.
 
 | `error.code` | Exit code | Meaning |
 |---|---|---|
@@ -439,28 +481,37 @@ from what the image serves. A fixture the image does not have exits 1.
 
 | Gap | Adapter |
 |---|---|
-| Compression (`features.compression`) | lorenzodonini: ocpp-go's `ws.Server` creates its WebSocket upgrader without compression and does not expose it, so the CSMS cannot accept it ([source](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ws/websocket.go#L284-L320)); its station offers it with `--compression`. chargetime, OCPP 1.6: JSONServer and JSONClient have no extensions ([source](https://github.com/ChargeTimeEU/Java-OCA-OCPP/blob/f27fe5bfb03e01491100597d6859080f5ae07545/ocpp-v1_6-json/src/main/java/eu/chargetime/ocpp/JSONServer.java#L70)). chargetime, OCPP 2.0.1: declared, but Java-WebSocket 1.6.0 keeps its compression context against what it announces, in both roles (tests/known-bugs.tsv) |
-| `compression` in `connection-opened` | chargetime: not exposed (`null` when it may have been negotiated). lorenzodonini: the station does not see it (`null` with `--compression`) |
+| Compression (`features.compression`) | lorenzodonini: ocpp-go's `ws.Server` creates its WebSocket upgrader without compression and does not expose it, so the CSMS cannot accept it ([source](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ws/websocket.go#L284-L320)); its station offers it with `--compression`. chargetime, OCPP 1.6: JSONServer and JSONClient have no extensions ([source](https://github.com/ChargeTimeEU/Java-OCA-OCPP/blob/f27fe5bfb03e01491100597d6859080f5ae07545/ocpp-v1_6-json/src/main/java/eu/chargetime/ocpp/JSONServer.java#L70)). chargetime, OCPP 2.0.1: declared, but Java-WebSocket 1.6.0 keeps its compression context against what it announces, in both roles (tests/known-bugs.tsv). cbsigma: `chargepoint.Config` cannot offer permessage-deflate (`client --compression` exits 5); its CSMS accepts it |
+| `compression` in `connection-opened` | chargetime: not exposed (`null` when it may have been negotiated). lorenzodonini: the station does not see it (`null` with `--compression`). cbsigma: the CSMS does not see whether it was negotiated (`null` when the station offers it) |
 | HTTP 401 for refused credentials and certificates | chargetime: Java-WebSocket 1.6.0 answers every handshake the adapter refuses with HTTP 404 ([source](https://github.com/TooTallNate/Java-WebSocket/blob/da3cf2a777aed862f2f5b5cf060cae7969958667/src/main/java/org/java_websocket/WebSocketImpl.java#L426-L428)); the event has the right reason |
 | OCPP 2.1 | chargetime: the pinned release (v2.0, the latest on Maven Central) has no 2.1; the upstream's master added it after that release. lorenzodonini: ocpp-go v0.19.0 has no 2.1 |
-| An operation to send a SEND and to provoke a CALLRESULTERROR; the features `send` and `callResultError` | all: The Mobility House ocpp 2.1.0 and EVerest libocpp (everest-core 2026.02.2) know the message types 2 to 4 only; the other upstreams have no 2.1 in their pinned releases |
+| The features `send` and `callResultError` (SEND and CALLRESULTERROR) | mobilityhouse, everest, citrineos: The Mobility House ocpp 2.1.0 and EVerest libocpp (everest-core 2026.02.2) know the message types 2 to 4 only, CitrineOS v2.1.0 knows message types 2 to 4 only (its `MessageTypeId`); chargetime, lorenzodonini: no 2.1 in their pinned releases |
 | `NotImplemented` for an OCPP 2.1 action the fixture does not answer | mobilityhouse: ocpp 2.1.0 does not answer such a CALL at all (tests/known-bugs.tsv) |
 | `callError` answers from the fixture (`fixtureCallErrors`) | chargetime: Java-OCA-OCPP answers a failed handler with `InternalError` only |
 | `NotImplemented` for a Core profile action the fixture does not answer | chargetime, OCPP 1.6: JSONServer and JSONClient always register the Core profile, so such an action reaches the adapter, which can only fail it (`InternalError`) |
 | Message ids of sent CALLs (`messageIds`), subprotocol and close code in events | chargetime: not exposed by Java-OCA-OCPP. lorenzodonini: the station does not see the negotiated subprotocol, the server not the close code |
-| `protocol-error` events | chargetime: the upstream logs unparsable frames without a hook |
+| `protocol-error` events | chargetime: the upstream logs unparsable frames without a hook. cbsigma: cB-Sigma has no hook for a frame it cannot read |
 | `connection-rejected` with reason `subprotocol` | chargetime: the 1.6 JSONServer also accepts a handshake without a subprotocol; mobilityhouse and lorenzodonini report it |
-| HTTP 404 for an identity the fixture does not list | lorenzodonini: ocpp-go's connection check refuses with 401 only (the event's reason is right) |
+| HTTP 404 for an identity the fixture does not list | lorenzodonini: ocpp-go's connection check refuses with 401 only (the event's reason is right). cbsigma: `csms.Config.Authenticate` refuses with 401 only (the event's reason is right) |
 | `--bind-address` other than `0.0.0.0` | lorenzodonini: ocpp-go's ws.Server listens on all addresses; another address exits 5 |
 | `server` (a CSMS) | everest: libocpp implements the charging station only; `server` exits 5 after the usage checks |
 | Close code in `connection-closed` | everest: libocpp's websocket does not pass it to the application |
-| `--station ""` | everest: libocpp always appends the identity to the URL; exits 5 |
+| `--station ""` | everest: libocpp always appends the identity to the URL; exits 5. cbsigma: `chargepoint` always appends the identity to the URL; exits 5 |
 | `client` (a station) | citrineos: CitrineOS is a CSMS only; `client` exits 5 after the usage checks |
 | Answers from the fixture (`fixtureAnswers`), `NotImplemented` for an action the fixture does not answer, `callError` answers (`fixtureCallErrors`) | citrineos: CitrineOS answers every CALL itself; `handles` lists the actions whose answer is the fixture's ([adapters/citrineos/README.md](../adapters/citrineos/README.md)) |
 | Every CSMS action of the version (`call`) | citrineos: CitrineOS's REST message API has no endpoint for the 1.6 reservation and Security Whitepaper messages, nor for most actions OCPP 2.1 adds; `call` exits 5 for them |
 
 ## Changes
 
+- **0.6** (unreleased): OCPP 2.1 SEND and CALLRESULTERROR, in the new
+  adapter `cbsigma` and the own image. With `send`, `client <Action>` and
+  `call` send a SEND action as a SEND frame (`response` `null`); the events
+  `send-sent` and `send-received`. With `callResultError`, the fixture field
+  `invalidAnswers` (2.1) makes the answering endpoint send an invalid
+  CALLRESULT, the receiver answers it with a CALLRESULTERROR (result field
+  `callResultError`), and the other end writes
+  `call-result-error`. An adapter without `callResultError` refuses a fixture
+  with `invalidAnswers` (exit 5).
 - **0.5** (unreleased): transport security and compression, in every
   adapter. The section [Transport security](#transport-security) makes
   security profiles 2 (TLS and Basic authentication) and 3 (mutual TLS, the

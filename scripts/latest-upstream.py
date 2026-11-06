@@ -101,12 +101,19 @@ def citrineos():
     return latest, tags[latest], "git tags of citrineos/citrineos-core"
 
 
+def cbsigma():
+    tags = git_tags("https://github.com/cB-Sigma/ocpp.git")
+    latest = newest(tags)
+    return latest, tags[latest], "git tags of cB-Sigma/ocpp"
+
+
 RESOLVERS = {
     "mobilityhouse": mobilityhouse,
     "chargetime": chargetime,
     "lorenzodonini": lorenzodonini,
     "everest": everest,
     "citrineos": citrineos,
+    "cbsigma": cbsigma,
 }
 
 

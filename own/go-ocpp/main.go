@@ -32,7 +32,7 @@ var (
 const (
 	adapterName     = "otfabric"
 	schemaVersion   = "1.0"
-	contractVersion = "0.5"
+	contractVersion = "0.6"
 	readyFile       = "/run/ocpp-interop/ready"
 	controlSocket   = "/run/ocpp-interop/control.sock"
 )
@@ -377,9 +377,11 @@ func versionCapabilities(version string) *object {
 			"--compression (client.WithCompression); connection-opened has compression as go-ocpp negotiated it " +
 			"(ocpp.ConnInfo.Compression, server.Session.Compression).",
 		"Message ids are go-ocpp's (UUIDs), read through a call interceptor (ocpp.CallInfo.MessageID).",
-		"go-ocpp implements SEND and CALLRESULTERROR (OCPP 2.1), but the contract has no operation to send a SEND or " +
-			"provoke a CALLRESULTERROR yet: the features send and callResultError are false, and a SEND action is " +
-			"refused (unsupported).",
+		"OCPP 2.1 SEND and CALLRESULTERROR (contract 0.6): a SEND action (NotifyPeriodicEventStream) is sent with " +
+			"Client.Send or Session.Send and received through ocpp.SendDispatcher, never answered; responses are read " +
+			"into a type that validates itself with ValidateResponse, so go-ocpp answers an invalid one with a " +
+			"CALLRESULTERROR; an invalidAnswers entry of the fixture is sent as it is (a raw result). The events of " +
+			"both come from the frame observer.",
 	}
 	return newObject().
 		set("client", newObject().set("supported", true).set("sends", stationSends).set("handles", stationHandles)).
@@ -387,23 +389,23 @@ func versionCapabilities(version string) *object {
 		set("features", newObject().
 			set("securityProfiles", []int{0, 1, 2, 3}).
 			set("compression", true).
-			set("send", false).
-			set("callResultError", false).
+			set("send", version == "2.1").
+			set("callResultError", version == "2.1").
 			set("fixtureCallErrors", true).
 			set("messageIds", true)).
 		set("notes", notes)
 }
 
 // declaredSends is what the self-tests exercise in one version: every action
-// of the version in the direction go-ocpp gives it, except the SEND actions
-// (OCPP 2.1), less notSent. The baseline fixtures have a sample and an answer
-// for each.
+// of the version in the direction go-ocpp gives it, the SEND actions of OCPP
+// 2.1 included (the send feature), less notSent. The baseline fixtures have a
+// sample and an answer (a SEND: none) for each.
 func declaredSends(version string) (station, csms []string) {
 	vi := versions[version]
 	list := func(actions map[string]bool) []string {
 		out := []string{}
 		for a := range actions {
-			if !vi.sendActions[a] && !notSent[version][a] {
+			if !notSent[version][a] {
 				out = append(out, a)
 			}
 		}

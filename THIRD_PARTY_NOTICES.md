@@ -7,7 +7,7 @@
 | This repository (adapters, scripts, fixtures, schemas, documentation) | MIT, see [LICENSE](LICENSE) |
 | Upstream OCPP implementations and their dependencies inside the images | their own licences, listed below per image |
 | `own/go-ocpp/` (links go-ocpp) | MIT |
-| OCA specifications and JSON schemas | CC BY-ND 4.0; **not committed** to this repository. The `mobilityhouse` image contains the OCA JSON schemas the ocpp package ships, unmodified, as part of that package |
+| OCA specifications and JSON schemas | CC BY-ND 4.0; **not committed** to this repository. The `mobilityhouse` image contains the OCA JSON schemas the ocpp package ships, and the `cbsigma` binary the OCA schemas, WSDLs and appendix CSV files cB-Sigma/ocpp embeds (its `oca/`, with attribution and checksums), unmodified, as part of those packages |
 
 Each image carries the full licence texts under `/licenses/<component>/`,
 this file as `/licenses/THIRD_PARTY_NOTICES.md`, and this repository's
@@ -121,3 +121,22 @@ in the Debian archive (bookworm).
 | PostGIS | 3.3.2 (Debian 3.3.2+dfsg-1+b1) | GPL-2.0-or-later | https://postgis.net |
 | RabbitMQ | 3.10.8 (Debian 3.10.8-1.1+deb12u1) | MPL-2.0 | https://www.rabbitmq.com |
 | Erlang/OTP | 25.2.3 (Debian 1:25.2.3+dfsg-1+deb12u4) | Apache-2.0 | https://www.erlang.org |
+
+## `ocpp-interop-cbsigma`
+
+Base image `debian:trixie-slim` (Debian trixie). One statically linked Go
+binary (built with Go 1.27.2); `/licenses/BUNDLED-MODULES.txt` lists the
+modules in it, as `go version -m` reports them, and `/licenses` holds their
+licence and NOTICE files.
+
+| Component | Version | Licence | Source |
+|---|---|---|---|
+| cB-Sigma/ocpp | v0.2.0 | Apache-2.0 (with a NOTICE file), except its embedded `oca/` files | https://github.com/cB-Sigma/ocpp |
+| OCA OCPP 1.6, 2.0.1 and 2.1 JSON schemas, OCPP-S 1.6 WSDLs and appendix CSV files, embedded unmodified in cB-Sigma/ocpp | as its `oca/` | CC BY-ND 4.0 (Open Charge Alliance) | https://openchargealliance.org |
+| cB-Sigma/jsonschema | v0.3.0 | Apache-2.0 (with a NOTICE file) | https://github.com/cB-Sigma/jsonschema |
+| coder/websocket | v1.8.15 | ISC | https://github.com/coder/websocket |
+| santhosh-tekuri/jsonschema | v6.0.3 | Apache-2.0 | https://github.com/santhosh-tekuri/jsonschema |
+| go-jose | v4.1.4 | Apache-2.0 | https://github.com/go-jose/go-jose |
+| golang.org/x/net | v0.59.0 | BSD-3-Clause | https://go.googlesource.com/net |
+| golang.org/x/text | v0.42.0 | BSD-3-Clause | https://go.googlesource.com/text |
+| Go standard library and runtime | 1.27.2 | BSD-3-Clause | https://go.dev |

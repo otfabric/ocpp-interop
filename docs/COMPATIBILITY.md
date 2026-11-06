@@ -7,19 +7,22 @@ the station and by the CSMS. The matrix below is the output of `make matrix` (fr
 `reports/report-interop.json`, written by `make documents`); CI writes the
 same matrix for each architecture into its job summary.
 
-Run: 2026-11-06, images built from this repository (v0.6.1) on
+Run: 2026-11-06, images built from this repository (v0.7.0) on
 linux/arm64 (macOS, Docker 29.9): `make images documents` (images, smoke,
-interop and the document schemas) with the five adapters; the OCPP 1.6
-citrineos column is from the shard `INTEROP_PAIRS=citrineos@1.6` re-run for
-v0.6.3 (citrineos declares SecurityEventNotification). The linux/amd64 images have not been
+interop and the document schemas) with the six adapters. Two results of the
+lorenzodonini station with the cbsigma CSMS (2.0.1 Reset and
+SetNetworkProfile) failed in that run and are the documented ocpp-go defect,
+recorded for `@cbsigma` after it; the shard `INTEROP_PAIRS=cbsigma@2.0.1`
+re-run with the entry has them as KNOWN_ISSUE. The linux/amd64 images have not been
 self-tested locally; CI does that natively.
 
 `everest` (EVerest libocpp, everest-core 2026.02.2) is a station only, and
 `citrineos` (CitrineOS core v2.1.0) a CSMS only. Every pairing with `everest`
 as the CSMS or `citrineos` as the station is one `pairing` SKIP_UNSUPPORTED
-(not in the tables). The tables are from one run of the five adapters on
-contract 0.5 (2026-11-06, linux/arm64): 2455 PASS, 28
-KNOWN_ISSUE, 300 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR (v0.4.0: 2196 PASS,
+(not in the tables). The tables are from one run of the six adapters on
+contract 0.6 (2026-11-06, linux/arm64): 4190 PASS, 37
+KNOWN_ISSUE, 423 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR (v0.6.3, five
+adapters: 2455 PASS, 28 KNOWN_ISSUE, 300 SKIP_UNSUPPORTED; v0.4.0: 2196 PASS,
 29 KNOWN_ISSUE, 558 SKIP_UNSUPPORTED; the everest station now declares
 every action libocpp can exchange, see RELEASE.md v0.4.1). The everest skips
 are compression, which libocpp cannot offer, and in 2.1 the SEND, the
@@ -28,7 +31,16 @@ know (adapters/everest/README.md). Most of
 the citrineos skips are actions it does not declare: CitrineOS answers by
 itself, and its lists are the actions whose answer is the fixture's, or
 that its REST message API sends ([adapters/citrineos/README.md](../adapters/citrineos/README.md));
-in the pairings with it, 576 PASS, 6 KNOWN_ISSUE, 235 SKIP_UNSUPPORTED.
+in the pairings with it, 756 PASS, 6 KNOWN_ISSUE, 315 SKIP_UNSUPPORTED.
+`cbsigma` (cB-Sigma/ocpp v0.2.0) has both roles in the three versions; in
+the pairings with it, 1735 PASS, 9 KNOWN_ISSUE (the upstream defects of its
+peers listed below), 123 SKIP_UNSUPPORTED (compression, which its station
+cannot offer, what its peers do not declare, and SEND and CALLRESULTERROR
+with peers that have neither). It is the only reference with the OCPP 2.1
+SEND and CALLRESULTERROR: `v21.send.notify-periodic-event-stream` and
+`v21.rpc.call-result-error` (both directions) pass between its own station
+and CSMS, and the own image runs them against it
+([own/go-ocpp/README.md](../own/go-ocpp/README.md)).
 
 Each cell: results of the CALLs and checks initiated by the station / by
 the CSMS. The baseline fixtures have a sample of every action of their
@@ -59,49 +71,50 @@ where both ends declare the profile or `compression`.
 
 ## OCPP 1.6J
 
-| Station ↓ / CSMS → | chargetime v2.0 | citrineos v2.1.0 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 |
-|---|---|---|---|---|
-| chargetime v2.0 | 27 pass 2 skip / 28 pass 1 skip | 21 pass 8 skip / 19 pass 10 skip | 28 pass 1 skip / 28 pass 1 skip | 28 pass 1 skip / 28 pass 1 skip |
-| lorenzodonini v0.19.0 | 27 pass 2 skip / 29 pass | 21 pass 8 skip / 20 pass 9 skip | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass |
-| mobilityhouse 2.1.0 | 26 pass 2 skip 1 known / 29 pass | 21 pass 7 skip 1 known / 20 pass 9 skip | 27 pass 1 skip 1 known / 29 pass | 28 pass 1 known / 29 pass |
-| everest 2026.02.2 | 27 pass 2 skip / 29 pass | 21 pass 8 skip / 20 pass 9 skip | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass |
+| Station ↓ / CSMS → | cbsigma v0.2.0 | chargetime v2.0 | citrineos v2.1.0 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 |
+|---|---|---|---|---|---|
+| cbsigma v0.2.0 | 28 pass 1 skip / 29 pass | 27 pass 2 skip / 29 pass | 21 pass 8 skip / 20 pass 9 skip | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass |
+| chargetime v2.0 | 28 pass 1 skip / 28 pass 1 skip | 27 pass 2 skip / 28 pass 1 skip | 21 pass 8 skip / 19 pass 10 skip | 28 pass 1 skip / 28 pass 1 skip | 28 pass 1 skip / 28 pass 1 skip |
+| lorenzodonini v0.19.0 | 28 pass 1 skip / 29 pass | 27 pass 2 skip / 29 pass | 21 pass 8 skip / 20 pass 9 skip | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass |
+| mobilityhouse 2.1.0 | 27 pass 1 skip 1 known / 29 pass | 26 pass 2 skip 1 known / 29 pass | 21 pass 7 skip 1 known / 20 pass 9 skip | 27 pass 1 skip 1 known / 29 pass | 28 pass 1 known / 29 pass |
+| everest 2026.02.2 | 28 pass 1 skip / 29 pass | 27 pass 2 skip / 29 pass | 21 pass 8 skip / 20 pass 9 skip | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass |
 
-Totals: 838 PASS, 4 KNOWN_ISSUE, 95 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
-Security profiles 2 and 3 pass in all sixteen pairings (every station,
-everest included, with every CSMS).
+Totals: 1332 PASS, 5 KNOWN_ISSUE, 124 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
+Security profiles 2 and 3 pass in all 25 pairings (every station, everest
+included, with every CSMS).
 
 | Station | CSMS | Test | Status | Evidence |
 |---|---|---|---|---|
-| mobilityhouse | all four | `v16.from-station.security-event-minimal` | KNOWN_ISSUE | [mobilityhouse/ocpp `v16/call.py`](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/v16/call.py#L232-L236) |
-| chargetime | all three | `v16.fixture-callerror.from-csms` | SKIP_UNSUPPORTED | chargetime does not declare `fixtureCallErrors` |
-| all three | chargetime | `v16.fixture-callerror.from-station` | SKIP_UNSUPPORTED | chargetime does not declare `fixtureCallErrors` |
+| mobilityhouse | all five | `v16.from-station.security-event-minimal` | KNOWN_ISSUE | [mobilityhouse/ocpp `v16/call.py`](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/v16/call.py#L232-L236) |
+| chargetime | all four | `v16.fixture-callerror.from-csms` | SKIP_UNSUPPORTED | chargetime does not declare `fixtureCallErrors` |
+| all four | chargetime | `v16.fixture-callerror.from-station` | SKIP_UNSUPPORTED | chargetime does not declare `fixtureCallErrors` |
 | all four | citrineos | `v16.not-implemented.from-station`, `v16.fixture-callerror.from-station` | SKIP_UNSUPPORTED (8) | citrineos declares `fixtureAnswers` and `fixtureCallErrors` false: CitrineOS answers by itself |
 | all four | citrineos | the actions citrineos does not declare | SKIP_UNSUPPORTED | see [adapters/citrineos/README.md](../adapters/citrineos/README.md) |
 | all but mobilityhouse with itself | | `v16.compression` | SKIP_UNSUPPORTED (8) | only mobilityhouse declares `compression` in 1.6: chargetime's 1.6 classes have no extensions, lorenzodonini's CSMS cannot accept it |
 
 ## OCPP 2.0.1
 
-| Station ↓ / CSMS → | chargetime v2.0 | citrineos v2.1.0 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 |
-|---|---|---|---|---|
-| chargetime v2.0 | 39 pass 1 skip 1 known / 43 pass 1 skip | 28 pass 12 skip 1 known / 40 pass 4 skip | 40 pass 1 skip / 42 pass 1 skip 1 known | 40 pass 1 known / 43 pass 1 skip |
-| lorenzodonini v0.19.0 | 38 pass 2 skip 1 known / 43 pass 1 known | 27 pass 13 skip 1 known / 39 pass 3 skip 2 known | 39 pass 1 skip 1 known / 43 pass 1 known | 39 pass 1 skip 1 known / 41 pass 3 known |
-| mobilityhouse 2.1.0 | 39 pass 1 skip 1 known / 44 pass | 29 pass 12 skip / 41 pass 3 skip | 40 pass 1 skip / 43 pass 1 known | 41 pass / 44 pass |
-| everest 2026.02.2 | 39 pass 2 skip / 44 pass | 28 pass 13 skip / 41 pass 3 skip | 40 pass 1 skip / 43 pass 1 known | 39 pass 1 skip 1 known / 44 pass |
+| Station ↓ / CSMS → | cbsigma v0.2.0 | chargetime v2.0 | citrineos v2.1.0 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 |
+|---|---|---|---|---|---|
+| cbsigma v0.2.0 | 40 pass 1 skip / 44 pass | 39 pass 2 skip / 44 pass | 28 pass 13 skip / 41 pass 3 skip | 40 pass 1 skip / 43 pass 1 known | 40 pass 1 skip / 44 pass |
+| chargetime v2.0 | 40 pass 1 skip / 43 pass 1 skip | 39 pass 1 skip 1 known / 43 pass 1 skip | 28 pass 12 skip 1 known / 40 pass 4 skip | 40 pass 1 skip / 42 pass 1 skip 1 known | 40 pass 1 known / 43 pass 1 skip |
+| lorenzodonini v0.19.0 | 39 pass 1 skip 1 known / 41 pass 3 known | 38 pass 2 skip 1 known / 43 pass 1 known | 27 pass 13 skip 1 known / 39 pass 3 skip 2 known | 39 pass 1 skip 1 known / 43 pass 1 known | 39 pass 1 skip 1 known / 41 pass 3 known |
+| mobilityhouse 2.1.0 | 40 pass 1 skip / 44 pass | 39 pass 1 skip 1 known / 44 pass | 29 pass 12 skip / 41 pass 3 skip | 40 pass 1 skip / 43 pass 1 known | 41 pass / 44 pass |
+| everest 2026.02.2 | 40 pass 1 skip / 44 pass | 39 pass 2 skip / 44 pass | 28 pass 13 skip / 41 pass 3 skip | 40 pass 1 skip / 43 pass 1 known | 39 pass 1 skip 1 known / 44 pass |
 
-Totals: 1263 PASS, 19 KNOWN_ISSUE, 87 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
-Security profiles 2 and 3 pass in all sixteen pairings, except the
-chargetime station with the citrineos CSMS (as in 1.6).
+Totals: 1997 PASS, 24 KNOWN_ISSUE, 115 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
+Security profiles 2 and 3 pass in all 25 pairings.
 
 | Station | CSMS | Test | Status | Evidence |
 |---|---|---|---|---|
 | mobilityhouse, chargetime | chargetime | `v201.compression` | KNOWN_ISSUE (2) | the CSMS keeps its compression context although it announces `server_no_context_takeover`: [Java-WebSocket 1.6.0 `PerMessageDeflateExtension`](https://github.com/TooTallNate/Java-WebSocket/blob/da3cf2a777aed862f2f5b5cf060cae7969958667/src/main/java/org/java_websocket/extensions/permessage_deflate/PerMessageDeflateExtension.java#L335-L340) |
 | chargetime | mobilityhouse | `v201.compression` | KNOWN_ISSUE | the station keeps its compression context although it offers `client_no_context_takeover`: [Java-WebSocket 1.6.0 `PerMessageDeflateExtension`](https://github.com/TooTallNate/Java-WebSocket/blob/da3cf2a777aed862f2f5b5cf060cae7969958667/src/main/java/org/java_websocket/extensions/permessage_deflate/PerMessageDeflateExtension.java#L326-L333) |
-| lorenzodonini | all three | `v201.from-station.notify-report` | KNOWN_ISSUE | [ocpp-go `notify_report.go`](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/provisioning/notify_report.go#L98-L104) |
-| lorenzodonini | mobilityhouse, citrineos | `v201.from-csms.reset-immediate`, `v201.from-csms.set-network-profile` | KNOWN_ISSUE (4) | [ocpp-go `reset.go`](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/provisioning/reset.go#L61-L64) |
-| lorenzodonini, or any station with lorenzodonini | all three, or lorenzodonini | `v201.from-csms.get-composite-schedule` | KNOWN_ISSUE (6) | [ocpp-go `get_composite_schedule.go`](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/smartcharging/get_composite_schedule.go#L31-L50) |
+| lorenzodonini | all four | `v201.from-station.notify-report` | KNOWN_ISSUE | [ocpp-go `notify_report.go`](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/provisioning/notify_report.go#L98-L104) |
+| lorenzodonini | mobilityhouse, citrineos, cbsigma | `v201.from-csms.reset-immediate`, `v201.from-csms.set-network-profile` | KNOWN_ISSUE (6) | [ocpp-go `reset.go`](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/provisioning/reset.go#L61-L64) |
+| lorenzodonini, or any station with lorenzodonini | all four, or lorenzodonini | `v201.from-csms.get-composite-schedule` | KNOWN_ISSUE (6) | [ocpp-go `get_composite_schedule.go`](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/smartcharging/get_composite_schedule.go#L31-L50) |
 | everest | mobilityhouse | `v201.from-station.notify-evcharging-needs` | KNOWN_ISSUE | the CSMS validates the draft-06 OCA schemas with jsonschema's `Draft4Validator`, so the integer `energyAmount` written `20000.0` (libocpp's `float`, a valid integer in draft-06) gets `TypeConstraintViolation`: [mobilityhouse/ocpp `messages.py`](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/messages.py#L130-L173) |
-| chargetime | all three | `v201.fixture-callerror.from-csms` | SKIP_UNSUPPORTED | chargetime does not declare `fixtureCallErrors` |
-| all three | chargetime | `v201.fixture-callerror.from-station` | SKIP_UNSUPPORTED | chargetime does not declare `fixtureCallErrors` |
+| chargetime | all four | `v201.fixture-callerror.from-csms` | SKIP_UNSUPPORTED | chargetime does not declare `fixtureCallErrors` |
+| all four | chargetime | `v201.fixture-callerror.from-station` | SKIP_UNSUPPORTED | chargetime does not declare `fixtureCallErrors` |
 | chargetime | citrineos | `v201.compression` | KNOWN_ISSUE | the chargetime station defect above |
 | all four | citrineos | `v201.not-implemented.from-station`, `v201.fixture-callerror.from-station`, undeclared actions | SKIP_UNSUPPORTED | as in 1.6 |
 | lorenzodonini at either end | | `v201.compression` | SKIP_UNSUPPORTED (5) | lorenzodonini does not declare `compression`: ocpp-go's CSMS cannot accept it |
@@ -123,25 +136,28 @@ implementations: the everest station with the mobilityhouse CSMS, and the
 mobilityhouse and everest stations with the citrineos CSMS (the first 2.1
 pairing in which mobilityhouse takes no part).
 
-| Station ↓ / CSMS → | chargetime v2.0 | citrineos v2.1.0 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 |
-|---|---|---|---|---|
-| chargetime v2.0 | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — |
-| lorenzodonini v0.19.0 | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — |
-| mobilityhouse 2.1.0 | 1 skip / — | 29 pass 25 skip / 41 pass 18 skip 1 known | 1 skip / — | 50 pass 3 skip 1 known / 58 pass 1 skip 1 known |
-| everest 2026.02.2 | 1 skip / — | 28 pass 26 skip / 42 pass 18 skip | 1 skip / — | 48 pass 4 skip 2 known / 58 pass 2 skip |
+| Station ↓ / CSMS → | cbsigma v0.2.0 | chargetime v2.0 | citrineos v2.1.0 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 |
+|---|---|---|---|---|---|
+| cbsigma v0.2.0 | 53 pass 1 skip / 60 pass | 1 skip / — | 28 pass 26 skip / 42 pass 18 skip | 1 skip / — | 50 pass 3 skip 1 known / 59 pass 1 skip |
+| chargetime v2.0 | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — |
+| lorenzodonini v0.19.0 | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — |
+| mobilityhouse 2.1.0 | 50 pass 4 skip / 58 pass 1 skip 1 known | 1 skip / — | 29 pass 25 skip / 41 pass 18 skip 1 known | 1 skip / — | 50 pass 3 skip 1 known / 58 pass 1 skip 1 known |
+| everest 2026.02.2 | 49 pass 4 skip 1 known / 58 pass 2 skip | 1 skip / — | 28 pass 26 skip / 42 pass 18 skip | 1 skip / — | 48 pass 4 skip 2 known / 58 pass 2 skip |
 
-Totals: 354 PASS, 5 KNOWN_ISSUE, 118 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
-`v21.tls.profile2` and `v21.tls.profile3` pass for both stations with the
-mobilityhouse and the citrineos CSMS; `v21.compression` passes for the
-mobilityhouse station with both CSMSs (everest cannot offer compression).
+Totals: 861 PASS, 8 KNOWN_ISSUE, 184 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
+`v21.tls.profile2` and `v21.tls.profile3` pass for the three stations with
+the three CSMSs (mobilityhouse, citrineos, cbsigma); `v21.compression`
+passes for the mobilityhouse station with the mobilityhouse and citrineos
+CSMSs (everest and cbsigma cannot offer compression).
+`v21.send.notify-periodic-event-stream` and `v21.rpc.call-result-error` pass
+for cbsigma with itself.
 
 | Station | CSMS | Test | Status | Evidence |
 |---|---|---|---|---|
 | mobilityhouse | mobilityhouse | `v21.not-implemented.from-station`, `v21.not-implemented.from-csms` | KNOWN_ISSUE (2) | [mobilityhouse/ocpp `charge_point.py`](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/charge_point.py#L161-L193) |
 | mobilityhouse | mobilityhouse, citrineos | `v21.from-station.battery-swap-in` | SKIP_UNSUPPORTED | the mobilityhouse station does not declare BatterySwap: ocpp 2.1.0 cannot send it (see below). The everest station sends it to the mobilityhouse CSMS: PASS |
-| mobilityhouse | mobilityhouse | `v21.send.notify-periodic-event-stream` | SKIP_UNSUPPORTED | no adapter declares `send` |
-| mobilityhouse | mobilityhouse | `v21.rpc.call-result-error` (from each end) | SKIP_UNSUPPORTED (2) | no adapter declares `callResultError` |
-| chargetime, lorenzodonini | all three | `v21.pairing` | SKIP_UNSUPPORTED (8) | 2.1 not declared by one of the two |
+| all but cbsigma with itself | | `v21.send.notify-periodic-event-stream`, `v21.rpc.call-result-error` | SKIP_UNSUPPORTED | `send` and `callResultError`: only cbsigma declares them (mobilityhouse, everest and citrineos know the message types 2 to 4 only) |
+| chargetime, lorenzodonini | all five | `v21.pairing` | SKIP_UNSUPPORTED (10) | 2.1 not declared by one of the two |
 | everest | mobilityhouse | `v21.from-station.report-dercontrol` | KNOWN_ISSUE | [libocpp `ocpp::v2::MessageType`](https://github.com/EVerest/everest-core/blob/45dba2c049223d05beb7611c75d59f6639c46ee0/lib/everest/ocpp/include/ocpp/v2/types.hpp#L15-L195) has no ReportDERControl |
 | everest | mobilityhouse | `v21.not-implemented.from-station` | KNOWN_ISSUE | the mobilityhouse defect above (no answer to an unanswered 2.1 action) |
 | mobilityhouse | citrineos | `v21.not-implemented.from-csms` | KNOWN_ISSUE | the mobilityhouse defect above, in its station |

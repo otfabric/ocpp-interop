@@ -31,6 +31,8 @@ cross-field rules (scripts/validate-fixtures.py):
   that version (for 2.1, the directions of OCPP 2.1 Edition 2, Part 2), and
   an action the version sends as a SEND (2.1: NotifyPeriodicEventStream) has
   no answer;
+- an invalid answer (`invalidAnswers`) is in a 2.1 fixture, by the role
+  that receives the action, and not for a SEND;
 - every sample is sent by the role that sends that action;
 - a derived answer names a table that fits the action and is not empty;
 - a `baseline` fixture has a sample of every action of its version and an
@@ -74,6 +76,22 @@ placeholder. An upstream may write it with milliseconds on the wire.
 
 ChangeConfiguration does not change what GetConfiguration reports: 1.6
 answers are fixed, apart from the derived ones.
+
+### Invalid answers
+
+`invalidAnswers` (OCPP 2.1 only) has the same two tables as `answers`, each
+entry `{"payload": {...}}`: an answer that does not validate against the
+action's response schema. An endpoint sends it as it is, in place of the
+action's entry in `answers`, so that the peer answers it with a
+CALLRESULTERROR ([CONTAINER_CONTRACT.md](CONTAINER_CONTRACT.md#ocpp-21-send-and-callresulterror)).
+`make fixtures` cannot check that the payload is invalid (the OCA schemas
+are not in this repository); the self-tests do. An adapter without the
+feature `callResultError` refuses a fixture with `invalidAnswers` (exit 5).
+
+`fixtures/v21/callresulterror` is the baseline with two: the CSMS answers
+Heartbeat with `{"currentTime": 1}` and the station answers
+GetTransactionStatus with `{"messagesInQueue": "yes"}`, both a
+TypeConstraintViolation.
 
 ### Device model variables (2.x)
 
