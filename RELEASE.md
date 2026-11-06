@@ -41,6 +41,25 @@ manual workflow and no releases (`own/go-ocpp/README.md`).
 
 ---
 
+## v0.7.0
+
+**Date:** 2026-11-06
+**Previous release:** v0.6.3
+
+### Added
+
+- `ghcr.io/otfabric/ocpp-interop-cbsigma`: a reference CSMS and station built on [cB-Sigma/ocpp](https://github.com/cB-Sigma/ocpp) v0.2.0 (Go, Apache-2.0, written from the OCPP documents), OCPP 1.6J, 2.0.1 and 2.1 in both roles, security profiles 0 to 3. It is the first reference with the OCPP 2.1 message types SEND and CALLRESULTERROR, and declares `send` and `callResultError` in 2.1. No compression: its station cannot offer it (`adapters/cbsigma/README.md`).
+- Contract 0.6 (docs/CONTAINER_CONTRACT.md, OCPP 2.1: SEND and CALLRESULTERROR): with `send`, `client <Action>` and `call` send a SEND action (NotifyPeriodicEventStream) as a SEND, with `response` `null`, and the events `send-sent` and `send-received`; with `callResultError`, the fixture field `invalidAnswers` (2.1) makes the answering end send an invalid CALLRESULT, the receiver answers it with a CALLRESULTERROR (the result field `callResultError`, `error.code` `invalid-response`) and the other end writes `call-result-error`.
+- `fixtures/v21/callresulterror`: the baseline with an invalid CSMS answer to Heartbeat and an invalid station answer to GetTransactionStatus. The fixture schema and `scripts/validate-fixtures.py` take `invalidAnswers` (2.1 only, by the receiving role, never for a SEND).
+- Self-tests: `scripts/smoke.sh` checks SEND and CALLRESULTERROR between an adapter's own ends, and that an adapter without `callResultError` refuses the `callresulterror` fixture (exit 5); `scripts/interop.sh` runs the SEND samples and CALLRESULTERROR in both directions (`v21.send.*`, `v21.rpc.call-result-error`) where both ends declare the feature, with the fixture at one end of a session at a time.
+
+### Changed
+
+- Every adapter reports contract 0.6. mobilityhouse, everest and citrineos refuse a fixture with `invalidAnswers` (exit 5): their upstreams know the message types 2 to 4 only.
+- `ocpp-interop-otfabric` (own image, not in releases): declares `send` and `callResultError` in OCPP 2.1 (go-ocpp's `Send`, `ocpp.SendDispatcher`, and responses that validate themselves, so go-ocpp answers an invalid one with a CALLRESULTERROR), and runs against `cbsigma` too. The "Own stack (go-ocpp)" workflow and `own/go-ocpp/Makefile` include `cbsigma` in the references.
+
+---
+
 ## v0.6.3
 
 **Date:** 2026-11-06

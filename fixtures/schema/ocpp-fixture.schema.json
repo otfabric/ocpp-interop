@@ -51,6 +51,15 @@
         "station": {"$ref": "#/$defs/answerTable"}
       }
     },
+    "invalidAnswers": {
+      "description": "OCPP 2.1 only: answers sent as they are although they do not validate against the action's response schema, so that the peer answers them with a CALLRESULTERROR (docs/FIXTURES.md, Invalid answers). An entry replaces the answer in answers for that action.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "csms": {"$ref": "#/$defs/invalidAnswerTable"},
+        "station": {"$ref": "#/$defs/invalidAnswerTable"}
+      }
+    },
     "samples": {
       "description": "Named requests a test can send. Consumers read them from print-fixture.",
       "type": "object",
@@ -122,6 +131,16 @@
         "idToken": {"type": "string", "minLength": 1, "maxLength": 255, "description": "At most 20 characters in 1.6, 36 in 2.0.1, 255 in 2.1 (scripts/validate-fixtures.py)"},
         "type": {"type": "string", "maxLength": 20, "description": "OCPP 2.0.1 IdTokenEnumType; OCPP 2.1 a string of at most 20 characters"},
         "status": {"enum": ["Accepted", "Blocked", "Expired", "Invalid", "ConcurrentTx", "NoCredit", "NotAllowedTypeEVSE", "NotAtThisLocation", "NotAtThisTime", "Unknown"]}
+      }
+    },
+    "invalidAnswerTable": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[A-Z][A-Za-z0-9]+$"},
+      "additionalProperties": {
+        "type": "object",
+        "required": ["payload"],
+        "additionalProperties": false,
+        "properties": {"payload": {"type": "object"}}
       }
     },
     "answerTable": {

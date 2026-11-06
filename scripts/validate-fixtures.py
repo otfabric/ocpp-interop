@@ -161,6 +161,17 @@ def semantic_errors(fx, path):
             if derived and not fx.get(derived):
                 errors.append(f"answers.{role}.{action}: derived from {derived}, which is empty")
 
+    # Invalid answers (OCPP 2.1 CALLRESULTERROR): only where 2.1 has the
+    # message type, by the role that receives the action, never for a SEND.
+    for role, table in fx.get("invalidAnswers", {}).items():
+        for action in table:
+            if version != "2.1":
+                errors.append(f"invalidAnswers.{role}.{action}: invalid answers are for OCPP 2.1 only (CALLRESULTERROR)")
+            elif action not in receives.get(role, set()):
+                errors.append(f"invalidAnswers.{role}.{action}: the {role} does not receive {action} in OCPP {version}")
+            elif action in SEND_ACTIONS[version]:
+                errors.append(f"invalidAnswers.{role}.{action}: {action} is a SEND in OCPP {version}, which has no answer")
+
     for name, sample in fx.get("samples", {}).items():
         sender = sample.get("from")
         if sample.get("action") not in ACTIONS[version].get(sender, set()):

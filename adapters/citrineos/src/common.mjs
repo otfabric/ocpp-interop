@@ -6,7 +6,7 @@ import fs from 'node:fs';
 
 export const ADAPTER = 'citrineos';
 export const SCHEMA_VERSION = '1.0';
-export const CONTRACT_VERSION = '0.5';
+export const CONTRACT_VERSION = '0.6';
 export const READY_FILE = '/run/ocpp-interop/ready';
 export const CONTROL_SOCKET = '/run/ocpp-interop/control.sock';
 export const FIXTURE_ROOT = '/fixtures';

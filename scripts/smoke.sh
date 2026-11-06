@@ -211,7 +211,19 @@ version_checks() {
     if [[ "${got}" == ready ]]; then ok "${role} with a mounted valid fixture: ready"; else fail "${role} with a mounted valid fixture: ${got}"; fi
     start "cerr-${RUN_ID}" "${ADAPTER}" "${mount[@]}" -- "${endpoint[@]}" --fixture /bad/callerror/${VDIR}/baseline/fixture.json
     got=$(served "cerr-${RUN_ID}"); stop_container "cerr-${RUN_ID}"
+    # Invalid answers (OCPP 2.1 CALLRESULTERROR): served only with callResultError.
+    local inv=""
+    if [[ "${V}" == 2.1 ]]; then
+        start "inv-${RUN_ID}" "${ADAPTER}" -- "${endpoint[@]}" --fixture "/fixtures/${VDIR}/callresulterror/fixture.json"
+        inv=$(served "inv-${RUN_ID}"); stop_container "inv-${RUN_ID}"
+    fi
     stop_container "peer-${RUN_ID}"
+    if [[ "${V}" == 2.1 ]]; then
+        local want_inv="exit 5"
+        has_feature callResultError && want_inv=ready
+        if [[ "${inv}" == "${want_inv}" ]]; then ok "${role} with invalidAnswers (callresulterror fixture): ${want_inv}"
+        else fail "${role} with invalidAnswers (callresulterror fixture): ${inv}, want ${want_inv}"; fi
+    fi
     if has_feature fixtureCallErrors; then
         if [[ "${got}" == ready ]]; then ok "${role} with a callError answer: ready (fixtureCallErrors)"; else fail "${role} with a callError answer: ${got}"; fi
     else
@@ -225,6 +237,9 @@ version_checks() {
         if [[ "${code}" == 5 ]] && jq -e '.ok == false and .error.code == "unsupported"' <<<"${doc}" >/dev/null 2>&1
         then ok "a SEND action without the send feature: unsupported, exit 5"; else fail "SEND action without the send feature: exit ${code}, ${doc}"; fi
     fi
+
+    # ---- SEND and CALLRESULTERROR (OCPP 2.1), between the adapter's own ends ----
+    rpc21_checks
 
     # ---- a connection that cannot be made ----
     if has_role client; then
@@ -310,6 +325,55 @@ version_checks() {
     stop_container "${srv}"
 
     if has_role client; then client_run_checks "${ADAPTER}"; else server_call_checks; fi
+}
+
+# rpc21_checks: an adapter with both roles that declares send or
+# callResultError in OCPP 2.1, against itself (docs/CONTAINER_CONTRACT.md,
+# OCPP 2.1: SEND and CALLRESULTERROR). The callresulterror fixture goes to one
+# end at a time: first the CSMS answers Heartbeat with a payload that breaks
+# the schema, then the station answers GetTransactionStatus with one.
+rpc21_checks() {
+    [[ "${V}" == 2.1 ]] && has_role server && has_role client || return 0
+    has_feature send || has_feature callResultError || return 0
+    local srv="rpc-${RUN_ID}" sta="rpcsta-${RUN_ID}" fx="/fixtures/${VDIR}/callresulterror/fixture.json" doc code payload
+    start "${srv}" "${ADAPTER}" -- server --version "${V}" --fixture "${fx}"
+    wait_ready "${srv}" || { fail "rpc: the server did not become ready"; stop_container "${srv}"; return 0; }
+    start "${sta}" "${ADAPTER}" -- client run --version "${V}" --url "ws://${srv}:9000/ocpp"
+    wait_ready "${sta}" || { fail "rpc: client run did not connect"; stop_container "${sta}"; stop_container "${srv}"; return 0; }
+    if has_feature send; then
+        payload=$(jq -c '.samples.notifyPeriodicEventStream.payload' "${FIXTURE}")
+        doc=$(docker exec "${sta}" ocpp-interop call NotifyPeriodicEventStream --payload "${payload}" 2>/dev/null); code=$?
+        if [[ "${code}" == 0 ]] && jq -e '.ok == true and .response == null and .callError == null and .error == null' <<<"${doc}" >/dev/null 2>&1
+        then ok "send: a SEND from client run, ok with no response"; else fail "send: exit ${code}, ${doc}"; fi
+        if wait_event "${srv}" "${JQ_LIB}"'.event == "send-received" and .station == $s and .action == "NotifyPeriodicEventStream" and within($p; .payload)' \
+            --arg s "${STATION}" --argjson p "${payload}" >/dev/null
+        then ok "send: the server reports send-received"; else fail "send: no send-received event"; fi
+        if wait_event "${sta}" '.event == "send-sent" and .action == "NotifyPeriodicEventStream"' >/dev/null
+        then ok "send: client run reports send-sent"; else fail "send: no send-sent event"; fi
+        sleep 1
+        if events "${srv}" | jq -e 'select(.event == "call-answered" and .action == "NotifyPeriodicEventStream")' >/dev/null 2>&1 \
+            || events "${sta}" | jq -e 'select(.event == "call-result" and .action == "NotifyPeriodicEventStream")' >/dev/null 2>&1
+        then fail "send: the SEND was answered"; else ok "send: the SEND is not answered"; fi
+    fi
+    if has_feature callResultError; then
+        doc=$(docker exec "${sta}" ocpp-interop call Heartbeat 2>/dev/null); code=$?
+        if [[ "${code}" == 1 ]] && jq -e '.ok == false and .error.code == "invalid-response" and (.callResultError.code | type == "string")' <<<"${doc}" >/dev/null 2>&1
+        then ok "callResultError: client run answers an invalid Heartbeat result with a CALLRESULTERROR"; else fail "callResultError (station): exit ${code}, ${doc}"; fi
+        if wait_event "${srv}" '.event == "call-result-error" and .station == $s and (.error.code | type == "string") and (.action == null or .action == "Heartbeat")' --arg s "${STATION}" >/dev/null
+        then ok "callResultError: the server reports call-result-error"; else fail "callResultError: no call-result-error event at the server"; fi
+    fi
+    stop_container "${sta}"; stop_container "${srv}"
+    has_feature callResultError || return 0
+    start "${srv}" "${ADAPTER}" -- server --version "${V}"
+    wait_ready "${srv}" || { fail "rpc: the server did not become ready"; stop_container "${srv}"; return 0; }
+    start "${sta}" "${ADAPTER}" -- client run --version "${V}" --url "ws://${srv}:9000/ocpp" --fixture "${fx}"
+    wait_ready "${sta}" || { fail "rpc: client run did not connect"; stop_container "${sta}"; stop_container "${srv}"; return 0; }
+    doc=$(docker exec "${srv}" ocpp-interop call --station "${STATION}" GetTransactionStatus --payload '{}' 2>/dev/null); code=$?
+    if [[ "${code}" == 1 ]] && jq -e '.ok == false and .error.code == "invalid-response" and (.callResultError.code | type == "string")' <<<"${doc}" >/dev/null 2>&1
+    then ok "callResultError: the server answers an invalid GetTransactionStatus result with a CALLRESULTERROR"; else fail "callResultError (CSMS): exit ${code}, ${doc}"; fi
+    if wait_event "${sta}" '.event == "call-result-error" and (.error.code | type == "string") and (.action == null or .action == "GetTransactionStatus")' >/dev/null
+    then ok "callResultError: client run reports call-result-error"; else fail "callResultError: no call-result-error event at client run"; fi
+    stop_container "${sta}"; stop_container "${srv}"
 }
 
 # server_call_checks: the CALLs of the server of an adapter without a client

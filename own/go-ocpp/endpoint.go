@@ -27,6 +27,7 @@ type tracker struct {
 	sentAction map[string]string          // station, id -> action of a CALL sent
 	results    map[string]bool            // station, id -> a CALLRESULT frame arrived
 	callErrors map[string]*object         // station, id -> the CALLERROR that arrived
+	answered   map[string]string          // station, id -> action of a CALL this end answered
 	last       map[string]string          // session -> the last frame received, for protocol-error
 	// opened is called before the first event of a session that has not
 	// been reported as opened yet (the server's connection-opened).
@@ -36,7 +37,7 @@ type tracker struct {
 func newTracker(emit bool) *tracker {
 	return &tracker{emit: emit, received: map[string]string{}, sent: map[string]json.RawMessage{},
 		sentAction: map[string]string{}, results: map[string]bool{}, callErrors: map[string]*object{},
-		last: map[string]string{}}
+		answered: map[string]string{}, last: map[string]string{}}
 }
 
 func key(station, id string) string { return station + "\x00" + id }
@@ -108,6 +109,12 @@ func (t *tracker) incoming(info ocpp.ConnInfo, data []byte) {
 	case kind == 4:
 		t.callErrors[k] = errorOf(rest)
 		t.event("call-result", station, "messageId", id, "action", t.actionOf(k), "error", t.callErrors[k])
+	case kind == 5: // OCPP 2.1 CALLRESULTERROR: the peer could not use our CALLRESULT
+		t.event("call-result-error", station, "messageId", id, "action", nullable(t.answered[k]), "error", errorOf(rest))
+	case kind == 6 && len(rest) == 2: // OCPP 2.1 SEND: never answered
+		var action string
+		_ = json.Unmarshal(rest[0], &action)
+		t.event("send-received", station, "messageId", id, "action", action, "payload", rest[1])
 	}
 }
 
@@ -132,11 +139,20 @@ func (t *tracker) outgoing(station string, data []byte) {
 	case kind == 3:
 		action := t.received[k]
 		delete(t.received, k)
+		t.answered[k] = action
 		t.event("call-answered", station, "messageId", id, "action", nullable(action), "payload", rest[0])
 	case kind == 4:
 		action := t.received[k]
 		delete(t.received, k)
 		t.event("call-answered", station, "messageId", id, "action", nullable(action), "error", errorOf(rest))
+	case kind == 6 && len(rest) == 2:
+		if _, reported := t.sentAction[k]; reported {
+			return // reported by intercept
+		}
+		var action string
+		_ = json.Unmarshal(rest[0], &action)
+		t.sentAction[k] = action
+		t.event("send-sent", station, "messageId", id, "action", action, "payload", rest[1])
 	}
 }
 
@@ -203,6 +219,7 @@ type callKey struct{}
 type outgoingCall struct {
 	id      string
 	payload json.RawMessage
+	send    bool // an OCPP 2.1 SEND, not a CALL
 }
 
 // intercept is the go-ocpp call interceptor (WithCallInterceptor). It reads
@@ -217,7 +234,11 @@ func (t *tracker) intercept(ctx context.Context, info ocpp.CallInfo, next func(c
 		t.mu.Lock()
 		t.sent[k] = c.payload
 		t.sentAction[k] = info.Action
-		t.event("call-sent", info.StationID, "messageId", info.MessageID, "action", info.Action, "payload", c.payload)
+		name := "call-sent"
+		if c.send {
+			name = "send-sent"
+		}
+		t.event(name, info.StationID, "messageId", info.MessageID, "action", info.Action, "payload", c.payload)
 		t.mu.Unlock()
 	}
 	return next(ctx)
@@ -247,9 +268,28 @@ func (e *endpoint) receives() map[string]bool {
 // version packages do on typed ones: the request is decoded and validated by
 // the version package (ValidateRequest), the fixture's answer by its
 // ValidateResponse, and go-ocpp sends the result or the CALLERROR.
-func (e *endpoint) dispatcher() ocpp.Dispatcher {
+func (e *endpoint) dispatcher() ocpp.Dispatcher { return dispatcher{e} }
+
+// dispatcher answers CALLs (Dispatch) and takes OCPP 2.1 SENDs
+// (ocpp.SendDispatcher): a SEND is validated by the version package and never
+// answered; the frame observer reports it (send-received).
+type dispatcher struct{ e *endpoint }
+
+func (d dispatcher) DispatchSend(_ context.Context, _ ocpp.Peer, action string, payload json.RawMessage) error {
+	vi := versions[d.e.version]
+	if !vi.sendActions[action] || !d.e.receives()[action] {
+		return fmt.Errorf("%s is not a SEND this role receives in OCPP %s", action, d.e.version)
+	}
+	return vi.validateRequest(action, payload)
+}
+
+func (d dispatcher) Dispatch(ctx context.Context, p ocpp.Peer, action string, payload json.RawMessage) (json.RawMessage, error) {
+	return d.e.dispatch(ctx, p, action, payload)
+}
+
+func (e *endpoint) dispatch(_ context.Context, _ ocpp.Peer, action string, payload json.RawMessage) (json.RawMessage, error) {
 	vi := versions[e.version]
-	return ocpp.DispatcherFunc(func(_ context.Context, _ ocpp.Peer, action string, payload json.RawMessage) (json.RawMessage, error) {
+	{
 		if !knows(e.version, action) {
 			return nil, ocpp.NewCallError(ocpp.NotImplemented, "")
 		}
@@ -270,6 +310,10 @@ func (e *endpoint) dispatcher() ocpp.Dispatcher {
 			return nil, ocpp.NewCallError(ocpp.NotImplemented, "the fixture has no answer for "+action)
 		case callErrorAnswer:
 			return nil, ocpp.NewCallError(ocpp.ErrorCode(a.code), a.description)
+		case invalidAnswer:
+			// Sent as it is: go-ocpp writes a raw result unchanged, and the
+			// peer is meant to refuse it with a CALLRESULTERROR.
+			return marshal(a.payload)
 		case map[string]any:
 			body, err := marshal(a)
 			if err != nil {
@@ -282,7 +326,7 @@ func (e *endpoint) dispatcher() ocpp.Dispatcher {
 		default:
 			return nil, fmt.Errorf("no answer for %s", action)
 		}
-	})
+	}
 }
 
 // execute sends one CALL with go-ocpp and returns the result document.
@@ -308,10 +352,6 @@ func (e *endpoint) execute(station, action string, payload map[string]any, timeo
 		return done(resultDoc{request: payload, errCode: "unsupported",
 			errMsg: fmt.Sprintf("the %s does not send %s in OCPP %s", sender, action, e.version)})
 	}
-	if vi.sendActions[action] {
-		return done(resultDoc{request: payload, errCode: "unsupported",
-			errMsg: action + " is a SEND, which the contract has no operation for (the send feature is not declared)"})
-	}
 	body, err := marshal(payload)
 	if err != nil {
 		return done(resultDoc{request: payload, errCode: "invalid-request", errMsg: err.Error()})
@@ -326,12 +366,28 @@ func (e *endpoint) execute(station, action string, payload map[string]any, timeo
 	default:
 	}
 
-	call := &outgoingCall{payload: body}
+	call := &outgoingCall{payload: body, send: vi.sendActions[action]}
 	ctx, cancel := context.WithTimeout(context.WithValue(context.Background(), callKey{}, call),
 		time.Duration(timeoutMs)*time.Millisecond)
 	defer cancel()
-	var response json.RawMessage
-	err = caller.Call(ctx, action, json.RawMessage(body), &response)
+	if call.send {
+		// An OCPP 2.1 SEND (contract 0.6): go-ocpp's Send, never answered.
+		sender, ok := caller.(interface {
+			Send(ctx context.Context, action string, req any) error
+		})
+		if !ok {
+			return done(resultDoc{request: payload, errCode: "failed", errMsg: "this endpoint cannot send a SEND"})
+		}
+		if err := sender.Send(ctx, action, json.RawMessage(body)); err != nil {
+			return done(resultDoc{messageID: call.id, request: json.RawMessage(body), errCode: "failed", errMsg: err.Error()})
+		}
+		return done(resultDoc{ok: true, messageID: call.id, request: json.RawMessage(body), response: nil})
+	}
+	// The response is read into checkedResponse: go-ocpp validates a typed
+	// response (Validate) and, on OCPP 2.1, answers an invalid one with a
+	// CALLRESULTERROR (contract 0.6).
+	response := &checkedResponse{action: action, validate: vi.validateResponse}
+	err = caller.Call(ctx, action, json.RawMessage(body), response)
 	id := call.id
 	asSent := func() any {
 		if sent, _, _ := e.tracker.outcome(station, id); sent != nil {
@@ -340,14 +396,20 @@ func (e *endpoint) execute(station, action string, payload map[string]any, timeo
 		return json.RawMessage(body)
 	}
 	if err == nil {
-		if verr := vi.validateResponse(action, response); verr != nil {
-			return done(resultDoc{messageID: id, request: asSent(), errCode: "invalid-response",
-				errMsg: "go-ocpp rejected the response: " + verr.Error()})
-		}
-		return done(resultDoc{ok: true, messageID: id, request: asSent(), response: response})
+		return done(resultDoc{ok: true, messageID: id, request: asSent(), response: response.raw})
 	}
 	var ce *ocpp.CallError
+	var ve *ocpp.ValidationError
 	switch {
+	case !errors.As(err, &ce) && errors.As(err, &ve):
+		r := resultDoc{messageID: id, request: asSent(), errCode: "invalid-response",
+			errMsg: "go-ocpp rejected the response: " + err.Error()}
+		if vi.version == ocpp.V21 {
+			// go-ocpp answered it with a CALLRESULTERROR of this error.
+			rce := ve.CallError()
+			r.callResultError = errorObject(string(rce.Code), rce.Description, map[string]any{})
+		}
+		return done(r)
 	case errors.As(err, &ce):
 		var details any = map[string]any{}
 		if len(ce.Details) > 0 {
@@ -379,3 +441,20 @@ func closeOf(err error) (code, reason any) {
 	}
 	return nil, nil
 }
+
+// checkedResponse is the response of a CALL as raw JSON that validates
+// itself with the version package (ValidateResponse). go-ocpp calls Validate
+// on a typed response, so an invalid one is refused, with a CALLRESULTERROR
+// on OCPP 2.1.
+type checkedResponse struct {
+	action   string
+	validate func(action string, payload json.RawMessage) error
+	raw      json.RawMessage
+}
+
+func (c *checkedResponse) UnmarshalJSON(data []byte) error {
+	c.raw = append(json.RawMessage(nil), data...)
+	return nil
+}
+
+func (c *checkedResponse) Validate() error { return c.validate(c.action, c.raw) }

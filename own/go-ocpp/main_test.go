@@ -107,10 +107,16 @@ func TestCapabilities(t *testing.T) {
 		if !ok || len(c.Client.Sends) == 0 || len(c.Server.Sends) == 0 {
 			t.Fatalf("OCPP %s: %+v", v, c)
 		}
+		sendsSEND := false
 		for _, a := range c.Client.Sends {
-			if versions[v].sendActions[a] || !versions[v].fromStation[a] {
+			if !versions[v].fromStation[a] {
 				t.Errorf("OCPP %s: the station declares %s", v, a)
 			}
+			sendsSEND = sendsSEND || versions[v].sendActions[a]
+		}
+		// The SEND actions (OCPP 2.1) are declared with the send feature.
+		if sendsSEND != (v == "2.1") {
+			t.Errorf("OCPP %s: the station declares a SEND action: %v", v, sendsSEND)
 		}
 	}
 }

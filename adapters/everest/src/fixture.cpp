@@ -174,7 +174,8 @@ void validate(const json& doc, const std::string& path, const std::string& versi
     auto add = [&errors](const std::string& message) { errors.push_back(message); };
     static const std::set<std::string> allowed = {"schemaVersion", "name",          "ocppVersion", "description",
                                                   "stations",      "idTokens",      "configuration",
-                                                  "variables",     "answers",       "samples"};
+                                                  "variables",     "answers",       "samples",
+                                                  "invalidAnswers"};
     for (const auto& item : doc.items()) {
         if (allowed.count(item.key()) == 0) {
             add("unknown property " + item.key());
@@ -436,6 +437,35 @@ void validate(const json& doc, const std::string& path, const std::string& versi
     if (!samples.is_object()) {
         add("samples is required");
     }
+    // Invalid answers (CALLRESULTERROR): OCPP 2.1 only, by the role that
+    // receives the action, never for a SEND.
+    if (doc.contains("invalidAnswers")) {
+        const json& invalid = doc.at("invalidAnswers");
+        if (!invalid.is_object()) {
+            add("invalidAnswers must be an object");
+        } else {
+            for (const auto& role : invalid.items()) {
+                if ((role.key() != "csms" && role.key() != "station") || !role.value().is_object()) {
+                    add("invalidAnswers." + role.key() + ": not csms or station");
+                    continue;
+                }
+                const auto sender = role.key() == "csms" ? "station" : "csms";
+                for (const auto& item : role.value().items()) {
+                    const auto where = "invalidAnswers." + role.key() + "." + item.key();
+                    if (!item.value().is_object() || !item.value().contains("payload") ||
+                        !item.value().at("payload").is_object() || item.value().size() != 1) {
+                        add(where + ": must be {\"payload\": {...}}");
+                    } else if (version != "2.1") {
+                        add(where + ": invalid answers are for OCPP 2.1 only (CALLRESULTERROR)");
+                    } else if (actions_from(version, sender).count(item.key()) == 0) {
+                        add(where + ": the " + role.key() + " does not receive " + item.key());
+                    } else if (is_send_action(version, item.key())) {
+                        add(where + ": " + item.key() + " is a SEND, which has no answer");
+                    }
+                }
+            }
+        }
+    }
     static const std::regex sample_name("^[a-z][a-zA-Z0-9]*$");
     const json no_samples = json::object();
     for (const auto& item : (samples.is_object() ? samples : no_samples).items()) {
@@ -519,6 +549,15 @@ Fixture Fixture::load(const std::string& path, const std::string& version) {
     if (doc.contains("variables")) {
         for (const auto& v : doc.at("variables")) {
             fixture.variables.push_back(v);
+        }
+    }
+    // libocpp knows the message types 2 to 4 only (callResultError false).
+    if (doc.contains("invalidAnswers")) {
+        for (const auto& role : doc.at("invalidAnswers").items()) {
+            for (const auto& item : role.value().items()) {
+                throw Unsupported(path + ": invalidAnswers." + role.key() + "." + item.key() +
+                                  ": libocpp has no CALLRESULTERROR (callResultError)");
+            }
         }
     }
     // A callError answer must use an OCPP-J error code of the version.

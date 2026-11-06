@@ -33,7 +33,7 @@ BUILDER ?= ocpp-interop
 
 # Adapters with an image, in priority order. The self-tests run over all of
 # them; override to work on one: make smoke ADAPTERS=mobilityhouse
-ADAPTERS ?= mobilityhouse chargetime lorenzodonini everest citrineos
+ADAPTERS ?= mobilityhouse chargetime lorenzodonini everest citrineos cbsigma
 
 image = $(REGISTRY)/ocpp-interop-$(1)
 
@@ -93,7 +93,7 @@ lint: ## Shellcheck the scripts, byte-compile the Python ones, gofmt the Go adap
 	@$(PYTHON) -m py_compile scripts/*.py adapters/mobilityhouse/ocpp_interop/*.py \
 		&& rm -rf scripts/__pycache__ adapters/mobilityhouse/ocpp_interop/__pycache__
 	@if command -v gofmt >/dev/null; then \
-		test -z "$$(gofmt -l adapters/lorenzodonini)" || { gofmt -l adapters/lorenzodonini; echo "gofmt: the files above need formatting"; exit 1; }; \
+		test -z "$$(gofmt -l adapters/lorenzodonini adapters/cbsigma)" || { gofmt -l adapters/lorenzodonini adapters/cbsigma; echo "gofmt: the files above need formatting"; exit 1; }; \
 	fi
 	@echo "lint ok"
 

@@ -60,6 +60,7 @@ to the specification. Neither does it establish OCA certification.
 | `chargetime` | [ChargeTimeEU/Java-OCA-OCPP](https://github.com/ChargeTimeEU/Java-OCA-OCPP) v2.0 | Java | 1.6J, 2.0.1 (2.1 on master only, unreleased) | **built: 1.6J and 2.0.1, both roles**, security profiles 0 to 3, compression in 2.0.1 (known upstream defects) |
 | `lorenzodonini` | [lorenzodonini/ocpp-go](https://github.com/lorenzodonini/ocpp-go) v0.19.0 | Go | 1.6J, 2.0.1 | **built: 1.6J and 2.0.1, both roles**, security profiles 0 to 3; no compression (its CSMS cannot accept it) |
 | `everest` | [EVerest libocpp](https://github.com/EVerest/everest-core/tree/2026.02.2/lib/everest/ocpp), everest-core 2026.02.2 | C++ | 1.6J, 2.0.1, 2.1 (station only) | **built: 1.6J, 2.0.1 and 2.1, station (`client`) only**, security profiles 0 to 3; no compression (libocpp cannot offer it) |
+| `cbsigma` | [cB-Sigma/ocpp](https://github.com/cB-Sigma/ocpp) v0.2.0 | Go | 1.6J, 2.0.1, 2.1 | **built: 1.6J, 2.0.1 and 2.1, both roles**, security profiles 0 to 3, OCPP 2.1 SEND and CALLRESULTERROR (the only reference with them); no compression (its station cannot offer it) |
 | `citrineos` | [citrineos/citrineos-core](https://github.com/citrineos/citrineos-core) v2.1.0 | TypeScript | 1.6J, 2.0.1, 2.1 (CSMS only) | **built: 1.6J, 2.0.1 and 2.1, CSMS (`server`) only**, security profiles 0 to 3, compression; CitrineOS answers by itself (`fixtureAnswers: false`), with PostgreSQL and RabbitMQ in its image |
 
 The versions listed are what each upstream advertises. A version or feature

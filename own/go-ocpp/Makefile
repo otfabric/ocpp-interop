@@ -7,7 +7,7 @@
 IMAGE ?= ghcr.io/otfabric/ocpp-interop-otfabric:dev
 # The harness release of the reference images to test against.
 VERSION ?= $(shell git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1)
-REFERENCES ?= mobilityhouse chargetime lorenzodonini everest citrineos
+REFERENCES ?= mobilityhouse chargetime lorenzodonini everest citrineos cbsigma
 BASE_REGISTRY ?= docker.io/library
 
 # The latest go-ocpp release, as the workflow builds it.
