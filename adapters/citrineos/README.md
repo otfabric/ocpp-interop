@@ -114,9 +114,10 @@ with reason `unknown-station`, `authentication` or `subprotocol`).
   - NotifyCustomerInformation, NotifyDisplayMessages:
     `PropertyConstraintViolation` for a `requestId` CitrineOS did not send.
   - SignCertificate: `FormatViolation` (CitrineOS parses the CSR).
-  - 1.6 Security Whitepaper messages from the station (SecurityEventNotification,
-    LogStatusNotification, SignCertificate, SignedFirmwareStatusNotification):
-    `NotImplemented`.
+  - 1.6 Security Whitepaper messages from the station (LogStatusNotification,
+    SignCertificate, SignedFirmwareStatusNotification): `NotImplemented`.
+    SecurityEventNotification is answered from v2.1.0 (`{}`, the fixture's
+    answer), so `handles` lists it.
   - OCPP 2.1 NotifyDERAlarm, NotifyDERStartStop, ReportDERControl,
     OpenPeriodicEventStream, ClosePeriodicEventStream, NotifyPriorityCharging,
     PullDynamicScheduleUpdate, GetCertificateChainStatus: `FormatViolation`

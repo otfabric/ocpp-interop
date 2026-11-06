@@ -9,15 +9,17 @@ same matrix for each architecture into its job summary.
 
 Run: 2026-11-06, images built from this repository (v0.6.1) on
 linux/arm64 (macOS, Docker 29.9): `make images documents` (images, smoke,
-interop and the document schemas) with the five adapters. The linux/amd64 images have not been
+interop and the document schemas) with the five adapters; the OCPP 1.6
+citrineos column is from the shard `INTEROP_PAIRS=citrineos@1.6` re-run for
+v0.6.3 (citrineos declares SecurityEventNotification). The linux/amd64 images have not been
 self-tested locally; CI does that natively.
 
 `everest` (EVerest libocpp, everest-core 2026.02.2) is a station only, and
 `citrineos` (CitrineOS core v2.1.0) a CSMS only. Every pairing with `everest`
 as the CSMS or `citrineos` as the station is one `pairing` SKIP_UNSUPPORTED
 (not in the tables). The tables are from one run of the five adapters on
-contract 0.5 (2026-11-06, linux/arm64): 2448 PASS, 27
-KNOWN_ISSUE, 308 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR (v0.4.0: 2196 PASS,
+contract 0.5 (2026-11-06, linux/arm64): 2455 PASS, 28
+KNOWN_ISSUE, 300 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR (v0.4.0: 2196 PASS,
 29 KNOWN_ISSUE, 558 SKIP_UNSUPPORTED; the everest station now declares
 every action libocpp can exchange, see RELEASE.md v0.4.1). The everest skips
 are compression, which libocpp cannot offer, and in 2.1 the SEND, the
@@ -26,7 +28,7 @@ know (adapters/everest/README.md). Most of
 the citrineos skips are actions it does not declare: CitrineOS answers by
 itself, and its lists are the actions whose answer is the fixture's, or
 that its REST message API sends ([adapters/citrineos/README.md](../adapters/citrineos/README.md));
-in the pairings with it, 569 PASS, 5 KNOWN_ISSUE, 243 SKIP_UNSUPPORTED.
+in the pairings with it, 576 PASS, 6 KNOWN_ISSUE, 235 SKIP_UNSUPPORTED.
 
 Each cell: results of the CALLs and checks initiated by the station / by
 the CSMS. The baseline fixtures have a sample of every action of their
@@ -59,18 +61,18 @@ where both ends declare the profile or `compression`.
 
 | Station ↓ / CSMS → | chargetime v2.0 | citrineos v2.1.0 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 |
 |---|---|---|---|---|
-| chargetime v2.0 | 27 pass 2 skip / 28 pass 1 skip | 19 pass 10 skip / 19 pass 10 skip | 28 pass 1 skip / 28 pass 1 skip | 28 pass 1 skip / 28 pass 1 skip |
-| lorenzodonini v0.19.0 | 27 pass 2 skip / 29 pass | 19 pass 10 skip / 20 pass 9 skip | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass |
-| mobilityhouse 2.1.0 | 26 pass 2 skip 1 known / 29 pass | 20 pass 9 skip / 20 pass 9 skip | 27 pass 1 skip 1 known / 29 pass | 28 pass 1 known / 29 pass |
-| everest 2026.02.2 | 27 pass 2 skip / 29 pass | 19 pass 10 skip / 20 pass 9 skip | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass |
+| chargetime v2.0 | 27 pass 2 skip / 28 pass 1 skip | 21 pass 8 skip / 19 pass 10 skip | 28 pass 1 skip / 28 pass 1 skip | 28 pass 1 skip / 28 pass 1 skip |
+| lorenzodonini v0.19.0 | 27 pass 2 skip / 29 pass | 21 pass 8 skip / 20 pass 9 skip | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass |
+| mobilityhouse 2.1.0 | 26 pass 2 skip 1 known / 29 pass | 21 pass 7 skip 1 known / 20 pass 9 skip | 27 pass 1 skip 1 known / 29 pass | 28 pass 1 known / 29 pass |
+| everest 2026.02.2 | 27 pass 2 skip / 29 pass | 21 pass 8 skip / 20 pass 9 skip | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass |
 
-Totals: 831 PASS, 3 KNOWN_ISSUE, 103 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
+Totals: 838 PASS, 4 KNOWN_ISSUE, 95 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
 Security profiles 2 and 3 pass in all sixteen pairings (every station,
 everest included, with every CSMS).
 
 | Station | CSMS | Test | Status | Evidence |
 |---|---|---|---|---|
-| mobilityhouse | all three | `v16.from-station.security-event-minimal` | KNOWN_ISSUE | [mobilityhouse/ocpp `v16/call.py`](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/v16/call.py#L232-L236) |
+| mobilityhouse | all four | `v16.from-station.security-event-minimal` | KNOWN_ISSUE | [mobilityhouse/ocpp `v16/call.py`](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/v16/call.py#L232-L236) |
 | chargetime | all three | `v16.fixture-callerror.from-csms` | SKIP_UNSUPPORTED | chargetime does not declare `fixtureCallErrors` |
 | all three | chargetime | `v16.fixture-callerror.from-station` | SKIP_UNSUPPORTED | chargetime does not declare `fixtureCallErrors` |
 | all four | citrineos | `v16.not-implemented.from-station`, `v16.fixture-callerror.from-station` | SKIP_UNSUPPORTED (8) | citrineos declares `fixtureAnswers` and `fixtureCallErrors` false: CitrineOS answers by itself |
