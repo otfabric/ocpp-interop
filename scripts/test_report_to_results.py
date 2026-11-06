@@ -54,6 +54,12 @@ class Convert(unittest.TestCase):
     def test_all_skipped_fails(self):
         self.assertTrue(interop_result.problems(convert([result("SKIP_UNSUPPORTED", evidence="no capability")])))
 
+    def test_an_image_that_is_not_independent_says_so(self):
+        doc = convert([result("PASS", server={"name": "b", "version": "v1.2.3", "image": "j", "independent": False})])
+        got = {i["name"]: i["independent"] for i in doc["implementations"]}
+        self.assertEqual(got, {"a": True, "b": False})
+        self.assertEqual(interop_result.schema_errors(doc), [])
+
     def test_every_known_bug_line_parses(self):
         self.assertTrue(rr.load_waivers())
         ids = [w["id"] for w in rr.load_waivers()]

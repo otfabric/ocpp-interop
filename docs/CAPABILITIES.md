@@ -141,7 +141,10 @@ compression with the chargetime 2.0.1 CSMS or station).
 document.) `upstream.revision` is the commit of the upstream release; for a
 package installed from a registry (PyPI, Maven Central) it is the commit of
 the release's git tag, which the build records but cannot verify from the
-artifact.
+artifact. `upstream.independentEngine` is `false` for OT Fabric's own stack
+(`otfabric`, built from `own/`): results with it do not count as an
+independent implementation, and `scripts/interop.sh` then runs only the
+pairings with it.
 
 ## Feature keys
 

@@ -6,12 +6,28 @@
 |---|---|
 | This repository (adapters, scripts, fixtures, schemas, documentation) | MIT, see [LICENSE](LICENSE) |
 | Upstream OCPP implementations and their dependencies inside the images | their own licences, listed below per image |
+| `own/go-ocpp/` (links go-ocpp) | MIT |
 | OCA specifications and JSON schemas | CC BY-ND 4.0; **not committed** to this repository. The `mobilityhouse` image contains the OCA JSON schemas the ocpp package ships, unmodified, as part of that package |
 
 Each image carries the full licence texts under `/licenses/<component>/`,
 this file as `/licenses/THIRD_PARTY_NOTICES.md`, and this repository's
 licence as `/licenses/ocpp-interop/LICENSE`. Base images (Debian, Ubuntu,
 Python, Eclipse Temurin) carry their own notices in their usual places.
+
+## `ocpp-interop-otfabric`
+
+OT Fabric's own stack, not a reference and not part of a release
+(`own/go-ocpp/README.md`). Base images `golang:1.27.2-trixie` (build) and
+`debian:trixie-slim` (runtime).
+
+| Component | Version | Licence | Source |
+|---|---|---|---|
+| go-ocpp | latest release when built | MIT | https://github.com/otfabric/go-ocpp |
+| coder/websocket | the version go-ocpp's go.mod requires | ISC | https://github.com/coder/websocket |
+| Go standard library | 1.27.2 | BSD-3-Clause | https://go.dev |
+| Adapter | this repository, `own/go-ocpp/` | MIT | https://github.com/otfabric/ocpp-interop |
+
+`/licenses/BUNDLED-MODULES.txt` in the image lists every module in the binary.
 
 ## `ocpp-interop-mobilityhouse`
 

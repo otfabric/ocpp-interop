@@ -26,7 +26,8 @@
       "properties": {
         "name": {"type": "string"},
         "version": {"type": "string"},
-        "image": {"type": "string", "description": "Image reference with digest, for adapters"}
+        "image": {"type": "string", "description": "Image reference with digest, for adapters"},
+        "independent": {"type": "boolean", "description": "What the image says of itself (upstream.independentEngine): false for OT Fabric's own stack"}
       }
     },
     "result": {

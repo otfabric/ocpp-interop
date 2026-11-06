@@ -25,6 +25,7 @@ of request flow, without owning any of that code.
 
 - [What this repository is, and is not](#what-this-repository-is-and-is-not)
 - [Reference implementations](#reference-implementations)
+- [OT Fabric's own stack](#ot-fabrics-own-stack)
 - [Using the images from a library's tests](#using-the-images-from-a-librarys-tests)
 - [Repository layout](#repository-layout)
 - [Development](#development)
@@ -66,6 +67,15 @@ becomes a capability only when a self-test exercises it
 ([docs/CAPABILITIES.md](docs/CAPABILITIES.md)). Pins are recorded in
 [versions.yaml](versions.yaml); each adapter's README says how it uses its
 upstream and what the upstream cannot do.
+
+## OT Fabric's own stack
+
+`ghcr.io/otfabric/ocpp-interop-otfabric` is go-ocpp behind the same contract, a
+CSMS and a station for OCPP 1.6J, 2.0.1 and 2.1, so you can test your stack
+against ours the way we test ours against yours. Despite the name it shares with
+the reference images, it is not an independent implementation and not part of a
+release of this repository, so its tags are go-ocpp versions and `manifest.json`
+does not list it: see [own/go-ocpp/README.md](own/go-ocpp/README.md).
 
 ## Using the images from a library's tests
 
@@ -128,11 +138,13 @@ it as a station connected to the mobilityhouse CSMS.
 
 ```text
 adapters/<name>/      adapter source, Dockerfile, lock file and README
+own/go-ocpp/          OT Fabric's own stack behind the contract, not in a release (own/go-ocpp/README.md)
 fixtures/<version>/   deterministic fixtures, one directory per fixture
 fixtures/schema/      the fixture schema
 schemas/              capability, result and report document schemas
 scripts/              validation, smoke and cross-stack self-tests, release helpers
 tests/                known upstream defects
+reports/              documents of a local run (generated, git-ignored)
 docs/                 contract, capabilities, fixtures, compatibility
 versions.yaml         every pin
 ```
