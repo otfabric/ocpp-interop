@@ -7,16 +7,16 @@ the station and by the CSMS. The matrix below is the output of `make matrix` (fr
 `reports/report-interop.json`, written by `make documents`); CI writes the
 same matrix for each architecture into its job summary.
 
-Run: 2026-10-19, images built from this repository (v0.4.1) on
-linux/arm64 (macOS, Docker 29.8): `make images documents` (images, smoke,
+Run: 2026-11-06, images built from this repository (v0.6.1) on
+linux/arm64 (macOS, Docker 29.9): `make images documents` (images, smoke,
 interop and the document schemas) with the five adapters. The linux/amd64 images have not been
 self-tested locally; CI does that natively.
 
-`everest` (EVerest libocpp, everest-core 2026.02.1) is a station only, and
-`citrineos` (CitrineOS core v2.0.1) a CSMS only. Every pairing with `everest`
+`everest` (EVerest libocpp, everest-core 2026.02.2) is a station only, and
+`citrineos` (CitrineOS core v2.1.0) a CSMS only. Every pairing with `everest`
 as the CSMS or `citrineos` as the station is one `pairing` SKIP_UNSUPPORTED
 (not in the tables). The tables are from one run of the five adapters on
-contract 0.5 (2026-10-19, linux/arm64): 2444 PASS, 31
+contract 0.5 (2026-11-06, linux/arm64): 2448 PASS, 27
 KNOWN_ISSUE, 308 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR (v0.4.0: 2196 PASS,
 29 KNOWN_ISSUE, 558 SKIP_UNSUPPORTED; the everest station now declares
 every action libocpp can exchange, see RELEASE.md v0.4.1). The everest skips
@@ -26,7 +26,7 @@ know (adapters/everest/README.md). Most of
 the citrineos skips are actions it does not declare: CitrineOS answers by
 itself, and its lists are the actions whose answer is the fixture's, or
 that its REST message API sends ([adapters/citrineos/README.md](../adapters/citrineos/README.md));
-in the pairings with it, 565 PASS, 9 KNOWN_ISSUE, 243 SKIP_UNSUPPORTED.
+in the pairings with it, 569 PASS, 5 KNOWN_ISSUE, 243 SKIP_UNSUPPORTED.
 
 Each cell: results of the CALLs and checks initiated by the station / by
 the CSMS. The baseline fixtures have a sample of every action of their
@@ -57,38 +57,36 @@ where both ends declare the profile or `compression`.
 
 ## OCPP 1.6J
 
-| Station ↓ / CSMS → | chargetime v2.0 | citrineos v2.0.1 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 |
+| Station ↓ / CSMS → | chargetime v2.0 | citrineos v2.1.0 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 |
 |---|---|---|---|---|
-| chargetime v2.0 | 27 pass 2 skip / 28 pass 1 skip | 17 pass 10 skip 2 known / 19 pass 10 skip | 28 pass 1 skip / 28 pass 1 skip | 28 pass 1 skip / 28 pass 1 skip |
+| chargetime v2.0 | 27 pass 2 skip / 28 pass 1 skip | 19 pass 10 skip / 19 pass 10 skip | 28 pass 1 skip / 28 pass 1 skip | 28 pass 1 skip / 28 pass 1 skip |
 | lorenzodonini v0.19.0 | 27 pass 2 skip / 29 pass | 19 pass 10 skip / 20 pass 9 skip | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass |
 | mobilityhouse 2.1.0 | 26 pass 2 skip 1 known / 29 pass | 20 pass 9 skip / 20 pass 9 skip | 27 pass 1 skip 1 known / 29 pass | 28 pass 1 known / 29 pass |
-| everest 2026.02.1 | 27 pass 2 skip / 29 pass | 19 pass 10 skip / 20 pass 9 skip | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass |
+| everest 2026.02.2 | 27 pass 2 skip / 29 pass | 19 pass 10 skip / 20 pass 9 skip | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass |
 
-Totals: 829 PASS, 5 KNOWN_ISSUE, 103 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
+Totals: 831 PASS, 3 KNOWN_ISSUE, 103 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
 Security profiles 2 and 3 pass in all sixteen pairings (every station,
-everest included, with every CSMS), except the chargetime station with the
-citrineos CSMS (known upstream bug: CitrineOS needs SNI).
+everest included, with every CSMS).
 
 | Station | CSMS | Test | Status | Evidence |
 |---|---|---|---|---|
 | mobilityhouse | all three | `v16.from-station.security-event-minimal` | KNOWN_ISSUE | [mobilityhouse/ocpp `v16/call.py`](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/v16/call.py#L232-L236) |
 | chargetime | all three | `v16.fixture-callerror.from-csms` | SKIP_UNSUPPORTED | chargetime does not declare `fixtureCallErrors` |
 | all three | chargetime | `v16.fixture-callerror.from-station` | SKIP_UNSUPPORTED | chargetime does not declare `fixtureCallErrors` |
-| chargetime | citrineos | `v16.tls.profile2`, `v16.tls.profile3` | KNOWN_ISSUE (2) | CitrineOS's TLS server presents its certificate only to a ClientHello with SNI, which the Java-OCA-OCPP station does not send: [CitrineOS `websocket-network-connection.ts`](https://github.com/citrineos/citrineos-core/blob/1a83638c31eebdb1dd8d6cdb0f5b8a9f142a1372/packages/ocpp/src/transport/network-connection/websocket-network-connection.ts#L937-L956) |
 | all four | citrineos | `v16.not-implemented.from-station`, `v16.fixture-callerror.from-station` | SKIP_UNSUPPORTED (8) | citrineos declares `fixtureAnswers` and `fixtureCallErrors` false: CitrineOS answers by itself |
 | all four | citrineos | the actions citrineos does not declare | SKIP_UNSUPPORTED | see [adapters/citrineos/README.md](../adapters/citrineos/README.md) |
 | all but mobilityhouse with itself | | `v16.compression` | SKIP_UNSUPPORTED (8) | only mobilityhouse declares `compression` in 1.6: chargetime's 1.6 classes have no extensions, lorenzodonini's CSMS cannot accept it |
 
 ## OCPP 2.0.1
 
-| Station ↓ / CSMS → | chargetime v2.0 | citrineos v2.0.1 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 |
+| Station ↓ / CSMS → | chargetime v2.0 | citrineos v2.1.0 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 |
 |---|---|---|---|---|
-| chargetime v2.0 | 39 pass 1 skip 1 known / 43 pass 1 skip | 26 pass 12 skip 3 known / 40 pass 4 skip | 40 pass 1 skip / 42 pass 1 skip 1 known | 40 pass 1 known / 43 pass 1 skip |
+| chargetime v2.0 | 39 pass 1 skip 1 known / 43 pass 1 skip | 28 pass 12 skip 1 known / 40 pass 4 skip | 40 pass 1 skip / 42 pass 1 skip 1 known | 40 pass 1 known / 43 pass 1 skip |
 | lorenzodonini v0.19.0 | 38 pass 2 skip 1 known / 43 pass 1 known | 27 pass 13 skip 1 known / 39 pass 3 skip 2 known | 39 pass 1 skip 1 known / 43 pass 1 known | 39 pass 1 skip 1 known / 41 pass 3 known |
 | mobilityhouse 2.1.0 | 39 pass 1 skip 1 known / 44 pass | 29 pass 12 skip / 41 pass 3 skip | 40 pass 1 skip / 43 pass 1 known | 41 pass / 44 pass |
-| everest 2026.02.1 | 39 pass 2 skip / 44 pass | 28 pass 13 skip / 41 pass 3 skip | 40 pass 1 skip / 43 pass 1 known | 39 pass 1 skip 1 known / 44 pass |
+| everest 2026.02.2 | 39 pass 2 skip / 44 pass | 28 pass 13 skip / 41 pass 3 skip | 40 pass 1 skip / 43 pass 1 known | 39 pass 1 skip 1 known / 44 pass |
 
-Totals: 1261 PASS, 21 KNOWN_ISSUE, 87 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
+Totals: 1263 PASS, 19 KNOWN_ISSUE, 87 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
 Security profiles 2 and 3 pass in all sixteen pairings, except the
 chargetime station with the citrineos CSMS (as in 1.6).
 
@@ -102,7 +100,6 @@ chargetime station with the citrineos CSMS (as in 1.6).
 | everest | mobilityhouse | `v201.from-station.notify-evcharging-needs` | KNOWN_ISSUE | the CSMS validates the draft-06 OCA schemas with jsonschema's `Draft4Validator`, so the integer `energyAmount` written `20000.0` (libocpp's `float`, a valid integer in draft-06) gets `TypeConstraintViolation`: [mobilityhouse/ocpp `messages.py`](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/messages.py#L130-L173) |
 | chargetime | all three | `v201.fixture-callerror.from-csms` | SKIP_UNSUPPORTED | chargetime does not declare `fixtureCallErrors` |
 | all three | chargetime | `v201.fixture-callerror.from-station` | SKIP_UNSUPPORTED | chargetime does not declare `fixtureCallErrors` |
-| chargetime | citrineos | `v201.tls.profile2`, `v201.tls.profile3` | KNOWN_ISSUE (2) | as in 1.6: CitrineOS needs SNI |
 | chargetime | citrineos | `v201.compression` | KNOWN_ISSUE | the chargetime station defect above |
 | all four | citrineos | `v201.not-implemented.from-station`, `v201.fixture-callerror.from-station`, undeclared actions | SKIP_UNSUPPORTED | as in 1.6 |
 | lorenzodonini at either end | | `v201.compression` | SKIP_UNSUPPORTED (5) | lorenzodonini does not declare `compression`: ocpp-go's CSMS cannot accept it |
@@ -124,12 +121,12 @@ implementations: the everest station with the mobilityhouse CSMS, and the
 mobilityhouse and everest stations with the citrineos CSMS (the first 2.1
 pairing in which mobilityhouse takes no part).
 
-| Station ↓ / CSMS → | chargetime v2.0 | citrineos v2.0.1 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 |
+| Station ↓ / CSMS → | chargetime v2.0 | citrineos v2.1.0 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 |
 |---|---|---|---|---|
 | chargetime v2.0 | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — |
 | lorenzodonini v0.19.0 | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — |
 | mobilityhouse 2.1.0 | 1 skip / — | 29 pass 25 skip / 41 pass 18 skip 1 known | 1 skip / — | 50 pass 3 skip 1 known / 58 pass 1 skip 1 known |
-| everest 2026.02.1 | 1 skip / — | 28 pass 26 skip / 42 pass 18 skip | 1 skip / — | 48 pass 4 skip 2 known / 58 pass 2 skip |
+| everest 2026.02.2 | 1 skip / — | 28 pass 26 skip / 42 pass 18 skip | 1 skip / — | 48 pass 4 skip 2 known / 58 pass 2 skip |
 
 Totals: 354 PASS, 5 KNOWN_ISSUE, 118 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
 `v21.tls.profile2` and `v21.tls.profile3` pass for both stations with the
@@ -143,7 +140,7 @@ mobilityhouse station with both CSMSs (everest cannot offer compression).
 | mobilityhouse | mobilityhouse | `v21.send.notify-periodic-event-stream` | SKIP_UNSUPPORTED | no adapter declares `send` |
 | mobilityhouse | mobilityhouse | `v21.rpc.call-result-error` (from each end) | SKIP_UNSUPPORTED (2) | no adapter declares `callResultError` |
 | chargetime, lorenzodonini | all three | `v21.pairing` | SKIP_UNSUPPORTED (8) | 2.1 not declared by one of the two |
-| everest | mobilityhouse | `v21.from-station.report-dercontrol` | KNOWN_ISSUE | [libocpp `ocpp::v2::MessageType`](https://github.com/EVerest/everest-core/blob/b61bb12b8cb89ee9d0fab037b05c3bb8cea9b13e/lib/everest/ocpp/include/ocpp/v2/types.hpp#L15-L195) has no ReportDERControl |
+| everest | mobilityhouse | `v21.from-station.report-dercontrol` | KNOWN_ISSUE | [libocpp `ocpp::v2::MessageType`](https://github.com/EVerest/everest-core/blob/45dba2c049223d05beb7611c75d59f6639c46ee0/lib/everest/ocpp/include/ocpp/v2/types.hpp#L15-L195) has no ReportDERControl |
 | everest | mobilityhouse | `v21.not-implemented.from-station` | KNOWN_ISSUE | the mobilityhouse defect above (no answer to an unanswered 2.1 action) |
 | mobilityhouse | citrineos | `v21.not-implemented.from-csms` | KNOWN_ISSUE | the mobilityhouse defect above, in its station |
 | mobilityhouse, everest | citrineos | `v21.not-implemented.from-station`, `v21.fixture-callerror.from-station`, undeclared actions | SKIP_UNSUPPORTED | as in 1.6; of the actions 2.1 adds, citrineos declares only SetDefaultTariff |
@@ -196,12 +193,11 @@ about conformance to the specification.
 | mobilityhouse (station, 2.1) | ocpp 2.1.0 | `snake_to_camel_case` writes the `soc` and `soh` fields of `BatteryDataType` as `SoC` and `soh` (the schema has `soC`, `soH`), so a BatterySwapRequest fails the upstream's own validation and cannot be sent. The baseline sample has `soC` and `soH`, as the OCA 2.1 schema the upstream bundles (identical to the OCA's): the upstream reads them as `soc` and `soh` and writes them back as `SoC` and `soh` ("Additional properties are not allowed ('SoC', 'soh' were unexpected)"). Not in known-bugs.tsv: the station does not declare BatterySwap, so no test runs it; the CSMS receives it fine (everest station: PASS). Still so on master (2026-10-04) | [source](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/charge_point.py#L57-L64) |
 | lorenzodonini (both roles, 2.0.1) | ocpp-go v0.19.0 | `GetCompositeScheduleResponse` does not have the OCA structure: a top-level `evseId`, always written, which the schema does not allow; no `statusInfo`; a `schedule` of `{startDateTime, chargingSchedule}` instead of `CompositeScheduleType`. The station cannot answer with a schedule, and the CSMS drops the schedule of a correct answer. Master removed the `evseId` and added `statusInfo` ([9356607](https://github.com/lorenzodonini/ocpp-go/commit/9356607e1ec2a128184064317c2ea719b550d003), 2025-03-28) but kept the `schedule` type; not released | [source](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/smartcharging/get_composite_schedule.go#L31-L50) |
 | mobilityhouse (both roles, 2.1) | ocpp 2.1.0 | `snake_to_camel_case` also misspells other optional 2.1 fields: `receiptUrl` (NotifySettlement, written `receiptURL`), the per-phase `limit_L2`-style fields (`limitL2`), `fixedPF...`, `prioritizedEMAIDs`, `taxRuleID`, `soC` of `LimitAtSoCType`; a payload with one fails the upstream's own validation. Not in known-bugs.tsv: the baseline's payloads use none of them (NotifySettlement is answered with `receiptId` only) | [source](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/charge_point.py#L46-L80) |
-| everest (station, 2.1) | libocpp of everest-core 2026.02.1 | `ocpp::v2::MessageType` has no ReportDERControl, GetCertificateChainStatus or NotifyWebPaymentStarted, though libocpp has their message structs: `ocpp::MessageQueue` converts every CALL's action to that enum (`ControlMessage`, `receive`), so libocpp can neither send these CALLs nor read one it receives; libocpp has no other path for a CALL. everest-core's main added ReportDERControl ([04ebcd2a](https://github.com/EVerest/everest-core/commit/04ebcd2aaaaa4bfa59c5a33ec1f743002b31117c), #2100, 2026-06-03), in no release; the other two are still missing on main (0da38568, 2026-10-16). Only ReportDERControl is declared | [source](https://github.com/EVerest/everest-core/blob/b61bb12b8cb89ee9d0fab037b05c3bb8cea9b13e/lib/everest/ocpp/include/ocpp/v2/types.hpp#L15-L195) |
+| everest (station, 2.1) | libocpp of everest-core 2026.02.2 | `ocpp::v2::MessageType` has no ReportDERControl, GetCertificateChainStatus or NotifyWebPaymentStarted, though libocpp has their message structs: `ocpp::MessageQueue` converts every CALL's action to that enum (`ControlMessage`, `receive`), so libocpp can neither send these CALLs nor read one it receives; libocpp has no other path for a CALL. everest-core's main added ReportDERControl ([04ebcd2a](https://github.com/EVerest/everest-core/commit/04ebcd2aaaaa4bfa59c5a33ec1f743002b31117c), #2100, 2026-06-03), in no release; the other two are still missing on main (0da38568, 2026-10-16). Only ReportDERControl is declared | [source](https://github.com/EVerest/everest-core/blob/45dba2c049223d05beb7611c75d59f6639c46ee0/lib/everest/ocpp/include/ocpp/v2/types.hpp#L15-L195) |
 | lorenzodonini (station, 2.0.1) | ocpp-go v0.19.0 | `NotifyReportRequest.Tbc` is a `bool` with `omitempty`: an explicit `"tbc": false` is dropped from the request (false is the default) | [source](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/provisioning/notify_report.go#L98-L104) |
 | mobilityhouse (CSMS, 2.0.1), with the everest station | ocpp 2.1.0 | `get_validator` validates every payload with jsonschema's `Draft4Validator`, although the bundled OCA 2.0.1 schemas declare draft-06, in which `20000.0` is an integer: a NotifyEVChargingNeeds with the integer `energyAmount` written `20000.0` is answered `TypeConstraintViolation`. libocpp writes it so: its `ocpp::v2` types come from the OCPP 2.1 schemas, where `energyAmount` is a number (`ACChargingParameters::energyAmount` is a `float`); a valid value, so the defect is the validator's. Still `Draft4Validator` on master (2026-10-04) | [source](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/messages.py#L130-L173) |
 
-| citrineos (CSMS, profiles 2 and 3), with a station that sends no SNI | CitrineOS v2.0.1 | `_generateServerOptions` gives the https server no key and certificate of its own, only an `SNICallback`: Node.js calls it only for a ClientHello with a server name, so a station without SNI gets the alert `handshake_failure` (`openssl s_client -noservername`: alert 40; with `-servername` the handshake completes). The Java-OCA-OCPP stations send no SNI in the self-tests | [source](https://github.com/citrineos/citrineos-core/blob/1a83638c31eebdb1dd8d6cdb0f5b8a9f142a1372/packages/ocpp/src/transport/network-connection/websocket-network-connection.ts#L937-L956) |
-| citrineos (CSMS, 2.1) | CitrineOS v2.0.1 | `OCPP2_1_CALL_SCHEMA_RECORD` has no schema for NotifyDERAlarm, NotifyDERStartStop, ReportDERControl, OpenPeriodicEventStream, ClosePeriodicEventStream, NotifyPriorityCharging, PullDynamicScheduleUpdate and GetCertificateChainStatus; `validateOCPPRequest` returns "invalid" when it finds no schema, so the router answers a valid CALL with `FormatViolation`, not `NotImplemented` (OCPP-J). Not in known-bugs.tsv: citrineos does not declare these actions, so no test runs them | [source](https://github.com/citrineos/citrineos-core/blob/1a83638c31eebdb1dd8d6cdb0f5b8a9f142a1372/packages/base/src/interfaces/modules/ocpp-validator.ts#L129-L190) |
+| citrineos (CSMS, 2.1) | CitrineOS v2.1.0 | `OCPP2_1_CALL_SCHEMA_RECORD` has no schema for NotifyDERAlarm, NotifyDERStartStop, ReportDERControl, OpenPeriodicEventStream, ClosePeriodicEventStream, NotifyPriorityCharging, PullDynamicScheduleUpdate and GetCertificateChainStatus; `validateOCPPRequest` returns "invalid" when it finds no schema, so the router answers a valid CALL with `FormatViolation`, not `NotImplemented` (OCPP-J). Not in known-bugs.tsv: citrineos does not declare these actions, so no test runs them | [source](https://github.com/citrineos/citrineos-core/blob/4fd7599b91c2fb6e6065e7c9b94be69880cced27/packages/base/src/interfaces/modules/ocpp-validator.ts#L129-L190) |
 
 Not defects, but why citrineos declares fewer actions: CitrineOS answers by
 itself, from its own data and policy. It answers an id token it does not

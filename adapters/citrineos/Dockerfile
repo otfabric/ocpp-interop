@@ -33,11 +33,11 @@ ARG NODE_SLIM_DIGEST=sha256:2c87ef9bd3c6a3bd4b472b4bec2ce9d16354b0c574f736c47648
 # ---------------------------------------------------------------------------
 FROM ${BASE_REGISTRY}/node:24.16.0-bookworm@${NODE_DIGEST} AS upstream
 
-# The release pin: citrineos-core release v2.0.1 and its commit. A candidate
+# The release pin: citrineos-core release v2.1.0 and its commit. A candidate
 # build ("make candidate-citrineos CANDIDATE_VERSION=... CANDIDATE_SHA=...")
 # overrides both.
-ARG UPSTREAM_VERSION=v2.0.1
-ARG UPSTREAM_SHA=1a83638c31eebdb1dd8d6cdb0f5b8a9f142a1372
+ARG UPSTREAM_VERSION=v2.1.0
+ARG UPSTREAM_SHA=4fd7599b91c2fb6e6065e7c9b94be69880cced27
 WORKDIR /src
 RUN set -eu; \
     echo "${UPSTREAM_SHA}" | grep -Eq '^[0-9a-f]{40}$'; \
@@ -87,8 +87,8 @@ RUN set -eu; \
 # ---------------------------------------------------------------------------
 FROM ${BASE_REGISTRY}/node:24.16.0-bookworm-slim@${NODE_SLIM_DIGEST} AS runtime
 
-ARG UPSTREAM_VERSION=v2.0.1
-ARG UPSTREAM_SHA=1a83638c31eebdb1dd8d6cdb0f5b8a9f142a1372
+ARG UPSTREAM_VERSION=v2.1.0
+ARG UPSTREAM_SHA=4fd7599b91c2fb6e6065e7c9b94be69880cced27
 ARG ADAPTER_VERSION=dev
 
 # PostgreSQL 15 with PostGIS 3 and RabbitMQ, Debian bookworm's.

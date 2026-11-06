@@ -17,7 +17,7 @@ ARG BASE_REGISTRY=docker.io/library
 # maven:3.9.16-eclipse-temurin-25-noble and eclipse-temurin:25.0.4.1_1-jre-noble,
 # multi-arch indexes (linux/amd64 and linux/arm64).
 ARG MAVEN_DIGEST=sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
-ARG JRE_DIGEST=sha256:3f2223fe04b750aa5a8179e29b5c9a1ddf7665fc9bb08bfe11ad01d143bc13a5
+ARG JRE_DIGEST=sha256:ce8543ddd3070ccbeaac2106a74c9387ddeb8d47a1c43348345715c1ef245c7f
 
 # ---------------------------------------------------------------------------
 # Stage 1: build the adapter jar and collect its runtime class path

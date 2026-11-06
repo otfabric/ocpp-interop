@@ -8,7 +8,7 @@
 # (EVerest libocpp) is a station for OCPP 1.6J, 2.0.1 and 2.1, and citrineos
 # (CitrineOS) a CSMS for the same three.
 
-interop_version: "0.6.0"
+interop_version: "0.6.1"
 contract_version: "0.5"        # docs/CONTAINER_CONTRACT.md (draft until 1.0); documents carry schemaVersion "1.0"
 fixture_schema: "1.0"          # fixtures/schema/ocpp-fixture.schema.json
 
@@ -97,12 +97,12 @@ implementations:
     status: built
     upstream: "EVerest libocpp"
     repository: "https://github.com/EVerest/everest-core"
-    artifact: "git:https://github.com/EVerest/everest-core@2026.02.1 (lib/everest/ocpp, log, timer, sqlite, evse_security)"
-    version: "2026.02.1"         # 2026-07-16, git tag of everest-core; its libocpp is project version 0.31.1
-    revision: "b61bb12b8cb89ee9d0fab037b05c3bb8cea9b13e"
+    artifact: "git:https://github.com/EVerest/everest-core@2026.02.2 (lib/everest/ocpp, log, timer, sqlite, evse_security)"
+    version: "2026.02.2"         # 2026-11-05, git tag of everest-core; its libocpp is project version 0.31.1
+    revision: "45dba2c049223d05beb7611c75d59f6639c46ee0"
     lock: "adapters/everest/Dockerfile"   # every source by tag and commit; Boost, OpenSSL, SQLite from Debian trixie
     transport: "libwebsockets 4.5.2 (through libocpp's ocpp::Websocket)"
-    latest: "2026.02.1"          # the standalone EVerest/libocpp is archived (last release v0.31.1, 2025-12-11)
+    latest: "2026.02.2"          # the standalone EVerest/libocpp is archived (last release v0.31.1, 2025-12-11)
     license: "Apache-2.0"
     language: "C++"
     independent_engine: true
@@ -124,13 +124,13 @@ implementations:
     status: built
     upstream: "CitrineOS core"
     repository: "https://github.com/citrineos/citrineos-core"
-    artifact: "git:https://github.com/citrineos/citrineos-core@v2.0.1 (apps/ocpp-server and the packages it deploys)"
-    version: "v2.0.1"            # 2026-10-06, git tag (lightweight)
-    revision: "1a83638c31eebdb1dd8d6cdb0f5b8a9f142a1372"
+    artifact: "git:https://github.com/citrineos/citrineos-core@v2.1.0 (apps/ocpp-server and the packages it deploys)"
+    version: "v2.1.0"            # 2026-10-21, git tag (lightweight)
+    revision: "4fd7599b91c2fb6e6065e7c9b94be69880cced27"
     lock: "pnpm-lock.yaml of the release"   # every npm package by version and integrity hash; pnpm 10.19.0 (packageManager)
     runtime: "PostgreSQL 15 with PostGIS 3 and RabbitMQ, Debian bookworm's, inside the container"
     transport: "ws 8.21.3 (through CitrineOS's WebsocketNetworkConnection)"
-    latest: "v2.0.1"
+    latest: "v2.1.0"
     license: "Apache-2.0"
     language: "TypeScript"
     independent_engine: true
@@ -168,7 +168,7 @@ base_images:
   # Dockerfile names them as *_DIGEST build arguments.
   python:
     image: "docker.io/library/python:3.14.8-slim-trixie"
-    digest: "sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170"
+    digest: "sha256:fbecd461fc72d21b2143c6eaba25143738079154a6d0ea3da3aec724f50eed4a"
     used_by: [mobilityhouse]
   maven:
     image: "docker.io/library/maven:3.9.16-eclipse-temurin-25-noble"
@@ -176,15 +176,15 @@ base_images:
     used_by: [chargetime]          # build stage only
   jre:
     image: "docker.io/library/eclipse-temurin:25.0.4.1_1-jre-noble"
-    digest: "sha256:3f2223fe04b750aa5a8179e29b5c9a1ddf7665fc9bb08bfe11ad01d143bc13a5"
+    digest: "sha256:ce8543ddd3070ccbeaac2106a74c9387ddeb8d47a1c43348345715c1ef245c7f"
     used_by: [chargetime]
   golang:
     image: "docker.io/library/golang:1.27.2-trixie"
-    digest: "sha256:e58d6f83b3416618d8bcac2b3dde1b7f7e3c4a77d25e88637f8bbae81536c48d"
+    digest: "sha256:47667934874913a449b96faa7ef4777fa285d9ec29126ee80ed61c45b7cccf0e"
     used_by: [lorenzodonini, otfabric]   # build stage only
   debian:
     image: "docker.io/library/debian:trixie-slim"
-    digest: "sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f"
+    digest: "sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2"
     used_by: [lorenzodonini, everest, otfabric]   # everest: build stage and runtime
   node:
     image: "docker.io/library/node:24.16.0-bookworm"

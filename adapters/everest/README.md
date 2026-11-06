@@ -1,18 +1,18 @@
 # everest adapter
 
 OCPP 1.6J, 2.0.1 and 2.1 reference **station** built on
-[EVerest libocpp](https://github.com/EVerest/everest-core/tree/2026.02.1/lib/everest/ocpp),
+[EVerest libocpp](https://github.com/EVerest/everest-core/tree/2026.02.2/lib/everest/ocpp),
 behind the [container contract](../../docs/CONTAINER_CONTRACT.md).
 
 | | |
 |---|---|
 | Upstream | EVerest libocpp (C++), its own protocol engine |
-| Version | everest-core release `2026.02.1`, released 2026-07-16 (commit `b61bb12b8cb89ee9d0fab037b05c3bb8cea9b13e`); its `lib/everest/ocpp` is libocpp project version 0.31.1 |
+| Version | everest-core release `2026.02.2`, released 2026-11-05 (commit `45dba2c049223d05beb7611c75d59f6639c46ee0`), a release of its `stable/2026.02` branch; its `lib/everest/ocpp` is libocpp project version 0.31.1 |
 | Where libocpp lives | `lib/everest/ocpp` of the [everest-core](https://github.com/EVerest/everest-core) monorepo. The standalone [EVerest/libocpp](https://github.com/EVerest/libocpp) repository is archived; its last release, v0.31.1 (2025-12-11), is older code than the monorepo release pinned here |
 | Built from the same tree | the EVerest libraries libocpp links: `lib/everest/log`, `timer`, `sqlite`, `evse_security`. Nothing else of everest-core |
 | Transport | libocpp's `ocpp::Websocket` on [libwebsockets](https://github.com/warmcat/libwebsockets) 4.5.2 |
 | Other dependencies | built from the tags libocpp's `dependencies.yaml` names, each checked against its commit: nlohmann/json 3.12.0, json-schema-validator 2.4.0, date 3.0.4, libwebsockets 4.5.2; Boost 1.83, OpenSSL 3.5 and SQLite 3.46 from Debian trixie. Only libwebsockets is a shared library in the image; OpenSSL, SQLite and the C++ runtime are the base image's |
-| Build tool only | [everest-cmake](https://github.com/EVerest/everest-cmake) v0.6.0 (commit `e378100829014ad4c3a721a7aa1c02ef56736c61`), the release current when everest-core 2026.02.1 was tagged |
+| Build tool only | [everest-cmake](https://github.com/EVerest/everest-cmake) v0.6.0 (commit `e378100829014ad4c3a721a7aa1c02ef56736c61`), the release current when everest-core 2026.02.1, the first release of the `stable/2026.02` branch, was tagged |
 | Licences | libocpp and the EVerest libraries Apache-2.0; two WebSocket++ headers bundled in libocpp BSD-3-Clause; nlohmann/json, json-schema-validator, date and libwebsockets MIT; Boost BSL-1.0 |
 | Base image | `debian:trixie-slim` (build and runtime), pinned by digest in the [Dockerfile](Dockerfile) |
 | OCPP | 1.6J, 2.0.1 and 2.1, **station (`client`) only**; security profiles 0 to 3 |
@@ -29,14 +29,14 @@ OCPP 2.0.1 functional block works with 2.1, and the 2.1 functional blocks are
 being added. For this adapter, what matters is in the source of the tag:
 
 - the subprotocol `ocpp2.1` (`ocpp::OcppProtocolVersion::v21`,
-  [types.cpp](https://github.com/EVerest/everest-core/blob/b61bb12b8cb89ee9d0fab037b05c3bb8cea9b13e/lib/everest/ocpp/lib/ocpp/common/types.cpp#L1063-L1093));
+  [types.cpp](https://github.com/EVerest/everest-core/blob/45dba2c049223d05beb7611c75d59f6639c46ee0/lib/everest/ocpp/lib/ocpp/common/types.cpp#L1063-L1093));
 - the message structs of every OCPP 2.1 action: the 2.0.1 messages in
   `ocpp::v2` (generated from the 2.1 schemas, shared by 2.0.1 and 2.1) and
   the 27 messages 2.1 adds in `ocpp::v21`
-  ([include/ocpp/v21/messages](https://github.com/EVerest/everest-core/tree/b61bb12b8cb89ee9d0fab037b05c3bb8cea9b13e/lib/everest/ocpp/include/ocpp/v21/messages));
+  ([include/ocpp/v21/messages](https://github.com/EVerest/everest-core/tree/45dba2c049223d05beb7611c75d59f6639c46ee0/lib/everest/ocpp/include/ocpp/v21/messages));
 - **no SEND and no CALLRESULTERROR**: `ocpp::MessageTypeId` has CALL (2),
   CALLRESULT (3) and CALLERROR (4) only, and 5 is `UNKNOWN`
-  ([call_types.hpp](https://github.com/EVerest/everest-core/blob/b61bb12b8cb89ee9d0fab037b05c3bb8cea9b13e/lib/everest/ocpp/include/ocpp/common/call_types.hpp#L47-L52)).
+  ([call_types.hpp](https://github.com/EVerest/everest-core/blob/45dba2c049223d05beb7611c75d59f6639c46ee0/lib/everest/ocpp/include/ocpp/common/call_types.hpp#L47-L52)).
   NotifyPeriodicEventStream, a SEND in 2.1, is one struct without a response
   in libocpp and nothing sends it as a SEND. Still so on everest-core's main
   (0da38568, 2026-10-16).
@@ -52,13 +52,13 @@ model. The contract needs a station that sends only what a test asks for
 fixture. So the adapter uses the parts of libocpp that `ChargePoint` itself
 is built on, the way `ChargePoint` uses them:
 
-- **`ocpp::Websocket`** ([websocket_libwebsockets.cpp](https://github.com/EVerest/everest-core/blob/b61bb12b8cb89ee9d0fab037b05c3bb8cea9b13e/lib/everest/ocpp/lib/ocpp/common/websocket/websocket_libwebsockets.cpp)):
+- **`ocpp::Websocket`** ([websocket_libwebsockets.cpp](https://github.com/EVerest/everest-core/blob/45dba2c049223d05beb7611c75d59f6639c46ee0/lib/everest/ocpp/lib/ocpp/common/websocket/websocket_libwebsockets.cpp)):
   the connection, with the subprotocol of `--version`, the station identity
   appended to the URL by libocpp (`ocpp::Uri::parse_and_validate`), HTTP
   Basic authentication in profiles 1 and 2 (user = identity, password = the
   fixture's), and TLS in profiles 2 and 3. One connection attempt
   (`max_connection_attempts` 0), no WebSocket pings.
-- **`ocpp::MessageQueue<M>`** ([message_queue.hpp](https://github.com/EVerest/everest-core/blob/b61bb12b8cb89ee9d0fab037b05c3bb8cea9b13e/lib/everest/ocpp/include/ocpp/common/message_queue.hpp)):
+- **`ocpp::MessageQueue<M>`** ([message_queue.hpp](https://github.com/EVerest/everest-core/blob/45dba2c049223d05beb7611c75d59f6639c46ee0/lib/everest/ocpp/include/ocpp/common/message_queue.hpp)):
   sends CALLs one at a time (`push_call_async`), matches the CALLRESULT or
   CALLERROR to the CALL in flight, times it out, and sends the answers
   (`push_call_result`, `push_call_error`) after a received CALL. Its retries
@@ -149,7 +149,7 @@ Listed in the `notes` of the capabilities:
   everest-core's main added `ReportDERControl` to the enum with the R04 DER
   control functional block
   ([04ebcd2a](https://github.com/EVerest/everest-core/commit/04ebcd2aaaaa4bfa59c5a33ec1f743002b31117c),
-  #2100, 2026-06-03), which is not in the 2026.02.1 release branch and in
+  #2100, 2026-06-03), which is not in the `stable/2026.02` branch (2026.02.1, 2026.02.2) and in
   no later release; `GetCertificateChainStatus` and
   `NotifyWebPaymentStarted` are still missing on main (0da38568,
   2026-10-16). libocpp has no other path for a CALL: no generic or raw

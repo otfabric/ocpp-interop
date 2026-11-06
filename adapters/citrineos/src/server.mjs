@@ -284,6 +284,10 @@ class Csms {
     if (['Accepted', 'Pending', 'Rejected'].includes(boot.status)) ocpp.unknownChargerStatus = boot.status;
     return {
       env: 'production',
+      // CitrineOS's REST API (from v2.1.0 behind authentication, by default
+      // 'localDev', which refuses env 'production') listens on 127.0.0.1 in
+      // the container and only the adapter calls it: no tokens, as before.
+      auth: { mode: 'localBypass' },
       host: '127.0.0.1',
       port: this.apiPort,
       database: { host: '127.0.0.1', port: PG_PORT, database: 'citrine', username: 'citrine', password: 'citrine' },
@@ -488,7 +492,7 @@ class Csms {
   // The Basic authentication password CitrineOS checks:
   // SecurityCtrlr.BasicAuthPassword in its device model.
   async seedPassword(container, station, password) {
-    const deviceModel = container.resolve('deviceModelRepository');
+    const deviceModel = container.resolve('variableAttributeRepository');
     await deviceModel.createOrUpdateDeviceModelByStationId(TENANT_ID, {
       component: { name: 'SecurityCtrlr' },
       variable: { name: 'BasicAuthPassword' },
