@@ -41,6 +41,19 @@ manual workflow and no releases (`own/go-ocpp/README.md`).
 
 ---
 
+## v0.6.3
+
+**Date:** 2026-11-06
+**Previous release:** v0.6.2
+
+### Changed
+
+- citrineos: CitrineOS v2.1.0 answers the OCPP 1.6 SecurityEventNotification with `{}`, the fixture's answer (v2.0.1 answered `NotImplemented`), so the adapter lists it in its 1.6 `handles` and the self-tests run it: 7 more scenarios pass (the station-initiated `v16.from-station.security-event` and `-minimal` with every station; The Mobility House's minimal one is its known upstream bug). LogStatusNotification, SignCertificate and SignedFirmwareStatusNotification are still `NotImplemented`. The adapter README and docs/COMPATIBILITY.md say so.
+
+The container contract and the fixtures do not change.
+
+---
+
 ## v0.6.2
 
 **Date:** 2026-11-06
