@@ -143,6 +143,9 @@ type stationConn struct {
 	once   sync.Once
 	mu     sync.Mutex
 	err    error // why the connection was lost; nil after a local Close
+	// compression: whether the handshake negotiated permessage-deflate
+	// (go-ocpp's ConnInfo.Compression, from OnConnect).
+	compression bool
 }
 
 // connectOptions are the transport settings of a station.
@@ -156,7 +159,11 @@ type connectOptions struct {
 func connectStation(url, station string, e *endpoint, opts connectOptions, connectTimeout time.Duration) (*stationConn, error) {
 	vi := versions[e.version]
 	conn := &stationConn{closed: make(chan struct{})}
-	m := &metrics{t: e.tracker, disconnected: func(_ ocpp.ConnInfo, err error) {
+	m := &metrics{t: e.tracker, connected: func(info ocpp.ConnInfo) {
+		conn.mu.Lock()
+		conn.compression = info.Compression
+		conn.mu.Unlock()
+	}, disconnected: func(_ ocpp.ConnInfo, err error) {
 		conn.once.Do(func() {
 			conn.mu.Lock()
 			conn.err = err
@@ -210,11 +217,9 @@ func clientRun(version, fullURL, station string, fx *fixture, opts connectOption
 		event("stopped", "")
 		return 3
 	}
-	// go-ocpp does not say whether permessage-deflate was negotiated.
-	var compression any
-	if !opts.compression {
-		compression = false
-	}
+	conn.mu.Lock()
+	compression := conn.compression
+	conn.mu.Unlock()
 	event("connection-opened", station, "subprotocol", conn.client.Version().Subprotocol(), "remote", fullURL,
 		"compression", compression)
 	control, err := serveControl(controlPath, func(wanted *string, action string, payload map[string]any,

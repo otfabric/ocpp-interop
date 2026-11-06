@@ -111,19 +111,24 @@ make -f own/go-ocpp/Makefile image smoke interop    # from the repository root
 
 ## What it cannot do
 
-Declared `false`, because the contract has no operation for them yet
-([Gaps before 1.0](../../docs/CONTAINER_CONTRACT.md#gaps-before-10)):
+Declared `false`:
 
 - `send`, `callResultError`: go-ocpp sends and receives SEND and
-  CALLRESULTERROR (OCPP 2.1), but the contract cannot ask for either, so a SEND
-  action (NotifyPeriodicEventStream) is refused with `unsupported`, as for
-  every other adapter.
+  CALLRESULTERROR (OCPP 2.1, message types 6 and 5), but no reference can: The
+  Mobility House ocpp 2.1.0 and EVerest libocpp know the message types 2 to 4
+  only, and the other references have no OCPP 2.1 in their pinned releases.
+  The contract has no operation to send either yet
+  ([Gaps before 1.0](../../docs/CONTAINER_CONTRACT.md#gaps-before-10)), and one
+  would only test go-ocpp against itself. A SEND action
+  (NotifyPeriodicEventStream) is refused with `unsupported`, as for every other
+  adapter.
+
+`compression` in `connection-opened` is what the handshake negotiated:
+go-ocpp's `ocpp.ConnInfo.Compression` and `server.Session.Compression` (from
+go-ocpp v0.3.0). Its CSMS accepts permessage-deflate whenever a station offers
+it, and its station offers it with `--compression` (`client.WithCompression`).
 
 Reported as `null`, because go-ocpp does not expose them:
 
-- `compression` in `connection-opened`, except `false` for a station started
-  without `--compression`: go-ocpp's CSMS accepts permessage-deflate whenever it
-  is offered and its station offers it with `--compression`
-  (`client.WithCompression`), but neither says whether it was negotiated.
 - `code` and `reason` of `connection-closed` when the connection ended without
   a close frame, or by a local close of the CSMS.

@@ -152,7 +152,7 @@ pairings with it.
 |---|---|
 | `securityProfiles` | Profiles exercised, in both roles: 0 (none), 1 (Basic over `ws://`), 2 (TLS + Basic), 3 (mutual TLS); see [Transport security](CONTAINER_CONTRACT.md#transport-security) |
 | `compression` | `permessage-deflate`: the station offers it with `--compression` and the CSMS accepts it, and it is used; both roles ([Compression](CONTAINER_CONTRACT.md#compression)) |
-| `send` | OCPP 2.1 SEND frames (message type 6) sent and received. `false` everywhere: no pinned upstream release implements SEND |
+| `send` | OCPP 2.1 SEND frames (message type 6) sent and received. `false` everywhere: no pinned reference release implements SEND, and the contract has no operation to send one. go-ocpp (`otfabric`) implements it, without a peer to test it against ([own/go-ocpp/README.md](../own/go-ocpp/README.md#what-it-cannot-do)) |
 | `callResultError` | OCPP 2.1 CALLRESULTERROR frames (message type 5) sent and received. `false` everywhere, for the same reason |
 | `fixtureCallErrors` | The adapter answers with the CALLERROR a fixture's `callError` answer names. Without it, such a fixture exits 5 |
 | `fixtureAnswers` | Every answer is the fixture's, and an action the fixture does not answer is answered with `NotImplemented`. Not declared means `true`. `false` (citrineos): the upstream is an application that answers by itself; `handles` then lists only the actions whose answer the self-tests found equal to the fixture's, and the `NotImplemented` test against it is `SKIP_UNSUPPORTED` |

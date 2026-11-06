@@ -374,8 +374,8 @@ func versionCapabilities(version string) *object {
 		"The server refuses an identity the fixture does not list with HTTP 404 (server.ErrUnknownStation), and wrong " +
 			"credentials or a client certificate of another identity with HTTP 401.",
 		"Compression: go-ocpp's CSMS accepts permessage-deflate whenever it is offered, and its station offers it with " +
-			"--compression (client.WithCompression); go-ocpp does not expose whether it was negotiated, so " +
-			"connection-opened has compression null (false for a station without --compression).",
+			"--compression (client.WithCompression); connection-opened has compression as go-ocpp negotiated it " +
+			"(ocpp.ConnInfo.Compression, server.Session.Compression).",
 		"Message ids are go-ocpp's (UUIDs), read through a call interceptor (ocpp.CallInfo.MessageID).",
 		"go-ocpp implements SEND and CALLRESULTERROR (OCPP 2.1), but the contract has no operation to send a SEND or " +
 			"provoke a CALLRESULTERROR yet: the features send and callResultError are false, and a SEND action is " +
