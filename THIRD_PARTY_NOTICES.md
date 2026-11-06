@@ -88,8 +88,8 @@ built from source, and libwebsockets as a shared library;
 
 | Component | Version | Licence | Source |
 |---|---|---|---|
-| libocpp (EVerest, `lib/everest/ocpp` of everest-core) | everest-core 2026.02.1 (libocpp 0.31.1) | Apache-2.0 | https://github.com/EVerest/everest-core |
-| EVerest liblog, libtimer, everest-sqlite, libevse-security (`lib/everest/log`, `timer`, `sqlite`, `evse_security`) | everest-core 2026.02.1 | Apache-2.0 | https://github.com/EVerest/everest-core |
+| libocpp (EVerest, `lib/everest/ocpp` of everest-core) | everest-core 2026.02.2 (libocpp 0.31.1) | Apache-2.0 | https://github.com/EVerest/everest-core |
+| EVerest liblog, libtimer, everest-sqlite, libevse-security (`lib/everest/log`, `timer`, `sqlite`, `evse_security`) | everest-core 2026.02.2 | Apache-2.0 | https://github.com/EVerest/everest-core |
 | WebSocket++ `uri.hpp` and `base64.hpp` (bundled in libocpp's `3rd_party/websocketpp_utils`) | as bundled | BSD-3-Clause (the licence is in the headers) | https://github.com/zaphoyd/websocketpp |
 | libwebsockets | 4.5.2 | MIT (some bundled sources BSD-3-Clause, BSD-2-Clause; see its LICENSE) | https://github.com/warmcat/libwebsockets |
 | nlohmann/json | 3.12.0 | MIT | https://github.com/nlohmann/json |
@@ -114,7 +114,7 @@ in the Debian archive (bookworm).
 
 | Component | Version | Licence | Source |
 |---|---|---|---|
-| CitrineOS core (`@citrineos/ocpp-server`, `ocpp`, `base`, `dal`, `types`) | v2.0.1 | Apache-2.0 | https://github.com/citrineos/citrineos-core |
+| CitrineOS core (`@citrineos/ocpp-server`, `ocpp`, `base`, `dal`, `types`) | v2.1.0 | Apache-2.0 | https://github.com/citrineos/citrineos-core |
 | npm dependencies of CitrineOS (fastify, sequelize, pg, amqplib, ws, ajv, awilix, tslog, the AWS and Google Cloud storage clients and others) | as locked by the release | their own permissive licences, listed in `/licenses` | https://www.npmjs.com |
 | Node.js | 24.16.0 | MIT (bundled third-party code under its own licences, see its LICENSE) | https://nodejs.org |
 | PostgreSQL | 15.19 (Debian 15.19-0+deb12u1) | PostgreSQL License | https://www.postgresql.org |

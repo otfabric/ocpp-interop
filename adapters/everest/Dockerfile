@@ -20,7 +20,7 @@
 ARG BASE_REGISTRY=docker.io/library
 # debian:trixie-slim, multi-arch index (linux/amd64 and linux/arm64): the
 # build stage and the runtime.
-ARG DEBIAN_DIGEST=sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
+ARG DEBIAN_DIGEST=sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
 
 # ---------------------------------------------------------------------------
 # Stage 1: toolchain, the pinned sources and libocpp's dependencies
@@ -80,15 +80,17 @@ RUN set -eu; \
         -DLWS_WITHOUT_TEST_CLIENT=ON -DDISABLE_WERROR=ON; \
     cmake --build libwebsockets/build --target install
 # everest-cmake: the CMake helpers every EVerest library starts with (build
-# only). v0.6.0 is the release that was current when everest-core 2026.02.1
-# was tagged (2026-07-16); everest-core itself fetches its main branch.
+# only). v0.6.0 is the release that was current when everest-core 2026.02.1,
+# the first release of its stable/2026.02 branch, was tagged (2026-07-16);
+# 2026.02.2 is a release of the same branch. everest-core itself fetches its
+# main branch.
 RUN fetch https://github.com/EVerest/everest-cmake v0.6.0 e378100829014ad4c3a721a7aa1c02ef56736c61 everest-cmake
 
-# The release pin: everest-core release 2026.02.1 and its commit. A candidate
+# The release pin: everest-core release 2026.02.2 and its commit. A candidate
 # build ("make candidate-everest CANDIDATE_VERSION=... CANDIDATE_SHA=...")
 # overrides both. Only lib/everest of the tree is checked out.
-ARG UPSTREAM_VERSION=2026.02.1
-ARG UPSTREAM_SHA=b61bb12b8cb89ee9d0fab037b05c3bb8cea9b13e
+ARG UPSTREAM_VERSION=2026.02.2
+ARG UPSTREAM_SHA=45dba2c049223d05beb7611c75d59f6639c46ee0
 RUN set -eu; \
     echo "${UPSTREAM_SHA}" | grep -Eq '^[0-9a-f]{40}$'; \
     git -c advice.detachedHead=false clone -q --depth 1 --filter=blob:none --sparse \
@@ -104,8 +106,8 @@ RUN set -eu; \
 # ---------------------------------------------------------------------------
 FROM deps AS build
 
-ARG UPSTREAM_VERSION=2026.02.1
-ARG UPSTREAM_SHA=b61bb12b8cb89ee9d0fab037b05c3bb8cea9b13e
+ARG UPSTREAM_VERSION=2026.02.2
+ARG UPSTREAM_SHA=45dba2c049223d05beb7611c75d59f6639c46ee0
 ARG ADAPTER_VERSION=dev
 # Parallel compile jobs. libocpp's OCPP 2.x sources need about 1 GiB of
 # memory each.

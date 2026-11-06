@@ -2,7 +2,7 @@
 
 A CSMS for OCPP 1.6J, 2.0.1 and 2.1, built on
 [CitrineOS core](https://github.com/citrineos/citrineos-core) release
-**v2.0.1** (commit `1a83638c31eebdb1dd8d6cdb0f5b8a9f142a1372`, Apache-2.0,
+**v2.1.0** (commit `4fd7599b91c2fb6e6065e7c9b94be69880cced27`, Apache-2.0,
 TypeScript). It is the second independent OCPP 2.1 CSMS of this repository,
 after `mobilityhouse`. CitrineOS has no charging station: `client` exits 5
 after the usage checks.
@@ -22,7 +22,7 @@ holds all of it:
 
 | Part | From | Runs as |
 |---|---|---|
-| CitrineOS `@citrineos/ocpp-server` v2.0.1 | built from the tag with pnpm 10.19.0 and the release's lockfile, as `apps/ocpp-server/deploy.Dockerfile` does | in the adapter's Node.js process |
+| CitrineOS `@citrineos/ocpp-server` v2.1.0 | built from the tag with pnpm 10.19.0 and the release's lockfile, as `apps/ocpp-server/deploy.Dockerfile` does | in the adapter's Node.js process |
 | PostgreSQL 15, PostGIS 3 | Debian bookworm | a child process, on 127.0.0.1:5432 |
 | RabbitMQ 3.10 (Erlang 25) | Debian bookworm | a child process, on 127.0.0.1:5672 |
 
@@ -75,7 +75,10 @@ the paths CitrineOS registers, read when it registers them) with a
 `callbackUrl` on a local HTTP server of the adapter, which CitrineOS posts
 the station's answer to. A request CitrineOS's schema validation refuses is
 `invalid-request` (HTTP 400); an endpoint that does not send the CALL is
-`failed`; an action without an endpoint is `unsupported` (exit 5).
+`failed`; an action without an endpoint is `unsupported` (exit 5). The API
+listens on 127.0.0.1 in the container, and only the adapter calls it, so its
+authentication (from v2.1.0) is off: `auth.mode` `localBypass`. The default,
+`localDev`, refuses the `production` environment the adapter runs CitrineOS in.
 
 **Events** come from CitrineOS's own objects, which the adapter wraps
 without changing what they do: the router's `onMessage` and network hook
@@ -103,7 +106,7 @@ with reason `unknown-station`, `authentication` or `subprotocol`).
     blocked and expired tokens with the fixture's status, but a token it does
     not know with `Unknown`, a valid OCPP 2.x status, where the fixture
     derives `Invalid`
-    ([authorize-request-ocpp-21-handler.ts](https://github.com/citrineos/citrineos-core/blob/1a83638c31eebdb1dd8d6cdb0f5b8a9f142a1372/packages/ocpp/src/handlers/requests/2/authorize-request-ocpp-21-handler.ts#L292-L293)).
+    ([authorize-request-ocpp-21-handler.ts](https://github.com/citrineos/citrineos-core/blob/4fd7599b91c2fb6e6065e7c9b94be69880cced27/packages/ocpp/src/handlers/requests/2/authorize-request-ocpp-21-handler.ts#L292-L293)).
     It refuses an ISO14443 token that is not 8 or 14 hexadecimal characters
     with `PropertyConstraintViolation` (OCPP 2.x defines ISO14443 as a 4 or 7
     byte UID in hexadecimal); the baseline's tokens are valid ones since
@@ -134,7 +137,7 @@ with reason `unknown-station`, `authentication` or `subprotocol`).
 - **Security profile 3:** once a BootNotification has given CitrineOS a
   serial number, it requires the client certificate's CommonName to equal
   that serial number, not the identity
-  ([client-certificate-filter.ts](https://github.com/citrineos/citrineos-core/blob/1a83638c31eebdb1dd8d6cdb0f5b8a9f142a1372/packages/ocpp/src/transport/network-connection/authenticator/client-certificate-filter.ts)).
+  ([client-certificate-filter.ts](https://github.com/citrineos/citrineos-core/blob/4fd7599b91c2fb6e6065e7c9b94be69880cced27/packages/ocpp/src/transport/network-connection/authenticator/client-certificate-filter.ts)).
 - **No SEND, no CALLRESULTERROR:** CitrineOS's router knows the message types
   2 to 4 only and answers any other with `FormatViolation`.
 - **Startup** takes about 15 seconds (PostgreSQL, RabbitMQ, CitrineOS).

@@ -41,6 +41,25 @@ manual workflow and no releases (`own/go-ocpp/README.md`).
 
 ---
 
+## v0.6.1
+
+**Date:** 2026-11-06
+**Previous release:** v0.6.0
+
+### Changed
+
+- citrineos: CitrineOS core v2.0.1 → v2.1.0 (`4fd7599b`). The adapter turns off the authentication v2.1.0 adds to CitrineOS's REST API (`auth.mode` `localBypass`): the API listens on 127.0.0.1 in the container and only the adapter calls it, and the default mode, `localDev`, refuses the `production` environment, so the CSMS did not start. The adapter now takes the device model repository by the name v2.1.0 registers it under (`variableAttributeRepository`).
+- everest: everest-core 2026.02.1 → 2026.02.2 (`45dba2c0`), a release of its `stable/2026.02` branch; libocpp is still 0.31.1, with the same dependencies.
+- Base images to the current digests of their tags: `debian:trixie-slim`, `eclipse-temurin:25.0.4.1_1-jre-noble`, `golang:1.27.2-trixie`, `python:3.14.8-slim-trixie`. The own image (`own/go-ocpp`) takes the new golang and debian digests too.
+
+### Fixed
+
+- CitrineOS v2.1.0 gives its TLS server a key and certificate of its own, so the chargetime station, which sends no SNI, connects with security profiles 2 and 3 (1.6 and 2.0.1): four tests pass that were known upstream bugs. The known-bugs entry is removed.
+
+The known-bugs entry of everest's ReportDERControl defect moves to 2026.02.2: `ocpp::v2::MessageType` is unchanged in that release. The container contract and the fixtures do not change. docs/COMPATIBILITY.md has the new run: 2448 PASS, 27 KNOWN_ISSUE, 308 SKIP_UNSUPPORTED, 0 FAIL.
+
+---
+
 ## v0.6.0
 
 **Date:** 2026-11-06
