@@ -36,6 +36,28 @@ The `Upstream` workflow runs daily. It compares each pin with the latest
 upstream release, self-tests a built adapter at that release, and keeps an
 issue open while a pin is behind. It never changes a pin.
 
+The `ocpp-interop-otfabric` image is not part of these releases. It has its own
+manual workflow and no releases (`own/go-ocpp/README.md`).
+
+---
+
+## v0.6.0
+
+**Date:** 2026-11-06
+**Previous release:** v0.5.3
+
+### Added
+
+- `ghcr.io/otfabric/ocpp-interop-otfabric`: OT Fabric's own OCPP stack, go-ocpp, behind the container contract, so that other stacks can test against it. A CSMS and a station for OCPP 1.6J, 2.0.1 and 2.1, security profiles 0 to 3 and compression. It declares `upstream.independentEngine: false`, is built by hand from the latest go-ocpp release with the manual workflow "Own stack (go-ocpp)", is tagged with go-ocpp versions and `latest`, and is not in this or any release or `manifest.json` (`own/go-ocpp/README.md`, ADR-0012 of otfabric/engineering).
+- The scripts take an image outside the release set through `ADAPTER_IMAGE_<adapter>`.
+
+### Changed
+
+- `results.json` records `independent` as the image says of itself (`upstream.independentEngine`), and reports carry it per implementation. The smoke test accepts either value.
+- `scripts/interop.sh` runs only the pairings with an adapter that declares `upstream.independentEngine: false`, when one is in the run: the own stack against the references, not the references again. A run of the reference adapters is unchanged.
+
+The reference images, the container contract and the fixtures do not change.
+
 ---
 
 ## v0.5.3

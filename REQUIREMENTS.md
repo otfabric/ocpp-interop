@@ -21,7 +21,9 @@ a substitute for the OCA Compliance Testing Tool (OCTT).
 
 - R1.1 This repository does not import, build, link against or depend on any
   library under test. It contains no test logic or expectation specific to
-  one.
+  one. The one exception is `own/` with its workflow: images of OT Fabric's own
+  stacks, published for others to test against (`own/go-ocpp/README.md`). The
+  rest of the repository does not know them, and they are not part of a release.
 - R1.2 A consumer depends only on the published images and the documented
   contract. It does not need a checkout of this repository.
 - R1.3 Each adapter drives its own upstream OCPP stack. Adapter glue

@@ -11,7 +11,8 @@ Instructions for AI coding agents (and humans) working in this repository.
 ## Hard rules
 
 - Never reference or depend on a library under test (`otfabric/go-ocpp` or
-  any other) from adapters, fixtures, schemas, scripts or tests.
+  any other) from adapters, fixtures, schemas, scripts or tests. `own/`, the
+  one image of OT Fabric's own stack, is the exception (`own/go-ocpp/README.md`).
 - Never write OCPP protocol logic shared between adapters. Each adapter
   drives its own upstream engine.
 - Never mark a capability true, or list an action, without a self-test that

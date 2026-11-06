@@ -69,7 +69,8 @@ def convert(report, waivers, seen):
             implementations.setdefault(side["name"], side)
     impls = []
     for name, side in sorted(implementations.items()):
-        i = {"name": name, "version": side["version"], "independent": True}
+        # What the image says of itself (upstream.independentEngine).
+        i = {"name": name, "version": side["version"], "independent": side.get("independent", True)}
         digest = side.get("image") if "@sha256:" in side.get("image", "") else interop_result.repo_digest(side.get("image", ""))
         if digest:
             i["image"] = digest

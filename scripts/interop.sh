@@ -32,6 +32,10 @@
 #                  each side unanswered: the baseline answers every action), the
 #                  fixture's own CALLERROR answers.
 #
+# When an adapter declares upstream.independentEngine false (OT Fabric's own
+# stack, own/), only the pairings with it run: the own stack against the
+# references, not the references again.
+#
 # Every result is a report result (schemas/report.schema.json) with the
 # status PASS, FAIL, SKIP_UNSUPPORTED (a capability one side does not declare),
 # KNOWN_ISSUE (a failure that tests/known-bugs.tsv explains) or INFRA_ERROR.
@@ -41,6 +45,7 @@
 # any library that consumes the images.
 #
 # Environment: REGISTRY, VERSION (image tag, default dev), VERBOSE=1,
+#              ADAPTER_IMAGE_<adapter>: an image outside the release set,
 #              REPORT_DIR (keeps every result document and the report),
 #              OCPP_VERSIONS (default "1.6 2.0.1 2.1"),
 #              INTEROP_PAIRS: run only the pairings whose CSMS and version
@@ -133,6 +138,15 @@ for adapter in "${ADAPTERS[@]}"; do
 done
 
 caps() { cat "${WORK}/caps-$1.json"; }
+# FOCUS: the adapters that are not independent implementations. When there
+# are any, a pairing runs only with one of them at one end at least.
+FOCUS=""
+for adapter in "${ADAPTERS[@]}"; do
+    jq -e '.upstream.independentEngine == false' "${WORK}/caps-${adapter}.json" >/dev/null 2>&1 && FOCUS="${FOCUS} ${adapter}"
+done
+in_scope() {  # in_scope <client> <server>
+    [[ -z "${FOCUS}" || " ${FOCUS} " == *" $1 "* || " ${FOCUS} " == *" $2 "* ]]
+}
 upstream_of() { jq -r '.upstream.version' "${WORK}/caps-$1.json"; }
 # declares <adapter> <jq condition on .versions[OCPP]>
 declares() { jq -e --arg v "${OCPP}" ".versions[\$v] // {} | $2" "${WORK}/caps-$1.json" >/dev/null 2>&1; }
@@ -239,10 +253,11 @@ FEATURE_OF='{
  }
 }'
 
-impl() {  # impl <adapter>: the implementation object of a report result
+impl() {  # impl <adapter>: the implementation object of a report result, with what the image says of itself
     jq -cn --arg n "$1" --arg v "$(upstream_of "$1")" --arg i "$(image_of "$1")" \
         --arg id "$(docker image inspect --format '{{.Id}}' "$(image_of "$1")" 2>/dev/null)" \
-        '{name: $n, version: $v, image: $i, imageId: $id}'
+        --argjson ind "$(jq '.upstream.independentEngine // true' "${WORK}/caps-$1.json")" \
+        '{name: $n, version: $v, image: $i, imageId: $id, independent: $ind}'
 }
 
 keep() {  # keep <label> <document>
@@ -780,12 +795,13 @@ for v in "${VERSIONS[@]}"; do
 done
 chmod -R a+rX "${WORK}"
 
-log "adapters: ${ADAPTERS[*]} (${VERSION}), OCPP ${VERSIONS[*]}${INTEROP_PAIRS:+, CSMS and version: ${INTEROP_PAIRS}}"
+log "adapters: ${ADAPTERS[*]} (${VERSION}), OCPP ${VERSIONS[*]}${INTEROP_PAIRS:+, CSMS and version: ${INTEROP_PAIRS}}${FOCUS:+, only the pairings with:${FOCUS}}"
 for v in "${VERSIONS[@]}"; do
     use_version "${v}"
     for server in "${ADAPTERS[@]}"; do
         selected "${server}" "${OCPP}" || continue
         for client in "${ADAPTERS[@]}"; do
+            in_scope "${client}" "${server}" || continue
             pairing "${client}" "${server}"
         done
     done

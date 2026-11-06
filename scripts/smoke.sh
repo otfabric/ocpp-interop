@@ -18,6 +18,7 @@
 # client of SMOKE_PEER.
 #
 # Environment: REGISTRY, VERSION (image tag, default dev), VERBOSE=1,
+#              ADAPTER_IMAGE_<adapter>: an image outside the release set,
 #              REPORT_DIR (keeps the capability document when set),
 #              SMOKE_PEER (default mobilityhouse, which serves every version).
 
@@ -63,7 +64,7 @@ if jq -e --arg a "${ADAPTER}" '
         .schemaVersion == "1.0" and .adapter == $a and (.adapterVersion | type == "string")
         and (.contractVersion | test("^[0-9]+\\.[0-9]+$"))
         and (.upstream.revision | test("^[0-9a-f]{40}$")) and (.upstream.version | type == "string")
-        and .upstream.independentEngine == true
+        and (.upstream.independentEngine | type == "boolean")
         and (.versions | length) > 0
         and ([.versions[] | (.client.supported | type == "boolean") and (.server.supported | type == "boolean")
               and ([.features | .securityProfiles, .compression, .send, .callResultError] | all(. != null))] | all)' \

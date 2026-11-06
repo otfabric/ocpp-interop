@@ -42,7 +42,7 @@ compatible line and changes only with the major version.
 
 | Item | Value |
 |------|-------|
-| Image | `ghcr.io/otfabric/ocpp-interop-<adapter>` |
+| Image | `ghcr.io/otfabric/ocpp-interop-<adapter>`; OT Fabric's own stack is the adapter `otfabric` (`own/go-ocpp/README.md`) |
 | Entrypoint | `ocpp-interop` (`/usr/local/bin/ocpp-interop`) |
 | Default command | `server --version 1.6` |
 | Protocol | OCPP-J over WebSocket: `ws://` with security profiles 0 and 1, `wss://` (TLS) with profiles 2 and 3, with keys and certificates the test generates and mounts at runtime ([Transport security](#transport-security)) |
