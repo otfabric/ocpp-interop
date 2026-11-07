@@ -67,7 +67,16 @@ from `server.crt` and `server.key`; with profile 3 a trust manager from
 `SSLEngine` of each connection by remote address, because
 `ServerEvents.authenticateSession` gets the address, not the connection: with
 profile 3 the adapter reads the verified client certificate there and
-refuses one whose CommonName is not the identity. The station calls
+refuses one whose CommonName is not the identity. The factory runs the
+SSL engine's delegated tasks inline (an `ExecutorService` that runs each
+task on the calling thread) instead of on the single thread Java-WebSocket
+uses by default: its `SSLSocketChannel2` goes on reading while a task runs,
+and a request that arrives while the task of a TLS 1.3 client-certificate
+handshake still runs makes the server close the connection before it writes
+its 101, so the handshake of a station that sends its request right after
+its Finished (the ocppkit station) hung about one time in seven at profile
+3 (a fresh CSMS for each connection: 14 of 104 handshakes hung before, 0 of
+60 after, OCPP 1.6 and 2.0.1). The station calls
 `enableWSS` with the upstream's `BaseWssSocketBuilder` and an
 `SSLSocketFactory` that trusts `ca.crt` (and presents `client.crt` with
 profile 3); Java-WebSocket's `WebSocketClient` turns on host name

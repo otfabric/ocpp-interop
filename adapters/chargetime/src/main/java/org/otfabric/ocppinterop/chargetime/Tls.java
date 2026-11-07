@@ -25,7 +25,9 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.naming.InvalidNameException;
@@ -181,7 +183,7 @@ final class Tls {
 
     @Override
     public WebSocketServerFactory build() {
-      return new SSLParametersWebSocketServerFactory(context, parameters) {
+      return new SSLParametersWebSocketServerFactory(context, new InlineExecutor(), parameters) {
         @Override
         public ByteChannel wrapChannel(SocketChannel channel, SelectionKey key) throws IOException {
           ByteChannel wrapped = super.wrapChannel(channel, key);
@@ -218,6 +220,49 @@ final class Tls {
         return null;
       }
       return null;
+    }
+  }
+
+  /**
+   * Runs the SSL engine's delegated tasks on the thread that asks for them. Java-WebSocket's
+   * SSLSocketChannel2 hands them to an executor and goes on reading; with the default (a thread of
+   * its own) a request that arrives while the task of a TLS 1.3 client-certificate handshake still
+   * runs makes the server close the connection before it writes its 101: the handshake of a
+   * station that sends its request right after its Finished (ocpp-kit) then hangs. Inline, the
+   * handshake is complete before the channel reads the request.
+   */
+  static final class InlineExecutor extends AbstractExecutorService {
+    private volatile boolean shutdown;
+
+    @Override
+    public void execute(Runnable task) {
+      task.run();
+    }
+
+    @Override
+    public void shutdown() {
+      shutdown = true;
+    }
+
+    @Override
+    public List<Runnable> shutdownNow() {
+      shutdown = true;
+      return new ArrayList<>();
+    }
+
+    @Override
+    public boolean isShutdown() {
+      return shutdown;
+    }
+
+    @Override
+    public boolean isTerminated() {
+      return shutdown;
+    }
+
+    @Override
+    public boolean awaitTermination(long timeout, TimeUnit unit) {
+      return true;
     }
   }
 }

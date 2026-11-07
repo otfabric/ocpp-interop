@@ -10,10 +10,11 @@ same matrix for each architecture into its job summary.
 Run: 2026-11-07 on linux/arm64 (macOS, Docker 29.9), the seven adapters:
 the six images of v0.7.0 and the ocppkit image built from this repository,
 in seven shards (`INTEROP_PAIRS=<CSMS>@<version>`, one per CSMS) merged
-with `scripts/merge-reports.py`. With the seven shards at once, the
-ocppkit station's profile 3 session with the chargetime CSMS timed out
-twice (the 5 s connect timeout, under load); the chargetime shard re-run on
-its own passes every test, and these tables have that run. The
+with `scripts/merge-reports.py`. The ocppkit station's profile 3 session
+with the chargetime CSMS hung now and then (about one handshake in seven) on
+a race in Java-WebSocket 1.6.0's TLS channel, which the chargetime adapter
+now avoids (adapters/chargetime/README.md, Transport security); these
+tables have the chargetime shard run with that fix. The
 linux/amd64 images have not been self-tested locally; CI does that
 natively.
 

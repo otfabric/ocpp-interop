@@ -55,6 +55,7 @@ manual workflow and no releases (`own/go-ocpp/README.md`).
 
 ### Changed
 
+- `ghcr.io/otfabric/ocpp-interop-chargetime`: the CSMS runs the SSL engine's delegated tasks inline. With Java-WebSocket 1.6.0's default (a thread of its own), a station that sends its request right after a TLS 1.3 client-certificate handshake (the ocppkit station) found the connection closed before the 101 about one time in seven at security profile 3 (14 of 104 fresh handshakes hung before, 0 of 60 after).
 - The "Own stack (go-ocpp)" workflow and `own/go-ocpp/Makefile` take their references from the Makefile's `ADAPTERS` of the harness release they test against, so a new reference is picked up with the release that adds it.
 - PLAN.md and COVERAGE.md: SEND and CALLRESULTERROR are tested (since v0.7.0), every action of 2.1 is exchanged; the Local Controller and seanlee0923/ocpp are open.
 
