@@ -41,6 +41,23 @@ manual workflow and no releases (`own/go-ocpp/README.md`).
 
 ---
 
+## v0.9.0
+
+**Date:** 2026-11-07
+**Previous release:** v0.8.0
+
+### Added
+
+- `ghcr.io/otfabric/ocpp-interop-seanlee`: a reference CSMS and station built on [seanlee0923/ocpp](https://github.com/seanlee0923/ocpp) v0.3.0 (Go, MIT, its own framing and message types generated from the OCA schemas), OCPP 1.6J, 2.0.1 and 2.1 in both roles, security profiles 0 to 3. No compression, no SEND from either role, no CALLRESULTERROR, and in 1.6 no Security Whitepaper messages (`adapters/seanlee/README.md`). The library's calls and handlers are generic over its payload types: `adapters/seanlee/actions_gen.go`, written by `go run ./gen`, instantiates them for every action (the image build regenerates it and fails when the committed file is stale).
+- `scripts/latest-upstream.py seanlee` (git tags) and the Upstream workflow's candidate build of seanlee.
+- A seanlee0923/ocpp v0.3.0 defect the self-tests show: its CSMS validates the everest station's NotifyEVChargingNeeds (`"energyAmount": 20000.0`, an integer in the draft-06 OCA schemas) and then cannot decode it into its Go `int` (`FormatViolation`; tests/known-bugs.tsv; seanlee0923/ocpp#2, tracked in #29). The ocpp-go `statusInfo: null` defect also shows with the seanlee CSMS. docs/COMPATIBILITY.md has the eight-adapter run: 9010 PASS, 56 KNOWN_ISSUE, 836 SKIP_UNSUPPORTED, 0 FAIL; seanlee's smoke test 263 checks.
+
+### Changed
+
+- CONTAINER_CONTRACT.md, CAPABILITIES.md, COVERAGE.md, PLAN.md and README.md list seanlee; the contract stays 0.7.
+
+---
+
 ## v0.8.0
 
 **Date:** 2026-11-07

@@ -3,7 +3,7 @@
 What the self-tests exercise, by category and version. Kept in step with
 [scripts/smoke.sh](scripts/smoke.sh) and [scripts/interop.sh](scripts/interop.sh);
 the results are in [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md). OCPP 2.1 is
-tested with `mobilityhouse`, `cbsigma` and `ocppkit` (both roles), `everest`
+tested with `mobilityhouse`, `cbsigma`, `ocppkit` and `seanlee` (both roles), `everest`
 (a station) and `citrineos` (a CSMS), the adapters whose pinned upstream
 releases have it.
 `citrineos` answers as CitrineOS does: it takes part in a category only

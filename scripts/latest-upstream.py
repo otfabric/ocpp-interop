@@ -107,6 +107,12 @@ def cbsigma():
     return latest, tags[latest], "git tags of cB-Sigma/ocpp"
 
 
+def seanlee():
+    tags = git_tags("https://github.com/seanlee0923/ocpp.git")
+    latest = newest(tags)
+    return latest, tags[latest], "git tags of seanlee0923/ocpp"
+
+
 def ocppkit():
     # The crate is built from crates.io; the commit of its git tag is what the
     # image reports as the upstream revision (the Dockerfile checks it against
@@ -126,6 +132,7 @@ RESOLVERS = {
     "citrineos": citrineos,
     "cbsigma": cbsigma,
     "ocppkit": ocppkit,
+    "seanlee": seanlee,
 }
 
 
