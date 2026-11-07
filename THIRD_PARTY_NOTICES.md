@@ -7,7 +7,7 @@
 | This repository (adapters, scripts, fixtures, schemas, documentation) | MIT, see [LICENSE](LICENSE) |
 | Upstream OCPP implementations and their dependencies inside the images | their own licences, listed below per image |
 | `own/go-ocpp/` (links go-ocpp) | MIT |
-| OCA specifications and JSON schemas | CC BY-ND 4.0; **not committed** to this repository. The `mobilityhouse` image contains the OCA JSON schemas the ocpp package ships, and the `cbsigma` binary the OCA schemas, WSDLs and appendix CSV files cB-Sigma/ocpp embeds (its `oca/`, with attribution and checksums), unmodified, as part of those packages |
+| OCA specifications and JSON schemas | CC BY-ND 4.0; **not committed** to this repository. The `mobilityhouse` image contains the OCA JSON schemas the ocpp package ships, and the `cbsigma` binary the OCA schemas, WSDLs and appendix CSV files cB-Sigma/ocpp embeds (its `oca/`, with attribution and checksums), unmodified, as part of those packages. The `ocppkit` binary has none: ocpp-kit generates its code from the schemas its crate vendors |
 
 Each image carries the full licence texts under `/licenses/<component>/`,
 this file as `/licenses/THIRD_PARTY_NOTICES.md`, and this repository's
@@ -140,3 +140,31 @@ licence and NOTICE files.
 | golang.org/x/net | v0.59.0 | BSD-3-Clause | https://go.googlesource.com/net |
 | golang.org/x/text | v0.42.0 | BSD-3-Clause | https://go.googlesource.com/text |
 | Go standard library and runtime | 1.27.2 | BSD-3-Clause | https://go.dev |
+
+## `ocpp-interop-ocppkit`
+
+Base image `debian:trixie-slim` (Debian trixie). One Rust binary (built with
+Rust 1.99.1), linked statically against its crates;
+`/licenses/BUNDLED-CRATES.txt` lists every crate in it with the licence its
+Cargo.toml declares, and `/licenses/<crate>-<version>/` holds its licence
+files (`LICENSE-DECLARED` for the two crates that ship none: uuid-simd and
+vsimd, both MIT). Build scripts and procedural macros run at build time only
+and are not in the binary.
+
+| Component | Version | Licence | Source |
+|---|---|---|---|
+| hupe1980/ocpp-kit | 0.3.0 | MIT OR Apache-2.0 | https://github.com/hupe1980/ocpp-kit |
+| tokio | 1.54.1 | MIT | https://github.com/tokio-rs/tokio |
+| rustls | 0.23.46 | Apache-2.0 OR ISC OR MIT | https://github.com/rustls/rustls |
+| ring | 0.17.14 | Apache-2.0 AND ISC | https://github.com/briansmith/ring |
+| rustls-webpki, untrusted | 0.103.16, 0.9.0 | ISC | https://github.com/rustls/webpki |
+| webpki-roots | 1.0.11 | CDLA-Permissive-2.0 | https://github.com/rustls/webpki-roots |
+| serde, serde_json | 1.0.229, 1.0.154 | MIT OR Apache-2.0 | https://github.com/serde-rs |
+| jsonschema | 0.33.0 | MIT | https://github.com/Stranger6667/jsonschema |
+| regex, aho-corasick, memchr | 1.13.1, 1.1.5, 2.8.3 | MIT OR Apache-2.0; Unlicense OR MIT | https://github.com/rust-lang/regex |
+| x509-parser, der-parser | 0.17.0, 10.0.0 | MIT OR Apache-2.0 | https://github.com/rusticata/x509-parser |
+| ICU4X crates (icu_*, zerovec, yoke and others, through idna) | 2.x | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| subtle | 2.6.1 | BSD-3-Clause | https://github.com/dalek-cryptography/subtle |
+| foldhash | 0.2.0 | Zlib | https://github.com/orlp/foldhash |
+| other crates (listed in `/licenses/BUNDLED-CRATES.txt`) | as locked in `adapters/ocppkit/Cargo.lock` | MIT, Apache-2.0 or both | https://crates.io |
+| Rust standard library | 1.99.1 | MIT OR Apache-2.0 | https://github.com/rust-lang/rust |

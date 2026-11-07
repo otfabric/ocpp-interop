@@ -3,8 +3,9 @@
 What the self-tests exercise, by category and version. Kept in step with
 [scripts/smoke.sh](scripts/smoke.sh) and [scripts/interop.sh](scripts/interop.sh);
 the results are in [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md). OCPP 2.1 is
-tested with `mobilityhouse` (both roles), `everest` (a station) and
-`citrineos` (a CSMS), the adapters whose pinned upstream releases have it.
+tested with `mobilityhouse`, `cbsigma` and `ocppkit` (both roles), `everest`
+(a station) and `citrineos` (a CSMS), the adapters whose pinned upstream
+releases have it.
 `citrineos` answers as CitrineOS does: it takes part in a category only
 with the actions it declares
 ([adapters/citrineos/README.md](adapters/citrineos/README.md)).
@@ -36,10 +37,10 @@ with the actions it declares
 | Battery swap (2.1): RequestBatterySwap; BatterySwap | — | — | tested (BatterySwap from the everest station; the mobilityhouse station cannot send it, upstream defect) |
 | Payment and settlement (2.1): NotifySettlement, VatNumberValidation, NotifyWebPaymentStarted, ChangeTransactionTariff | — | — | tested |
 | Priority and dynamic charging (2.1): UsePriorityCharging, NotifyPriorityCharging, UpdateDynamicSchedule, PullDynamicScheduleUpdate, NotifyAllowedEnergyTransfer, AFRRSignal | — | — | tested |
-| Security profile 1 (Basic): accepted, no credentials, wrong password | tested | tested | tested |
+| Security profile 1 (Basic): accepted, no credentials, wrong password | tested | tested | tested (no credentials: not with the ocppkit station, which always sends them) |
 | Security profiles 2 and 3 (TLS, RSA and ECDSA keys): accepted, CALLs from both ends; refused: wrong password, client certificate of another identity, from another CA, or none, server certificate from another CA or for another host name, `ws://` to a TLS server | tested | tested | tested |
 | Compression (permessage-deflate): the CSMS accepts it, the station offers it only with `--compression`, CALLs from both ends | tested | tested (chargetime: known upstream defects) | tested |
-| SEND and CALLRESULTERROR (NotifyPeriodicEventStream as a SEND) | — | — | planned: no pinned upstream release implements them; a SEND action is refused (exit 5) |
+| SEND and CALLRESULTERROR (NotifyPeriodicEventStream as a SEND; an invalid CALLRESULT answered with a CALLRESULTERROR, from each end) | — | — | tested between cbsigma and ocppkit, in both roles and with themselves; the other references know the message types 2 to 4 only, or have no 2.1 |
 | Container contract: usage errors, exit codes, fixture validation, readiness, events, SIGTERM, health check, uid, licences | tested | tested | tested |
 
 ## Actions
@@ -57,13 +58,11 @@ station in 1.6 and 2.0.1; in 2.1 the everest station sends 35 and handles
 | In a sample (before: v0.2.0) | 39 (30) | 64 (27) | 91 (43) |
 | Station sends / handles | 14 / 26 (11 / 19) | 25 / 40 (13 / 14) | 35 / 55 (18 / 23) |
 | CSMS sends / handles | 26 / 14 (20 / 10) | 40 / 25 (15 / 12) | 55 / 36 (24 / 17) |
-| Exchanged with a PASS between at least one pairing | 39 | 64 | 90 |
+| Exchanged with a PASS between at least one pairing | 39 | 64 | 91 |
 
-Not exchanged by any pairing, with the reason:
-
-| Version | Action | Why |
-|---|---|---|
-| 2.1 | NotifyPeriodicEventStream | a SEND; no pinned upstream release implements SEND frames |
+Every action is exchanged by at least one pairing; NotifyPeriodicEventStream,
+a SEND, since v0.7.0 (cbsigma) and between two independent implementations
+since v0.8.0 (cbsigma and ocppkit).
 
 Exchanged, but not with every adapter: 2.0.1 GetCompositeSchedule fails
 with lorenzodonini in either role (ocpp-go's response type does not have the

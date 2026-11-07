@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: MIT
+[package]
+name = "ocpp-interop-ocppkit"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+publish = false
+description = "ocpp-interop adapter for hupe1980/ocpp-kit (docs/CONTAINER_CONTRACT.md)"
+
+[[bin]]
+name = "ocpp-interop"
+path = "src/main.rs"
+
+[dependencies]
+# The upstream: ocpp-kit from crates.io, exactly this release (Cargo.lock pins
+# it and every dependency by version and checksum).
+ocpp-kit = { version = "=0.3.0", default-features = false, features = [
+    "std", "v1_6", "v2_0_1", "v2_1", "tokio", "rustls", "compression", "station", "csms",
+] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time", "io-util", "sync", "fs"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value", "preserve_order"] }
+jsonschema = { version = "0.33", default-features = false }
+regex = { version = "1", default-features = false, features = ["std", "unicode-perl"] }
+x509-parser = { version = "0.17", default-features = false }
+
+[profile.release]
+strip = true
+lto = "thin"
+codegen-units = 4

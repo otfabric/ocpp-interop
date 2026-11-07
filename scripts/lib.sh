@@ -43,18 +43,36 @@ cleanup() {
     return 0
 }
 
+# BASE_PROFILE: the security profile of the servers and stations whose
+# command sets none. 0 (no authentication) unless the station of the pairing
+# does not declare profile 0 in its client role (contract 0.7,
+# client.securityProfiles): its pairings then run with HTTP Basic
+# authentication, profile 1, at both ends.
+BASE_PROFILE=0
+
+# base_profile_args <command and args...>: the flag that sets BASE_PROFILE,
+# for a server or client command that sets no profile of its own.
+base_profile_args() {
+    [[ "${BASE_PROFILE}" == 0 ]] && return 0
+    [[ "$1" == server || "$1" == client ]] || return 0
+    [[ " $* " == *" --security-profile "* ]] && return 0
+    echo "--security-profile ${BASE_PROFILE}"
+}
+
 # start <name> <adapter> [docker run options --] <command and args...>
 # Starts a detached container on the test network.
 start() {
     local name="$1" adapter="$2"; shift 2
-    local opts=()
+    local opts=() base
     if [[ " $* " == *" -- "* ]]; then
         while [[ "$1" != "--" ]]; do opts+=("$1"); shift; done
         shift
     fi
+    base=$(base_profile_args "$@")
     docker rm -f "${name}" >/dev/null 2>&1
+    # shellcheck disable=SC2086 # base is empty or one flag and its value
     docker run -d --name "${name}" --network "${NETWORK}" --label "ocpp-interop.run=${RUN_ID}" \
-        ${opts[@]+"${opts[@]}"} "$(image_of "${adapter}")" "$@" >/dev/null
+        ${opts[@]+"${opts[@]}"} "$(image_of "${adapter}")" "$@" ${base} >/dev/null
 }
 
 # wait_ready <container>: the ready file exists only once the server listens,
@@ -112,8 +130,11 @@ run_client() {
         while [[ "$1" != "--" ]]; do opts+=("$1"); shift; done
         shift
     fi
+    local base
+    base=$(base_profile_args client "$@")
+    # shellcheck disable=SC2086 # base is empty or one flag and its value
     docker run --rm --network "${NETWORK}" --label "ocpp-interop.run=${RUN_ID}" \
-        ${opts[@]+"${opts[@]}"} "$(image_of "${adapter}")" client "$@" 2>/dev/null
+        ${opts[@]+"${opts[@]}"} "$(image_of "${adapter}")" client "$@" ${base} 2>/dev/null
 }
 
 # JSON helpers for jq, shared by the tests:

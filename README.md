@@ -9,7 +9,7 @@ against real implementation diversity, in both roles and in both directions
 of request flow, without owning any of that code.
 
 > **Status: Phase 6 (OCPP 2.1).** `mobilityhouse`, `chargetime` and
-> `lorenzodonini` implement the container contract, draft 0.5, for OCPP 1.6J
+> `lorenzodonini` implement the container contract (draft 0.7) for OCPP 1.6J
 > and 2.0.1 in both roles, and `mobilityhouse` also for OCPP 2.1 (the pinned
 > releases of the other two upstreams have no 2.1), with security profiles 0
 > to 3 (TLS and mutual TLS) and, where the upstream can, compression. `everest` (EVerest
@@ -17,9 +17,11 @@ of request flow, without owning any of that code.
 > independent OCPP 2.1 implementation. `citrineos` (CitrineOS) is a CSMS for
 > the same three: the second independent OCPP 2.1 CSMS. They are self-tested
 > against each other in both directions of request flow, with the upstream
-> defects that shows recorded ([results](docs/COMPATIBILITY.md)). No pinned
-> upstream release implements the OCPP 2.1 SEND and CALLRESULTERROR frames
-> yet. See [PLAN.md](PLAN.md).
+> defects that shows recorded ([results](docs/COMPATIBILITY.md)). `cbsigma`
+> (cB-Sigma/ocpp, Go) and `ocppkit` (hupe1980/ocpp-kit, Rust) have both
+> roles in all three versions and the OCPP 2.1 SEND and CALLRESULTERROR
+> frames, so each of those is tested between two independent
+> implementations. See [PLAN.md](PLAN.md).
 
 ## Table of contents
 
@@ -60,7 +62,8 @@ to the specification. Neither does it establish OCA certification.
 | `chargetime` | [ChargeTimeEU/Java-OCA-OCPP](https://github.com/ChargeTimeEU/Java-OCA-OCPP) v2.0 | Java | 1.6J, 2.0.1 (2.1 on master only, unreleased) | **built: 1.6J and 2.0.1, both roles**, security profiles 0 to 3, compression in 2.0.1 (known upstream defects) |
 | `lorenzodonini` | [lorenzodonini/ocpp-go](https://github.com/lorenzodonini/ocpp-go) v0.19.0 | Go | 1.6J, 2.0.1 | **built: 1.6J and 2.0.1, both roles**, security profiles 0 to 3; no compression (its CSMS cannot accept it) |
 | `everest` | [EVerest libocpp](https://github.com/EVerest/everest-core/tree/2026.02.2/lib/everest/ocpp), everest-core 2026.02.2 | C++ | 1.6J, 2.0.1, 2.1 (station only) | **built: 1.6J, 2.0.1 and 2.1, station (`client`) only**, security profiles 0 to 3; no compression (libocpp cannot offer it) |
-| `cbsigma` | [cB-Sigma/ocpp](https://github.com/cB-Sigma/ocpp) v0.2.0 | Go | 1.6J, 2.0.1, 2.1 | **built: 1.6J, 2.0.1 and 2.1, both roles**, security profiles 0 to 3, OCPP 2.1 SEND and CALLRESULTERROR (the only reference with them); no compression (its station cannot offer it) |
+| `cbsigma` | [cB-Sigma/ocpp](https://github.com/cB-Sigma/ocpp) v0.2.0 | Go | 1.6J, 2.0.1, 2.1 | **built: 1.6J, 2.0.1 and 2.1, both roles**, security profiles 0 to 3, OCPP 2.1 SEND and CALLRESULTERROR; no compression (its station cannot offer it) |
+| `ocppkit` | [hupe1980/ocpp-kit](https://github.com/hupe1980/ocpp-kit) 0.3.0 | Rust | 1.6J, 2.0.1, 2.1 | **built: 1.6J, 2.0.1 and 2.1, both roles**, security profiles 0 to 3 (the station 1 to 3: it always authenticates), compression, OCPP 2.1 SEND and CALLRESULTERROR |
 | `citrineos` | [citrineos/citrineos-core](https://github.com/citrineos/citrineos-core) v2.1.0 | TypeScript | 1.6J, 2.0.1, 2.1 (CSMS only) | **built: 1.6J, 2.0.1 and 2.1, CSMS (`server`) only**, security profiles 0 to 3, compression; CitrineOS answers by itself (`fixtureAnswers: false`), with PostgreSQL and RabbitMQ in its image |
 
 The versions listed are what each upstream advertises. A version or feature

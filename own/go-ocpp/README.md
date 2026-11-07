@@ -117,9 +117,11 @@ a SEND action (NotifyPeriodicEventStream) is sent with `Client.Send` or
 `Session.Send` and received through `ocpp.SendDispatcher`; a response is read
 into a type that validates itself with `ValidateResponse`, so go-ocpp answers
 an invalid one with a CALLRESULTERROR; an `invalidAnswers` entry of the
-fixture is sent as it is. The independent peer is the `cbsigma` reference
-(cB-Sigma/ocpp); the other references know the message types 2 to 4 only, or
-have no OCPP 2.1.
+fixture is sent as it is. The independent peers are the `cbsigma` (cB-Sigma/ocpp,
+Go) and `ocppkit` (hupe1980/ocpp-kit, Rust) references; the other references
+know the message types 2 to 4 only, or have no OCPP 2.1. With the ocppkit
+station, whose station always authenticates, the pairings run with security
+profile 1 at both ends.
 
 `compression` in `connection-opened` is what the handshake negotiated:
 go-ocpp's `ocpp.ConnInfo.Compression` and `server.Session.Compression` (from

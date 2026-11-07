@@ -107,6 +107,17 @@ def cbsigma():
     return latest, tags[latest], "git tags of cB-Sigma/ocpp"
 
 
+def ocppkit():
+    # The crate is built from crates.io; the commit of its git tag is what the
+    # image reports as the upstream revision (the Dockerfile checks it against
+    # the crate's .cargo_vcs_info.json).
+    crate = json.loads(fetch("https://crates.io/api/v1/crates/ocpp-kit"))
+    live = [v["num"] for v in crate["versions"] if not v.get("yanked")]
+    latest = newest(live)
+    tags = git_tags("https://github.com/hupe1980/ocpp-kit.git")
+    return latest, tags.get("v" + latest, tags.get(latest, "")), "crates.io (commit: git tags of hupe1980/ocpp-kit)"
+
+
 RESOLVERS = {
     "mobilityhouse": mobilityhouse,
     "chargetime": chargetime,
@@ -114,6 +125,7 @@ RESOLVERS = {
     "everest": everest,
     "citrineos": citrineos,
     "cbsigma": cbsigma,
+    "ocppkit": ocppkit,
 }
 
 

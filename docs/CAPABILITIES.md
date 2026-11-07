@@ -23,7 +23,7 @@ reports the rest as `SKIP_UNSUPPORTED`.
 `mobilityhouse`, `chargetime` and `lorenzodonini` declare OCPP 1.6 and
 2.0.1 in both roles, `mobilityhouse` also OCPP 2.1, `everest` OCPP 1.6,
 2.0.1 and 2.1 as a station only, `citrineos` the same three as a CSMS only,
-and `cbsigma` all three in both roles, exactly what
+and `cbsigma` and `ocppkit` all three in both roles, exactly what
 [scripts/smoke.sh](../scripts/smoke.sh) and
 [scripts/interop.sh](../scripts/interop.sh) exercise. Each role sends every
 action of the version that the specification gives to it (the direction
@@ -35,18 +35,22 @@ declared action and check its answer.
 
 | Declared actions | OCPP 1.6 (39) | OCPP 2.0.1 (64) | OCPP 2.1 (91) |
 |---|---|---|---|
-| Station sends | 14, all five stations | 25, all five stations | 37, cbsigma; 35, mobilityhouse and everest |
-| Station handles | 26, all five stations | 40, all five stations | 55, mobilityhouse and cbsigma; 54, everest |
-| CSMS sends | 26, all four adapters | 40, all four adapters | 55, mobilityhouse and cbsigma |
-| CSMS handles | 14, all four adapters | 25, all four adapters | 37, cbsigma; 36, mobilityhouse |
+| Station sends | 14, all six stations | 25, all six stations | 37, cbsigma and ocppkit; 35, mobilityhouse and everest |
+| Station handles | 26, all six stations | 40, all six stations | 55, mobilityhouse and cbsigma; 54, everest and ocppkit |
+| CSMS sends | 26, all five CSMSs but citrineos | 40, all five CSMSs but citrineos | 55, mobilityhouse and cbsigma; 54, ocppkit |
+| CSMS handles | 14, all five CSMSs but citrineos | 25, all five CSMSs but citrineos | 37, cbsigma and ocppkit; 36, mobilityhouse |
 
 The 2.1 station lists differ: mobilityhouse does not send BatterySwap
 (below), everest does not send GetCertificateChainStatus nor answer
 NotifyWebPaymentStarted (libocpp's message queue does not know them,
 [adapters/everest/README.md](../adapters/everest/README.md)); neither
-sends NotifyPeriodicEventStream (a SEND). cbsigma sends every station action
-of 2.1, the SEND NotifyPeriodicEventStream included (the feature `send`), and
-its CSMS receives it.
+sends NotifyPeriodicEventStream (a SEND). cbsigma and ocppkit send every
+station action of 2.1, the SEND NotifyPeriodicEventStream included (the
+feature `send`), and their CSMSs receive it. ocppkit leaves out
+NotifyWebPaymentStarted, which OCPP 2.1 has the CSMS send and ocpp-kit 0.3.0
+has as a station message
+([adapters/ocppkit/README.md](../adapters/ocppkit/README.md)). citrineos is
+counted apart (below).
 
 DataTransfer goes both ways and is counted in each direction. The pinned
 releases of Java-OCA-OCPP (v2.0) and ocpp-go (v0.19.0) have a request and a
@@ -95,14 +99,14 @@ and 14, 18 and 23 actions (sends and handles in 1.6, 2.0.1, 2.1).
 The features differ per adapter; they are the same in every version it
 declares, except `compression` for chargetime:
 
-| | mobilityhouse | chargetime | lorenzodonini | everest | citrineos |
-|---|---|---|---|---|---|
-| `securityProfiles` | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 |
-| `compression` | true (1.6, 2.0.1, 2.1) | 2.0.1: true, with known upstream defects in both roles; 1.6: false | false: the CSMS cannot accept it | false: libocpp cannot offer it | true: the CSMS accepts it (no station role) |
-| `fixtureCallErrors` | true | false | true | true | false |
-| `fixtureAnswers` | (not declared: true) | (true) | (true) | (true) | false |
-| `messageIds` | true | false | true | true | true |
-| `send`, `callResultError` | false | false | false | false | false |
+| | mobilityhouse | chargetime | lorenzodonini | everest | citrineos | cbsigma | ocppkit |
+|---|---|---|---|---|---|---|---|
+| `securityProfiles` | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3; the station 1, 2, 3 (`client.securityProfiles`) |
+| `compression` | true (1.6, 2.0.1, 2.1) | 2.0.1: true, with known upstream defects in both roles; 1.6: false | false: the CSMS cannot accept it | false: libocpp cannot offer it | true: the CSMS accepts it (no station role) | false: the station cannot offer it | true |
+| `fixtureCallErrors` | true | false | true | true | false | true | true |
+| `fixtureAnswers` | (not declared: true) | (true) | (true) | (true) | false | (true) | (true) |
+| `messageIds` | true | false | true | true | true | true | false |
+| `send`, `callResultError` | false | false | false | false | false | true in 2.1 | true in 2.1 |
 
 Each adapter explains its limitations in `notes`, per version. Known
 upstream defects that the self-tests show are in
@@ -153,10 +157,10 @@ pairings with it.
 
 | Key | Meaning |
 |---|---|
-| `securityProfiles` | Profiles exercised, in both roles: 0 (none), 1 (Basic over `ws://`), 2 (TLS + Basic), 3 (mutual TLS); see [Transport security](CONTAINER_CONTRACT.md#transport-security) |
+| `securityProfiles` | Profiles exercised: 0 (none), 1 (Basic over `ws://`), 2 (TLS + Basic), 3 (mutual TLS); see [Transport security](CONTAINER_CONTRACT.md#transport-security). In both roles, unless a role lists its own (`client.securityProfiles`, `server.securityProfiles`, contract 0.7): then this is every profile of either role |
 | `compression` | `permessage-deflate`: the station offers it with `--compression` and the CSMS accepts it, and it is used; both roles ([Compression](CONTAINER_CONTRACT.md#compression)) |
-| `send` | OCPP 2.1 SEND frames (message type 6) sent and received ([CONTAINER_CONTRACT.md](CONTAINER_CONTRACT.md#ocpp-21-send-and-callresulterror)): `client <Action>` and `call` send a SEND action as a SEND, the receiver reports it and never answers. With it, the SEND actions are in `sends` and, for the receiving role, in `handles`. `true` in 2.1 for `cbsigma` and the own image (`otfabric`); the other references know the message types 2 to 4 only, or have no 2.1 |
-| `callResultError` | OCPP 2.1 CALLRESULTERROR frames (message type 5) sent and received: an invalid CALLRESULT is answered with one, and one received is reported. With it, a fixture's `invalidAnswers` are sent as they are. `true` in 2.1 for `cbsigma` and `otfabric` |
+| `send` | OCPP 2.1 SEND frames (message type 6) sent and received ([CONTAINER_CONTRACT.md](CONTAINER_CONTRACT.md#ocpp-21-send-and-callresulterror)): `client <Action>` and `call` send a SEND action as a SEND, the receiver reports it and never answers. With it, the SEND actions are in `sends` and, for the receiving role, in `handles`. `true` in 2.1 for `cbsigma`, `ocppkit` and the own image (`otfabric`); the other references know the message types 2 to 4 only, or have no 2.1 |
+| `callResultError` | OCPP 2.1 CALLRESULTERROR frames (message type 5) sent and received: an invalid CALLRESULT is answered with one, and one received is reported. With it, a fixture's `invalidAnswers` are sent as they are. `true` in 2.1 for `cbsigma`, `ocppkit` and `otfabric` |
 | `fixtureCallErrors` | The adapter answers with the CALLERROR a fixture's `callError` answer names. Without it, such a fixture exits 5 |
 | `fixtureAnswers` | Every answer is the fixture's, and an action the fixture does not answer is answered with `NotImplemented`. Not declared means `true`. `false` (citrineos): the upstream is an application that answers by itself; `handles` then lists only the actions whose answer the self-tests found equal to the fixture's, and the `NotImplemented` test against it is `SKIP_UNSUPPORTED` |
 | `messageIds` | Result documents and the `call-sent` and `call-result` events carry the message id of the CALL the upstream sent |

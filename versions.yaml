@@ -8,8 +8,8 @@
 # (EVerest libocpp) is a station for OCPP 1.6J, 2.0.1 and 2.1, and citrineos
 # (CitrineOS) a CSMS for the same three.
 
-interop_version: "0.7.0"
-contract_version: "0.6"        # docs/CONTAINER_CONTRACT.md (draft until 1.0); documents carry schemaVersion "1.0"
+interop_version: "0.8.0"
+contract_version: "0.7"        # docs/CONTAINER_CONTRACT.md (draft until 1.0); documents carry schemaVersion "1.0"
 fixture_schema: "1.0"          # fixtures/schema/ocpp-fixture.schema.json
 
 protocol:
@@ -173,6 +173,32 @@ implementations:
       own interop module runs mobilityhouse/ocpp, ocpp-go and
       seanlee0923/ocpp against it.
 
+  ocppkit:
+    priority: P2
+    status: built
+    upstream: "hupe1980/ocpp-kit"
+    repository: "https://github.com/hupe1980/ocpp-kit"
+    crate: "ocpp-kit"
+    artifact: "crates:ocpp-kit@0.3.0"   # from crates.io; the crate is the tree of git tag v0.3.0 (.cargo_vcs_info.json)
+    version: "0.3.0"             # 2026-09-15, crates.io (git tag v0.3.0)
+    revision: "b64ce83ab46c742dfbd99e925cd0acfacbf2ddc9"
+    lock: "adapters/ocppkit/Cargo.lock"   # every crate by version and checksum
+    transport: "its own RFC 6455 WebSocket and RFC 7692 compression, rustls"
+    latest: "0.3.0"
+    license: "MIT OR Apache-2.0"
+    language: "Rust"
+    independent_engine: true     # its own codec, engine and WebSocket; no code of go-ocpp
+    roles: [server, client]
+    versions_verified: ["1.6", "2.0.1", "2.1"]   # by the self-tests (scripts/smoke.sh, scripts/interop.sh)
+    versions_claimed: ["1.6", "2.0.1", "2.1"]
+    note: >-
+      A Rust toolkit with a station, a CSMS and a local controller, the
+      OCPP 2.1 SEND and CALLRESULTERROR message types and permessage-deflate
+      in both roles. Its station has security profiles 1 to 3 only (no
+      connection without credentials), so its pairings run with HTTP Basic
+      authentication (client.securityProfiles, contract 0.7). It has OCPP
+      2.1 NotifyWebPaymentStarted in the wrong direction (not declared).
+
 # OT Fabric's own stacks. Not independent implementations, not in a release of
 # this repository or its manifest.json: see own/<library>/README.md.
 own_implementations:
@@ -211,7 +237,11 @@ base_images:
   debian:
     image: "docker.io/library/debian:trixie-slim"
     digest: "sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2"
-    used_by: [lorenzodonini, everest, cbsigma, otfabric]   # everest: build stage and runtime
+    used_by: [lorenzodonini, everest, cbsigma, ocppkit, otfabric]   # everest: build stage and runtime
+  rust:
+    image: "docker.io/library/rust:1.99.1-slim-trixie"
+    digest: "sha256:7eab7ce19273ce785e0ca7578bdf7bc1fcbae621775a8197379a04c9f6e03cd5"
+    used_by: [ocppkit]             # build stage only
   node:
     image: "docker.io/library/node:24.16.0-bookworm"
     digest: "sha256:40ad9f3064e67d6860b4bc3fe1880b2953934fd6320ada990e45fe0efa6badd7"
@@ -228,5 +258,6 @@ images:
   everest: "ghcr.io/otfabric/ocpp-interop-everest"
   citrineos: "ghcr.io/otfabric/ocpp-interop-citrineos"
   cbsigma: "ghcr.io/otfabric/ocpp-interop-cbsigma"
+  ocppkit: "ghcr.io/otfabric/ocpp-interop-ocppkit"
 
 platforms: ["linux/amd64", "linux/arm64"]

@@ -40,7 +40,11 @@
       "properties": {
         "supported": {"type": "boolean"},
         "sends": {"type": "array", "items": {"$ref": "#/$defs/action"}, "uniqueItems": true},
-        "handles": {"type": "array", "items": {"$ref": "#/$defs/action"}, "uniqueItems": true}
+        "handles": {"type": "array", "items": {"$ref": "#/$defs/action"}, "uniqueItems": true},
+        "securityProfiles": {
+          "type": "array", "items": {"enum": [0, 1, 2, 3]}, "uniqueItems": true,
+          "description": "Contract 0.7: the security profiles of this role, when they are not all of features.securityProfiles (a station that cannot connect without credentials)"
+        }
       }
     },
     "version": {
