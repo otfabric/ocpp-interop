@@ -75,6 +75,21 @@ if [[ $(wc -l <<<"${caps}") -eq 1 ]]; then ok "print-capabilities is one line"; 
 has_feature() { jq -e --arg v "${V}" --arg f "$1" '.versions[$v].features[$f] == true' <<<"${caps}" >/dev/null 2>&1; }
 has_role() { jq -e --arg v "${V}" --arg r "$1" '.versions[$v][$r].supported == true' <<<"${caps}" >/dev/null 2>&1; }
 has_profile() { jq -e --arg v "${V}" --argjson p "$1" '.versions[$v].features.securityProfiles | index($p) != null' <<<"${caps}" >/dev/null 2>&1; }
+# has_client_profile <n>: the client role takes part in security profile n
+# (contract 0.7: client.securityProfiles, else features.securityProfiles).
+has_client_profile() {
+    jq -e --arg v "$2" --argjson p "$1" '.versions[$v] | (.client.securityProfiles // .features.securityProfiles) | index($p) != null' \
+        <<<"${caps}" >/dev/null 2>&1
+}
+# set_base_profile <version>: a client without profile 0 is tested with HTTP
+# Basic authentication, profile 1, at both ends (BASE_PROFILE, scripts/lib.sh).
+set_base_profile() {
+    BASE_PROFILE=0
+    if jq -e --arg v "$1" '.versions[$v].client.supported == true' <<<"${caps}" >/dev/null 2>&1 && ! has_client_profile 0 "$1"; then
+        BASE_PROFILE=1
+        log "OCPP $1: the client has no security profile 0; servers and stations without a profile of their own use profile 1"
+    fi
+}
 DECLARED=$(jq -r '.versions | keys[]' <<<"${caps}" 2>/dev/null | tr '\n' ' ')
 log "declared OCPP versions: ${DECLARED}"
 
@@ -130,6 +145,11 @@ for p in 2 3; do
     has_profile "${p}" && continue
     expect_exit 5 "server with security profile ${p} (not declared)" "${IMAGE}" server --version 1.6 --security-profile "${p}" --tls-dir /tmp
 done
+if jq -e '.versions["1.6"].client.supported == true' <<<"${caps}" >/dev/null 2>&1 && ! has_client_profile 0 1.6; then
+    expect_exit 5 "client with security profile 0 (not declared for the client)" "${IMAGE}" client Heartbeat --version 1.6 \
+        --url ws://nowhere:9000/ocpp --security-profile 0
+fi
+set_base_profile 1.6
 doc=$(run_client "${ADAPTER}" FrobnicateThing --version 1.6 --url ws://nowhere:9000/ocpp); code=$?
 if [[ "${code}" == 5 ]] && jq -e '.ok == false and .error.code == "unsupported" and .operation == "FrobnicateThing"' <<<"${doc}" >/dev/null 2>&1
 then ok "client with an action the upstream does not have: exit 5 and a result document"; else fail "unknown action: exit ${code}, ${doc}"; fi
@@ -675,11 +695,16 @@ tls_checks() {
 }
 
 # The handshake response of the server to a request that offers
-# permessage-deflate, read with bash inside the server's own container.
+# permessage-deflate, read with bash inside the server's own container. With
+# BASE_PROFILE 1 the request has the station's Basic credentials.
 offer_deflate() {  # offer_deflate <server container>
+    local auth=""
+    if [[ "${BASE_PROFILE}" == 1 ]]; then
+        auth="Authorization: Basic $(jq -j --arg s "${STATION}" '.stations[] | select(.id == $s) | "\($s):\(.password)"' "${FIXTURE}" | base64 | tr -d '\n')\r\n"
+    fi
     docker exec "$1" bash -c 'exec 3<>/dev/tcp/127.0.0.1/9000 || exit 1
-        printf "GET /ocpp/%s HTTP/1.1\r\nHost: localhost:9000\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Protocol: %s\r\nSec-WebSocket-Extensions: permessage-deflate; client_max_window_bits\r\n\r\n" "$1" "$2" >&3
-        timeout 2 cat <&3; exit 0' _ "${STATION}" "$(jq -rn --arg v "${V}" '{"1.6": "ocpp1.6", "2.0.1": "ocpp2.0.1", "2.1": "ocpp2.1"}[$v]')" 2>/dev/null | tr -d '\r'
+        printf "GET /ocpp/%s HTTP/1.1\r\nHost: localhost:9000\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Protocol: %s\r\n%bSec-WebSocket-Extensions: permessage-deflate; client_max_window_bits\r\n\r\n" "$1" "$2" "$3" >&3
+        timeout 2 cat <&3; exit 0' _ "${STATION}" "$(jq -rn --arg v "${V}" '{"1.6": "ocpp1.6", "2.0.1": "ocpp2.0.1", "2.1": "ocpp2.1"}[$v]')" "${auth}" 2>/dev/null | tr -d '\r'
 }
 
 compression_checks() {
@@ -732,6 +757,7 @@ compression_checks() {
 
 for v in ${DECLARED}; do
     use_version "${v}"
+    set_base_profile "${v}"
     # The station of the transport checks: the image itself, or the client of
     # ${PEER} for an adapter without a client role.
     STA_ADAPTER="${ADAPTER}"

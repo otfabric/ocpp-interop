@@ -1,6 +1,6 @@
 # Container contract
 
-Version: **0.6 (draft)**. `contract_version` in [versions.yaml](../versions.yaml).
+Version: **0.7 (draft)**. `contract_version` in [versions.yaml](../versions.yaml).
 
 > Implemented by `mobilityhouse`, `chargetime` and `lorenzodonini` for OCPP
 > 1.6J and 2.0.1, and by `mobilityhouse` for OCPP 2.1, with security
@@ -8,7 +8,9 @@ Version: **0.6 (draft)**. `contract_version` in [versions.yaml](../versions.yaml
 > (a station only: `client` and `call`) for OCPP 1.6J, 2.0.1 and 2.1, and by
 > `citrineos` (a CSMS only: `server` and `call`) for the same three, and by
 > `cbsigma` (cB-Sigma/ocpp) for all three in both roles, with OCPP 2.1 SEND
-> and CALLRESULTERROR. It stays a draft (0.x)
+> and CALLRESULTERROR, and by `ocppkit` (hupe1980/ocpp-kit) for all three in
+> both roles, with SEND, CALLRESULTERROR and compression; its station has
+> security profiles 1 to 3 only. It stays a draft (0.x)
 > until every adapter implements every part of it;
 > [Gaps before 1.0](#gaps-before-10) lists what is missing. Until 1.0 it may
 > change without a major version bump.
@@ -167,7 +169,7 @@ answers CALLs the CSMS sends meanwhile from the fixture.
 | `--station ID` | the fixture's first station | Station identity |
 | `--fixture PATH` | `/fixtures/<version>/baseline/fixture.json` | Fixture used for answers and credentials |
 | `--payload JSON` | `{}` | Request payload (`client <Action>` only) |
-| `--security-profile N` | `0` | As for `server`; profiles 1 and 2 send the station identity and the fixture's password of that station |
+| `--security-profile N` | `0` | As for `server`; profiles 1 and 2 send the station identity and the fixture's password of that station. With a `--station` the fixture does not list, the adapter sends a password of its own, 16 to 20 characters (valid in 1.6 and 2.x), or exits 2; the server refuses the identity (`unknown-station`). A station that cannot do a profile exits 5 for it ([Transport security](#transport-security)) |
 | `--tls-dir DIR` | — | `ca.crt`, and for profile 3 `client.crt` and `client.key`. Required with profiles 2 and 3, a usage error with 0 and 1 |
 | `--compression` | off | Offer permessage-deflate, and use it when the CSMS accepts it ([Compression](#compression)). An adapter whose upstream cannot offer it in that version exits 5 |
 | `--connect-timeout-ms N` | 5000 | Upper bound for the WebSocket handshake |
@@ -336,7 +338,14 @@ may be RSA (2048 bits or more) or ECDSA on P-256; adapters accept both.
 
 An adapter or upstream that cannot do a profile leaves it out of
 `features.securityProfiles` and exits 5 for it, and says why in its
-`notes`.
+`notes`. When only one role can do a profile, the role says which profiles
+it has (`client.securityProfiles` or `server.securityProfiles`, contract
+0.7), and `features.securityProfiles` lists every profile of either role.
+A station without profile 0 cannot connect without credentials (OCPP 2.0.1
+and the 1.6 Security Whitepaper define profiles 1 to 3 only): the
+self-tests then run its pairings with profile 1 at both ends, for every
+server and station they start without a profile of their own, and skip
+`profile1.no-credentials`.
 
 ## Compression
 
@@ -482,27 +491,35 @@ from what the image serves. A fixture the image does not have exits 1.
 | Gap | Adapter |
 |---|---|
 | Compression (`features.compression`) | lorenzodonini: ocpp-go's `ws.Server` creates its WebSocket upgrader without compression and does not expose it, so the CSMS cannot accept it ([source](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ws/websocket.go#L284-L320)); its station offers it with `--compression`. chargetime, OCPP 1.6: JSONServer and JSONClient have no extensions ([source](https://github.com/ChargeTimeEU/Java-OCA-OCPP/blob/f27fe5bfb03e01491100597d6859080f5ae07545/ocpp-v1_6-json/src/main/java/eu/chargetime/ocpp/JSONServer.java#L70)). chargetime, OCPP 2.0.1: declared, but Java-WebSocket 1.6.0 keeps its compression context against what it announces, in both roles (tests/known-bugs.tsv). cbsigma: `chargepoint.Config` cannot offer permessage-deflate (`client --compression` exits 5); its CSMS accepts it |
-| `compression` in `connection-opened` | chargetime: not exposed (`null` when it may have been negotiated). lorenzodonini: the station does not see it (`null` with `--compression`). cbsigma: the CSMS does not see whether it was negotiated (`null` when the station offers it) |
+| `compression` in `connection-opened` | chargetime: not exposed (`null` when it may have been negotiated). lorenzodonini: the station does not see it (`null` with `--compression`). cbsigma: the CSMS does not see whether it was negotiated (`null` when the station offers it). ocppkit: ocpp-kit does not say whether it was negotiated (`null` when offered) |
 | HTTP 401 for refused credentials and certificates | chargetime: Java-WebSocket 1.6.0 answers every handshake the adapter refuses with HTTP 404 ([source](https://github.com/TooTallNate/Java-WebSocket/blob/da3cf2a777aed862f2f5b5cf060cae7969958667/src/main/java/org/java_websocket/WebSocketImpl.java#L426-L428)); the event has the right reason |
 | OCPP 2.1 | chargetime: the pinned release (v2.0, the latest on Maven Central) has no 2.1; the upstream's master added it after that release. lorenzodonini: ocpp-go v0.19.0 has no 2.1 |
 | The features `send` and `callResultError` (SEND and CALLRESULTERROR) | mobilityhouse, everest, citrineos: The Mobility House ocpp 2.1.0 and EVerest libocpp (everest-core 2026.02.2) know the message types 2 to 4 only, CitrineOS v2.1.0 knows message types 2 to 4 only (its `MessageTypeId`); chargetime, lorenzodonini: no 2.1 in their pinned releases |
 | `NotImplemented` for an OCPP 2.1 action the fixture does not answer | mobilityhouse: ocpp 2.1.0 does not answer such a CALL at all (tests/known-bugs.tsv) |
 | `callError` answers from the fixture (`fixtureCallErrors`) | chargetime: Java-OCA-OCPP answers a failed handler with `InternalError` only |
 | `NotImplemented` for a Core profile action the fixture does not answer | chargetime, OCPP 1.6: JSONServer and JSONClient always register the Core profile, so such an action reaches the adapter, which can only fail it (`InternalError`) |
-| Message ids of sent CALLs (`messageIds`), subprotocol and close code in events | chargetime: not exposed by Java-OCA-OCPP. lorenzodonini: the station does not see the negotiated subprotocol, the server not the close code |
-| `protocol-error` events | chargetime: the upstream logs unparsable frames without a hook. cbsigma: cB-Sigma has no hook for a frame it cannot read |
+| Message ids of sent CALLs (`messageIds`), subprotocol and close code in events | chargetime: not exposed by Java-OCA-OCPP. lorenzodonini: the station does not see the negotiated subprotocol, the server not the close code. ocppkit: ocpp-kit does not return the id of a CALL it sends, and reports the end of a session for logs only (`code` and `reason` `null`) |
+| `protocol-error` events | chargetime: the upstream logs unparsable frames without a hook. cbsigma: cB-Sigma has no hook for a frame it cannot read. ocppkit: ocpp-kit has no hook for a frame it cannot read |
 | `connection-rejected` with reason `subprotocol` | chargetime: the 1.6 JSONServer also accepts a handshake without a subprotocol; mobilityhouse and lorenzodonini report it |
 | HTTP 404 for an identity the fixture does not list | lorenzodonini: ocpp-go's connection check refuses with 401 only (the event's reason is right). cbsigma: `csms.Config.Authenticate` refuses with 401 only (the event's reason is right) |
 | `--bind-address` other than `0.0.0.0` | lorenzodonini: ocpp-go's ws.Server listens on all addresses; another address exits 5 |
 | `server` (a CSMS) | everest: libocpp implements the charging station only; `server` exits 5 after the usage checks |
 | Close code in `connection-closed` | everest: libocpp's websocket does not pass it to the application |
-| `--station ""` | everest: libocpp always appends the identity to the URL; exits 5. cbsigma: `chargepoint` always appends the identity to the URL; exits 5 |
+| `--station ""` | everest: libocpp always appends the identity to the URL; exits 5. cbsigma: `chargepoint` always appends the identity to the URL; exits 5. ocppkit: the station always appends the identity to the URL; exits 5 |
+| Security profile 0 as a station | ocppkit: ocpp-kit's station always sends credentials (`client.securityProfiles` `[1, 2, 3]`); `client --security-profile 0` exits 5 |
 | `client` (a station) | citrineos: CitrineOS is a CSMS only; `client` exits 5 after the usage checks |
 | Answers from the fixture (`fixtureAnswers`), `NotImplemented` for an action the fixture does not answer, `callError` answers (`fixtureCallErrors`) | citrineos: CitrineOS answers every CALL itself; `handles` lists the actions whose answer is the fixture's ([adapters/citrineos/README.md](../adapters/citrineos/README.md)) |
 | Every CSMS action of the version (`call`) | citrineos: CitrineOS's REST message API has no endpoint for the 1.6 reservation and Security Whitepaper messages, nor for most actions OCPP 2.1 adds; `call` exits 5 for them |
 
 ## Changes
 
+- **0.7** (unreleased): security profiles per role. The optional
+  `securityProfiles` of `client` and `server` in the capabilities says which
+  profiles a role has when they are not all of `features.securityProfiles`;
+  a station without profile 0 is tested with profile 1 at both ends. With a
+  `--station` the fixture does not list, a station at profile 1 or 2 may
+  send a password of its own. In the new adapter `ocppkit`, whose station
+  always authenticates.
 - **0.6** (unreleased): OCPP 2.1 SEND and CALLRESULTERROR, in the new
   adapter `cbsigma` and the own image. With `send`, `client <Action>` and
   `call` send a SEND action as a SEND frame (`response` `null`); the events

@@ -153,7 +153,9 @@ declares() { jq -e --arg v "${OCPP}" ".versions[\$v] // {} | $2" "${WORK}/caps-$
 sends() { declares "$1" ".$2.sends // [] | index(\"$3\") != null"; }
 handles() { declares "$1" ".$2.handles // [] | index(\"$3\") != null"; }
 feature() { declares "$1" ".features.$2 == true"; }
-profile() { declares "$1" ".features.securityProfiles // [] | index($2) != null"; }
+# profile <adapter> <role> <n>: the role takes part in security profile n
+# (contract 0.7: <role>.securityProfiles, else features.securityProfiles).
+profile() { declares "$1" "(.$2.securityProfiles // .features.securityProfiles // []) | index($3) != null"; }
 
 # known_bug <client> <server> <test id>: "<evidence>\t<summary>" of a known
 # bug that explains a failure of this test in this pairing, if there is one.
@@ -568,7 +570,18 @@ pairing() {  # pairing <client adapter> <server adapter>
             "OCPP ${OCPP} is not declared by ${client} (client) or ${server} (server)"
         return
     fi
-    log "OCPP ${OCPP}: ${client} -> ${server}"
+    # A station without profile 0 runs the pairing with HTTP Basic
+    # authentication (BASE_PROFILE, scripts/lib.sh).
+    BASE_PROFILE=0
+    if ! profile "${client}" client 0; then
+        if ! profile "${client}" client 1 || ! profile "${server}" server 1; then
+            record "${VDIR}.pairing" "${client}" "${server}" client other "" SKIP_UNSUPPORTED 0 \
+                "${client} (client) has no security profile 0, and not both ${client} and ${server} declare profile 1"
+            return
+        fi
+        BASE_PROFILE=1
+    fi
+    log "OCPP ${OCPP}: ${client} -> ${server}$([[ "${BASE_PROFILE}" == 0 ]] || echo " (security profile ${BASE_PROFILE})")"
 
     start "${srv}" "${server}" -- server --version "${OCPP}"
     if ! wait_ready "${srv}"; then
@@ -660,26 +673,35 @@ pairing() {  # pairing <client adapter> <server adapter>
     stop_container "${srv}"
 
     # ---- security profile 1: HTTP Basic authentication over ws:// ----
-    if profile "${client}" 1 && profile "${server}" 1; then
+    if profile "${client}" client 1 && profile "${server}" server 1; then
         start "${srv}" "${server}" -- server --version "${OCPP}" --security-profile 1
         if wait_ready "${srv}"; then
             one_shot ${VDIR}.profile1.accepted "${client}" "${server}" security-profile-1 Heartbeat ok "${srv}" --security-profile 1
             record ${VDIR}.profile1.accepted "${client}" "${server}" client security-profile-1 Heartbeat \
                 "$([[ -z "${ONE_SHOT_PROBLEM}" ]] && echo PASS || echo FAIL)" "${ONE_SHOT_MS}" "${ONE_SHOT_PROBLEM}"
 
-            one_shot ${VDIR}.profile1.no-credentials "${client}" "${server}" security-profile-1 Heartbeat connect-failed "${srv}"
-            problem="${ONE_SHOT_PROBLEM}"
-            if [[ -z "${problem}" ]] && ! wait_event "${srv}" '.event == "connection-rejected" and .station == $s and .reason == "authentication"' --arg s "${STATION}" >/dev/null; then
-                problem="the server reported no connection-rejected event with reason authentication"
+            if profile "${client}" client 0; then
+                one_shot ${VDIR}.profile1.no-credentials "${client}" "${server}" security-profile-1 Heartbeat connect-failed "${srv}" \
+                    --security-profile 0
+                problem="${ONE_SHOT_PROBLEM}"
+                if [[ -z "${problem}" ]] && ! wait_event "${srv}" '.event == "connection-rejected" and .station == $s and .reason == "authentication"' --arg s "${STATION}" >/dev/null; then
+                    problem="the server reported no connection-rejected event with reason authentication"
+                fi
+                record ${VDIR}.profile1.no-credentials "${client}" "${server}" client security-profile-1 "" \
+                    "$([[ -z "${problem}" ]] && echo PASS || echo FAIL)" "${ONE_SHOT_MS}" "${problem}"
+            else
+                record ${VDIR}.profile1.no-credentials "${client}" "${server}" client security-profile-1 "" SKIP_UNSUPPORTED 0 \
+                    "${client} (client) cannot connect without credentials (no security profile 0)"
             fi
-            record ${VDIR}.profile1.no-credentials "${client}" "${server}" client security-profile-1 "" \
-                "$([[ -z "${problem}" ]] && echo PASS || echo FAIL)" "${ONE_SHOT_MS}" "${problem}"
 
             one_shot ${VDIR}.profile1.wrong-password "${client}" "${server}" security-profile-1 Heartbeat connect-failed "${srv}" \
                 -v "${WORK}/fixtures:/wrong:ro" -- --security-profile 1 --fixture /wrong/password/${VDIR}/baseline/fixture.json
             problem="${ONE_SHOT_PROBLEM}"
-            if [[ -z "${problem}" ]] && [[ $(events "${srv}" | jq -c 'select(.event == "connection-rejected" and .reason == "authentication")' | wc -l) -lt 2 ]]; then
-                problem="the server reported no second connection-rejected event with reason authentication"
+            # The second refusal, after no-credentials; the first when that was skipped.
+            local refusals=2
+            profile "${client}" client 0 || refusals=1
+            if [[ -z "${problem}" ]] && [[ $(events "${srv}" | jq -c 'select(.event == "connection-rejected" and .reason == "authentication")' | wc -l) -lt "${refusals}" ]]; then
+                problem="the server reported no connection-rejected event with reason authentication for the wrong password"
             fi
             record ${VDIR}.profile1.wrong-password "${client}" "${server}" client security-profile-1 "" \
                 "$([[ -z "${problem}" ]] && echo PASS || echo FAIL)" "${ONE_SHOT_MS}" "${problem}"
@@ -832,7 +854,7 @@ session() {
 # transport <client> <server>: security profiles 2 and 3, and compression.
 transport() {
     local client="$1" server="$2" url="csms-$2-${RUN_ID}:9000/ocpp" tls="/tls/${VDIR}"
-    if profile "${client}" 2 && profile "${server}" 2; then
+    if profile "${client}" client 2 && profile "${server}" server 2; then
         session "${VDIR}.tls.profile2" "${client}" "${server}" security-profile-2 \
             --security-profile 2 --tls-dir "${tls}/rsa/server" -- \
             --url "wss://${url}" --security-profile 2 --tls-dir "${tls}/rsa/station"
@@ -840,7 +862,7 @@ transport() {
         record "${VDIR}.tls.profile2" "${client}" "${server}" client security-profile-2 "" SKIP_UNSUPPORTED 0 \
             "security profile 2 is not declared by both ${client} and ${server}"
     fi
-    if profile "${client}" 3 && profile "${server}" 3; then
+    if profile "${client}" client 3 && profile "${server}" server 3; then
         session "${VDIR}.tls.profile3" "${client}" "${server}" security-profile-3 \
             --security-profile 3 --tls-dir "${tls}/ec/server" -- \
             --url "wss://${url}" --security-profile 3 --tls-dir "${tls}/ec/station"

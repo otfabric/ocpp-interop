@@ -107,7 +107,15 @@ interoperability. First slice: OCPP 1.6J only (2026-10-18).
 - [ ] 2.1 in `chargetime`: Java-OCA-OCPP has 2.1 (with SEND and
       CALLRESULTERROR) on master since 2025-12-13, after its v2.0 release,
       the latest on Maven Central. Waits for a release (R2.2)
-- [ ] SEND and CALLRESULTERROR: a contract operation and the features
-      `send` and `callResultError`, once a pinned upstream release
-      implements them (neither ocpp 2.1.0 nor libocpp of everest-core
-      2026.02.1 does)
+- [x] SEND and CALLRESULTERROR: contract 0.6 and the features `send` and
+      `callResultError`, in the `cbsigma` adapter (cB-Sigma/ocpp v0.2.0,
+      Go), v0.7.0
+- [x] `ocppkit` adapter (Rust, hupe1980/ocpp-kit 0.3.0): both roles in
+      1.6J, 2.0.1 and 2.1, SEND, CALLRESULTERROR and compression; SEND and
+      CALLRESULTERROR between two independent implementations. Contract
+      0.7: security profiles per role (its station always authenticates)
+- [ ] The Local Controller (OCPP 2.0.1 and 2.1 Part 1): a contract role
+      that relays between stations and a CSMS, with ocpp-kit's
+      `LocalController`
+- [ ] seanlee0923/ocpp (Go): its CSMS receives SEND; to evaluate as a
+      reference

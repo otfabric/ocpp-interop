@@ -33,7 +33,7 @@ BUILDER ?= ocpp-interop
 
 # Adapters with an image, in priority order. The self-tests run over all of
 # them; override to work on one: make smoke ADAPTERS=mobilityhouse
-ADAPTERS ?= mobilityhouse chargetime lorenzodonini everest citrineos cbsigma
+ADAPTERS ?= mobilityhouse chargetime lorenzodonini everest citrineos cbsigma ocppkit
 
 image = $(REGISTRY)/ocpp-interop-$(1)
 
@@ -84,7 +84,7 @@ fixtures: ## Validate every fixture against the schema and the cross-field rules
 	@echo "Validating fixtures..."
 	$(call with_jsonschema,scripts/validate-fixtures.py --require-schema)
 
-lint: ## Shellcheck the scripts, byte-compile the Python ones, gofmt the Go adapter (the image build also runs gofmt and go vet)
+lint: ## Shellcheck the scripts, byte-compile the Python ones, gofmt the Go adapters (the image builds also run gofmt and go vet, cargo fmt and clippy)
 	@if command -v shellcheck >/dev/null; then \
 		shellcheck --severity=warning -x -P scripts scripts/*.sh; \
 	else \

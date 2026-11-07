@@ -127,7 +127,8 @@ jobs:
 
       - name: Pull the reference images of ${{ needs.version.outputs.harness }}
         run: |
-          for a in mobilityhouse chargetime lorenzodonini everest citrineos cbsigma; do
+          # The references of that release: its Makefile's ADAPTERS.
+          for a in $(sed -nE 's/^ADAPTERS \?= //p' harness/Makefile); do
             scripts/retry.sh docker pull --quiet "ghcr.io/otfabric/ocpp-interop-${a}:${VERSION}"
             docker run --rm "ghcr.io/otfabric/ocpp-interop-${a}:${VERSION}" print-capabilities \
               | jq -r --arg image "${a}:${VERSION}" '"- \($image): \(.upstream.name) \(.upstream.version)"' | tee -a "$GITHUB_STEP_SUMMARY"
@@ -139,7 +140,8 @@ jobs:
           set -o pipefail
           mkdir -p reports
           REPORT_DIR=reports scripts/smoke.sh otfabric
-          REPORT_DIR=reports scripts/interop.sh otfabric mobilityhouse chargetime lorenzodonini everest citrineos cbsigma 2>&1 | tee reports/interop.log
+          # shellcheck disable=SC2046 # one argument per adapter
+          REPORT_DIR=reports scripts/interop.sh otfabric $(sed -nE 's/^ADAPTERS \?= //p' Makefile) 2>&1 | tee reports/interop.log
           python3 scripts/validate-documents.py reports
           grep -E '^\[(smoke|interop)\]' reports/interop.log | tee -a "$GITHUB_STEP_SUMMARY" || true
 
