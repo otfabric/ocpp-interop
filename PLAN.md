@@ -42,13 +42,12 @@ interoperability. First slice: OCPP 1.6J only (2026-10-18).
       matrix (scripts/compat-matrix.py, docs/COMPATIBILITY.md)
 - [x] Per-architecture CI (native amd64 and arm64); image build, self-test
       and GHCR publish jobs in the release workflow; candidate builds in the
-      candidate workflow (`make candidate-<adapter>`). Written and checked
-      with actionlint, not yet run on GitHub; locally both images also build
-      and start for linux/amd64 under emulation, but are self-tested on
-      arm64 only
+      candidate workflow (`make candidate-<adapter>`). Run on GitHub for
+      every pull request and release since v0.1.0, natively on amd64 and
+      arm64
 - [x] Contract 0.2: what implementing it with these upstreams showed
 - [ ] Contract 1.0, once the adapters close the gaps the contract lists
-- [ ] Release v0.1.0 (the maintainer decides when)
+- [x] First release, v0.1.0; v0.10.0 is the latest (RELEASE.md)
 
 ## Phase 5 - OCPP 2.0.1 and the third adapter (open)
 
