@@ -60,6 +60,10 @@ class Convert(unittest.TestCase):
         self.assertEqual(got, {"a": True, "b": False})
         self.assertEqual(interop_result.schema_errors(doc), [])
 
+    def test_a_relayed_test_matches_the_entry_of_the_direct_test(self):
+        doc = convert([result("KNOWN_ISSUE", testId="v201.lc.from-csms.reset", evidence=URL, error="e")], {"the bug": True})
+        self.assertEqual(doc["results"][0]["waiver"], "w")
+
     def test_every_known_bug_line_parses(self):
         self.assertTrue(rr.load_waivers())
         ids = [w["id"] for w in rr.load_waivers()]

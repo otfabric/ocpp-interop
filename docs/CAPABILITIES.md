@@ -111,6 +111,7 @@ declares, except `compression` for chargetime:
 | `fixtureAnswers` | (not declared: true) | (true) | (true) | (true) | false | (true) | (true) | (true) |
 | `messageIds` | true | false | true | true | true | true | false | false |
 | `send`, `callResultError` | false | false | false | false | false | true in 2.1 | true in 2.1 | false |
+| `localController` (contract 0.8) | — | — | — | — | — | — | 2.0.1 and 2.1, profiles 0 to 3 | — |
 
 Each adapter explains its limitations in `notes`, per version. Known
 upstream defects that the self-tests show are in
@@ -168,5 +169,10 @@ pairings with it.
 | `fixtureCallErrors` | The adapter answers with the CALLERROR a fixture's `callError` answer names. Without it, such a fixture exits 5 |
 | `fixtureAnswers` | Every answer is the fixture's, and an action the fixture does not answer is answered with `NotImplemented`. Not declared means `true`. `false` (citrineos): the upstream is an application that answers by itself; `handles` then lists only the actions whose answer the self-tests found equal to the fixture's, and the `NotImplemented` test against it is `SKIP_UNSUPPORTED` |
 | `messageIds` | Result documents and the `call-sent` and `call-result` events carry the message id of the CALL the upstream sent |
+
+Not a feature key but an object of the version, beside `client` and
+`server`: `localController` (contract 0.8), `{"supported": true,
+"securityProfiles": [...]}` for an adapter with the `local-controller`
+command in that version ([CONTAINER_CONTRACT.md](CONTAINER_CONTRACT.md#local-controller)).
 
 Further boolean keys may be added in a minor version of the contract.

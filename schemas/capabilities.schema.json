@@ -64,6 +64,16 @@
           },
           "additionalProperties": {"type": "boolean"}
         },
+        "localController": {
+          "type": "object",
+          "description": "Contract 0.8: the local-controller command (an OCPP 2.x Local Controller, Part 4 chapter 6). Absent: not supported",
+          "required": ["supported"],
+          "additionalProperties": false,
+          "properties": {
+            "supported": {"type": "boolean"},
+            "securityProfiles": {"type": "array", "items": {"enum": [0, 1, 2, 3]}, "uniqueItems": true}
+          }
+        },
         "notes": {"type": "array", "items": {"type": "string"}}
       }
     }

@@ -38,6 +38,7 @@
         "version": {"enum": ["1.6", "2.0.1", "2.1"]},
         "client": {"$ref": "#/$defs/implementation"},
         "server": {"$ref": "#/$defs/implementation"},
+        "relay": {"$ref": "#/$defs/implementation", "description": "Contract 0.8: the Local Controller between the station (client) and the CSMS (server), in the v<version>.lc.* tests"},
         "initiator": {"enum": ["client", "server"], "description": "Which end sent the CALL under test"},
         "feature": {"type": "string"},
         "action": {"type": "string"},

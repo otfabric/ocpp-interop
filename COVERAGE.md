@@ -41,6 +41,7 @@ with the actions it declares
 | Security profiles 2 and 3 (TLS, RSA and ECDSA keys): accepted, CALLs from both ends; refused: wrong password, client certificate of another identity, from another CA, or none, server certificate from another CA or for another host name, `ws://` to a TLS server | tested | tested | tested |
 | Compression (permessage-deflate): the CSMS accepts it, the station offers it only with `--compression`, CALLs from both ends | tested | tested (chargetime: known upstream defects) | tested |
 | SEND and CALLRESULTERROR (NotifyPeriodicEventStream as a SEND; an invalid CALLRESULT answered with a CALLRESULTERROR, from each end) | — | — | tested between cbsigma and ocppkit, in both roles and with themselves; the other references know the message types 2 to 4 only, or have no 2.1 |
+| Local Controller (Part 4 chapter 6, contract 0.8): every sample of both ends relayed, the station's identity at the CSMS, close propagation in both directions, no CSMS (refused); each station through the controller to one CSMS, each CSMS behind it from one station; profiles 2 and 3 on both legs (smoke) | — | tested (ocpp-kit's controller) | tested (ocpp-kit's controller) |
 | Container contract: usage errors, exit codes, fixture validation, readiness, events, SIGTERM, health check, uid, licences | tested | tested | tested |
 
 ## Actions

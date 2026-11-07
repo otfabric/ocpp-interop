@@ -154,6 +154,20 @@ doc=$(run_client "${ADAPTER}" FrobnicateThing --version 1.6 --url ws://nowhere:9
 if [[ "${code}" == 5 ]] && jq -e '.ok == false and .error.code == "unsupported" and .operation == "FrobnicateThing"' <<<"${doc}" >/dev/null 2>&1
 then ok "client with an action the upstream does not have: exit 5 and a result document"; else fail "unknown action: exit ${code}, ${doc}"; fi
 expect_exit 3 "call without a running server or client run" "${IMAGE}" call Heartbeat
+# local-controller (contract 0.8), for an adapter that declares one.
+has_lc() { jq -e --arg v "$1" '.versions[$v].localController.supported == true' <<<"${caps}" >/dev/null 2>&1; }
+if jq -e '[.versions[] | .localController.supported == true] | any' <<<"${caps}" >/dev/null 2>&1; then
+    lcv=$(jq -r '[.versions | to_entries[] | select(.value.localController.supported == true) | .key][0]' <<<"${caps}")
+    expect_exit 2 "local-controller without --upstream" "${IMAGE}" local-controller --version "${lcv}"
+    expect_exit 2 "local-controller without --version" "${IMAGE}" local-controller --upstream ws://nowhere:9000/ocpp
+    expect_exit 2 "local-controller with an upstream that is not ws://" "${IMAGE}" local-controller --version "${lcv}" --upstream http://nowhere/ocpp
+    expect_exit 2 "local-controller with a wss:// upstream and security profile 0" "${IMAGE}" local-controller --version "${lcv}" --upstream wss://nowhere:9000/ocpp
+    expect_exit 2 "local-controller with an unknown flag" "${IMAGE}" local-controller --version "${lcv}" --upstream ws://nowhere:9000/ocpp --frobnicate 1
+    for v in 1.6 2.0.1 2.1; do
+        has_lc "${v}" || expect_exit 5 "local-controller --version ${v} (not declared)" "${IMAGE}" local-controller --version "${v}" \
+            --upstream ws://nowhere:9000/ocpp
+    done
+fi
 
 # A Reset the fixture's station answers: Soft in 1.6, Immediate in 2.0.1.
 reset_payload() { if [[ "${V}" == 1.6 ]]; then echo '{"type":"Soft"}'; else echo '{"type":"Immediate"}'; fi; }
@@ -755,6 +769,70 @@ compression_checks() {
     stop_container "${sta}"; stop_container "${srv}"
 }
 
+# ---- local-controller (contract 0.8): station -> controller -> CSMS ----
+lc_checks() {
+    has_lc "${V}" || return 0
+    local srv="lc-csms-${RUN_ID}" rel="lc-${RUN_ID}" sta="lc-station-${RUN_ID}" problems="" doc
+    start "${srv}" "${SRV_ADAPTER}" -- server --version "${V}"
+    wait_ready "${srv}" || { fail "local-controller: the server did not become ready"; stop_container "${srv}"; return 0; }
+    start "${rel}" "${ADAPTER}" -- local-controller --version "${V}" --upstream "ws://${srv}:9000/ocpp"
+    wait_ready "${rel}" || { fail "local-controller did not become ready"; stop_container "${rel}"; stop_container "${srv}"; return 0; }
+    start "${sta}" "${STA_ADAPTER}" -- client run --version "${V}" --url "ws://${rel}:9000/ocpp"
+    if wait_ready "${sta}"; then
+        doc=$(docker exec "${sta}" ocpp-interop call Heartbeat --timeout-ms 5000 2>/dev/null)
+        jq -e '.ok' <<<"${doc}" >/dev/null 2>&1 || problems+="Heartbeat through the controller: ${doc:0:200}; "
+        doc=$(docker exec "${srv}" ocpp-interop call --station "${STATION}" Reset --payload "$(reset_payload)" --timeout-ms 5000 2>/dev/null)
+        jq -e '.ok' <<<"${doc}" >/dev/null 2>&1 || problems+="Reset from the CSMS through the controller: ${doc:0:200}; "
+        wait_event "${srv}" '.event == "connection-opened" and .station == $s' --arg s "${STATION}" >/dev/null \
+            || problems+="the CSMS reported no connection-opened for the station; "
+        wait_event "${rel}" '.event == "relayed" and .station == $s and .direction == "northbound" and .messageType == "CALL" and .action == "Heartbeat"' \
+            --arg s "${STATION}" >/dev/null || problems+="no relayed northbound Heartbeat; "
+        wait_event "${rel}" '.event == "relayed" and .station == $s and .direction == "southbound" and .messageType == "CALL" and .action == "Reset"' \
+            --arg s "${STATION}" >/dev/null || problems+="no relayed southbound Reset; "
+        docker stop -t 15 "${sta}" >/dev/null 2>&1
+        wait_event "${srv}" '.event == "connection-closed" and .station == $s' --arg s "${STATION}" >/dev/null \
+            || problems+="the station closed, but the CSMS reported no connection-closed; "
+    else
+        problems+="client run through the controller did not connect; "
+    fi
+    events "${rel}" | grep -v '^{' | grep -q . && problems+="local-controller stdout has lines that are not JSON; "
+    verdict "${VDIR}.local-controller" "local-controller: CALLs from both ends relayed, the close propagated" "${problems}"
+    stop_container "${sta}"; stop_container "${rel}"; stop_container "${srv}"
+}
+
+# lc_tls_checks: security profiles 2 (RSA, Basic authentication passed
+# through) and 3 (ECDSA; the controller presents the station's certificate
+# upstream) on both legs, where the controller declares them.
+lc_tls_checks() {
+    has_lc "${V}" || return 0
+    local srv="lc-csms-${RUN_ID}" rel="lc-${RUN_ID}" sta="lc-station-${RUN_ID}" dir="${WORK}/lctls/${VDIR}" p type t problems doc
+    { make_pki "${dir}/rsa" rsa "${STATION}" "${srv}" "${rel}" \
+        && make_pki "${dir}/ec" ec "${STATION}" "${srv}" "${rel}"; } || { fail "local-controller: cannot generate the TLS material"; return 0; }
+    for p in 2 3; do
+        jq -e --arg v "${V}" --argjson p "${p}" '.versions[$v].localController.securityProfiles // [] | index($p) != null' \
+            <<<"${caps}" >/dev/null 2>&1 || continue
+        type=rsa; [[ "${p}" == 3 ]] && type=ec
+        t="/lctls/${VDIR}/${type}"; problems=""
+        start "${srv}" "${SRV_ADAPTER}" -v "${WORK}/lctls:/lctls:ro" -- server --version "${V}" --security-profile "${p}" --tls-dir "${t}/server"
+        wait_ready "${srv}" || { fail "local-controller profile ${p}: the server did not become ready"; stop_container "${srv}"; continue; }
+        start "${rel}" "${ADAPTER}" -v "${WORK}/lctls:/lctls:ro" -- local-controller --version "${V}" --security-profile "${p}" \
+            --tls-dir "${t}/server" --upstream "wss://${srv}:9000/ocpp" --upstream-tls-dir "${t}/station"
+        wait_ready "${rel}" || { fail "local-controller profile ${p} did not become ready"; stop_container "${rel}"; stop_container "${srv}"; continue; }
+        start "${sta}" "${STA_ADAPTER}" -v "${WORK}/lctls:/lctls:ro" -- client run --version "${V}" --url "wss://${rel}:9000/ocpp" \
+            --security-profile "${p}" --tls-dir "${t}/station"
+        if wait_ready "${sta}"; then
+            doc=$(docker exec "${sta}" ocpp-interop call Heartbeat --timeout-ms 5000 2>/dev/null)
+            jq -e '.ok' <<<"${doc}" >/dev/null 2>&1 || problems+="Heartbeat: ${doc:0:200}; "
+            doc=$(docker exec "${srv}" ocpp-interop call --station "${STATION}" Reset --payload "$(reset_payload)" --timeout-ms 5000 2>/dev/null)
+            jq -e '.ok' <<<"${doc}" >/dev/null 2>&1 || problems+="Reset from the CSMS: ${doc:0:200}; "
+        else
+            problems+="client run did not connect to the controller: $(events "${sta}" | jq -r 'select(.event == "connection-failed") | .detail' 2>/dev/null | sed -n 1p); "
+        fi
+        verdict "${VDIR}.local-controller.profile${p}" "local-controller, security profile ${p} on both legs" "${problems}"
+        stop_container "${sta}"; stop_container "${rel}"; stop_container "${srv}"
+    done
+}
+
 for v in ${DECLARED}; do
     use_version "${v}"
     set_base_profile "${v}"
@@ -762,10 +840,14 @@ for v in ${DECLARED}; do
     # ${PEER} for an adapter without a client role.
     STA_ADAPTER="${ADAPTER}"
     has_role client || STA_ADAPTER="${PEER}"
+    SRV_ADAPTER="${ADAPTER}"
+    has_role server || SRV_ADAPTER="${PEER}"
     log "OCPP ${V}"; CHECK_PREFIX="[${V}] "
     version_checks
     tls_checks
     compression_checks
+    lc_checks
+    lc_tls_checks
 done
 
 finish

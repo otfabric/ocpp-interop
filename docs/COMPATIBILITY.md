@@ -231,6 +231,66 @@ about conformance to the specification.
   it sends with one fraction digit (`ocpp.messages._DecimalEncoder`). The
   fixture's limits are whole numbers, so the tests do not exercise it.
 
+## Local Controller (contract 0.8)
+
+`ocppkit` is the only reference with a Local Controller (ocpp-kit's
+`transport::LocalController`, OCPP 2.0.1 and 2.1 Part 4 chapter 6), so the
+self-tests run it as a star: each station through it to the ocppkit CSMS,
+and each CSMS behind it with the ocppkit station (13 relayed pairings in
+2.0.1, 9 in 2.1; 1.6 has no Local Controller). Each runs every sample of
+both ends (`v<version>.lc.from-station.*`, `.lc.from-csms.*`, in 2.1 the
+SEND where both ends declare it), and checks that the CSMS sees the
+station's identity (`lc.connect`), that every CALL that passed was relayed
+in its direction (`lc.relayed`), that a close propagates from the station to
+the CSMS and from the CSMS to the station (`lc.close-from-station`,
+`lc.close-from-csms`), and that a station is refused when there is no CSMS
+(`lc.no-upstream`). Same run as the tables above (2026-11-07,
+linux/arm64): 1849 relayed results, 1712 PASS, 72 KNOWN_ISSUE, 65
+SKIP_UNSUPPORTED, 0 FAIL; the connect, relayed, close and no-upstream
+tests pass in all 22 pairings, and `v21.lc.send.notify-periodic-event-stream`
+passes between cbsigma and ocppkit and with ocppkit itself. The smoke test
+adds security profiles 2 and 3 on both legs. One controller is one
+implementation: the role is tested against every station and CSMS, not yet
+between two controllers (PLAN.md).
+
+| OCPP 2.0.1 | Station → | CSMS | Station-initiated | CSMS-initiated |
+|---|---|---|---|---|
+| | cbsigma | ocppkit | 33 pass | 40 pass |
+| | chargetime | ocppkit | 33 pass | 40 pass |
+| | everest | ocppkit | 32 pass 1 known | 40 pass |
+| | lorenzodonini | ocppkit | 32 pass 1 known | 39 pass 1 known |
+| | mobilityhouse | ocppkit | 33 pass | 40 pass |
+| | ocppkit | ocppkit | 33 pass | 40 pass |
+| | seanlee | ocppkit | 33 pass | 40 pass |
+| | ocppkit | cbsigma | 33 pass | 40 pass |
+| | ocppkit | chargetime | 6 pass 27 known | 40 known |
+| | ocppkit | citrineos | 24 pass 9 skip | 37 pass 3 skip |
+| | ocppkit | lorenzodonini | 33 pass | 39 pass 1 known |
+| | ocppkit | mobilityhouse | 33 pass | 40 pass |
+| | ocppkit | seanlee | 33 pass | 40 pass |
+
+| OCPP 2.1 | Station → | CSMS | Station-initiated | CSMS-initiated |
+|---|---|---|---|---|
+| | cbsigma | ocppkit | 45 pass | 54 pass 1 skip |
+| | everest | ocppkit | 42 pass 2 skip 1 known | 54 pass 1 skip |
+| | mobilityhouse | ocppkit | 43 pass 2 skip | 54 pass 1 skip |
+| | ocppkit | ocppkit | 45 pass | 54 pass 1 skip |
+| | seanlee | ocppkit | 44 pass 1 skip | 54 pass 1 skip |
+| | ocppkit | cbsigma | 45 pass | 54 pass 1 skip |
+| | ocppkit | citrineos | 24 pass 21 skip | 38 pass 17 skip |
+| | ocppkit | mobilityhouse | 44 pass 1 skip | 54 pass 1 skip |
+| | ocppkit | seanlee | 44 pass 1 skip | 54 pass 1 skip |
+
+The known issues are the defects of the direct pairings (below), and one
+that only the controller shows: OCPP 2.x Part 4 §3.4 requires a Local
+Controller to support permessage-deflate, and ocpp-kit's offers it on the
+CSMS leg, which the chargetime 2.0.1 CSMS accepts with its compression
+defect (it keeps its compression context although it announces
+`server_no_context_takeover`): the first CALL through the controller passes,
+and every later message from that CSMS cannot be decompressed
+(`chargetime:server@ocppkit` in tests/known-bugs.tsv). The citrineos skips
+are the actions it does not declare.
+
 ## Known upstream defects
 
 | Adapter | Upstream | Defect | Evidence |

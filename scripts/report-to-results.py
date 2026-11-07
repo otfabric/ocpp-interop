@@ -45,7 +45,10 @@ def applies(w, client, server, test_id):
 
 def waiver_of(waivers, r):
     for w in waivers:
-        if w["evidence"] == r.get("evidence") and applies(w, r["client"]["name"], r["server"]["name"], r["testId"]):
+        # A relayed test (v<version>.lc.*, contract 0.8) matches an entry for
+        # its own id, or for the same test without the Local Controller.
+        ids = (r["testId"], r["testId"].replace(".lc.", ".", 1))
+        if w["evidence"] == r.get("evidence") and any(applies(w, r["client"]["name"], r["server"]["name"], i) for i in ids):
             return w
     return None
 
