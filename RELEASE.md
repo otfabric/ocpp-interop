@@ -41,7 +41,10 @@ manual workflow and no releases (`own/go-ocpp/README.md`).
 
 ---
 
-## Unreleased
+## v0.9.0
+
+**Date:** 2026-11-07
+**Previous release:** v0.8.0
 
 ### Added
 
