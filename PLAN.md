@@ -117,5 +117,6 @@ interoperability. First slice: OCPP 1.6J only (2026-10-18).
 - [ ] The Local Controller (OCPP 2.0.1 and 2.1 Part 1): a contract role
       that relays between stations and a CSMS, with ocpp-kit's
       `LocalController`
-- [ ] seanlee0923/ocpp (Go): its CSMS receives SEND; to evaluate as a
-      reference
+- [x] `seanlee` adapter (Go, seanlee0923/ocpp v0.3.0): both roles in
+      1.6J (without the Security Whitepaper messages), 2.0.1 and 2.1,
+      security profiles 0 to 3; no compression, SEND or CALLRESULTERROR

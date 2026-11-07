@@ -199,6 +199,31 @@ implementations:
       authentication (client.securityProfiles, contract 0.7). It has OCPP
       2.1 NotifyWebPaymentStarted in the wrong direction (not declared).
 
+  seanlee:
+    priority: P2
+    status: built
+    upstream: "seanlee0923/ocpp"
+    repository: "https://github.com/seanlee0923/ocpp"
+    module: "github.com/seanlee0923/ocpp"
+    artifact: "go:github.com/seanlee0923/ocpp@v0.3.0"   # from proxy.golang.org; the module is the tree of the tag
+    version: "v0.3.0"            # 2026-08-13, git tag (the Go module version)
+    revision: "7e3759d106605a11e4e3f1ce45fc44e6f595cd3c"
+    lock: "adapters/seanlee/go.mod"   # with go.sum: every module by version and checksum
+    transport: "gorilla/websocket 1.5.3"
+    latest: "v0.3.0"
+    license: "MIT"
+    language: "Go"
+    independent_engine: true     # its own framing, routing and generated types; no code of go-ocpp
+    roles: [server, client]
+    versions_verified: ["1.6", "2.0.1", "2.1"]   # by the self-tests (scripts/smoke.sh, scripts/interop.sh)
+    versions_claimed: ["1.6", "2.0.1", "2.1"]
+    note: >-
+      A Go library with a CSMS (package csms) and a station (package
+      station), message types and validation generated from the OCA JSON
+      schemas, security profiles 0 to 3. No compression, no CALLRESULTERROR;
+      its CSMS takes OCPP 2.1 SENDs but neither role sends one. OCPP 1.6
+      without the Security Whitepaper messages.
+
 # OT Fabric's own stacks. Not independent implementations, not in a release of
 # this repository or its manifest.json: see own/<library>/README.md.
 own_implementations:
@@ -233,11 +258,11 @@ base_images:
   golang:
     image: "docker.io/library/golang:1.27.2-trixie"
     digest: "sha256:47667934874913a449b96faa7ef4777fa285d9ec29126ee80ed61c45b7cccf0e"
-    used_by: [lorenzodonini, cbsigma, otfabric]   # build stage only
+    used_by: [lorenzodonini, cbsigma, seanlee, otfabric]   # build stage only
   debian:
     image: "docker.io/library/debian:trixie-slim"
     digest: "sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2"
-    used_by: [lorenzodonini, everest, cbsigma, ocppkit, otfabric]   # everest: build stage and runtime
+    used_by: [lorenzodonini, everest, cbsigma, ocppkit, seanlee, otfabric]   # everest: build stage and runtime
   rust:
     image: "docker.io/library/rust:1.99.1-slim-trixie"
     digest: "sha256:7eab7ce19273ce785e0ca7578bdf7bc1fcbae621775a8197379a04c9f6e03cd5"
@@ -259,5 +284,6 @@ images:
   citrineos: "ghcr.io/otfabric/ocpp-interop-citrineos"
   cbsigma: "ghcr.io/otfabric/ocpp-interop-cbsigma"
   ocppkit: "ghcr.io/otfabric/ocpp-interop-ocppkit"
+  seanlee: "ghcr.io/otfabric/ocpp-interop-seanlee"
 
 platforms: ["linux/amd64", "linux/arm64"]

@@ -7,7 +7,7 @@
 | This repository (adapters, scripts, fixtures, schemas, documentation) | MIT, see [LICENSE](LICENSE) |
 | Upstream OCPP implementations and their dependencies inside the images | their own licences, listed below per image |
 | `own/go-ocpp/` (links go-ocpp) | MIT |
-| OCA specifications and JSON schemas | CC BY-ND 4.0; **not committed** to this repository. The `mobilityhouse` image contains the OCA JSON schemas the ocpp package ships, and the `cbsigma` binary the OCA schemas, WSDLs and appendix CSV files cB-Sigma/ocpp embeds (its `oca/`, with attribution and checksums), unmodified, as part of those packages. The `ocppkit` binary has none: ocpp-kit generates its code from the schemas its crate vendors |
+| OCA specifications and JSON schemas | CC BY-ND 4.0; **not committed** to this repository. The `mobilityhouse` image contains the OCA JSON schemas the ocpp package ships, and the `cbsigma` binary the OCA schemas, WSDLs and appendix CSV files cB-Sigma/ocpp embeds (its `oca/`, with attribution and checksums), unmodified, as part of those packages. The `ocppkit` and `seanlee` binaries have none: ocpp-kit and seanlee0923/ocpp generate their code (and, for seanlee0923/ocpp, the validation) from the schemas |
 
 Each image carries the full licence texts under `/licenses/<component>/`,
 this file as `/licenses/THIRD_PARTY_NOTICES.md`, and this repository's
@@ -168,3 +168,17 @@ and are not in the binary.
 | foldhash | 0.2.0 | Zlib | https://github.com/orlp/foldhash |
 | other crates (listed in `/licenses/BUNDLED-CRATES.txt`) | as locked in `adapters/ocppkit/Cargo.lock` | MIT, Apache-2.0 or both | https://crates.io |
 | Rust standard library | 1.99.1 | MIT OR Apache-2.0 | https://github.com/rust-lang/rust |
+
+## `ocpp-interop-seanlee`
+
+Base image `debian:trixie-slim` (Debian trixie). One statically linked Go
+binary (built with Go 1.27.2); `/licenses/BUNDLED-MODULES.txt` lists the
+modules in it, as `go version -m` reports them, and `/licenses` holds their
+licence files.
+
+| Component | Version | Licence | Source |
+|---|---|---|---|
+| seanlee0923/ocpp | v0.3.0 | MIT | https://github.com/seanlee0923/ocpp |
+| gorilla/websocket | v1.5.3 | BSD-2-Clause | https://github.com/gorilla/websocket |
+| google/uuid | v1.6.0 | BSD-3-Clause | https://github.com/google/uuid |
+| Go standard library and runtime | 1.27.2 | BSD-3-Clause | https://go.dev |

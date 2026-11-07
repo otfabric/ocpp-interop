@@ -23,7 +23,7 @@ reports the rest as `SKIP_UNSUPPORTED`.
 `mobilityhouse`, `chargetime` and `lorenzodonini` declare OCPP 1.6 and
 2.0.1 in both roles, `mobilityhouse` also OCPP 2.1, `everest` OCPP 1.6,
 2.0.1 and 2.1 as a station only, `citrineos` the same three as a CSMS only,
-and `cbsigma` and `ocppkit` all three in both roles, exactly what
+and `cbsigma`, `ocppkit` and `seanlee` all three in both roles, exactly what
 [scripts/smoke.sh](../scripts/smoke.sh) and
 [scripts/interop.sh](../scripts/interop.sh) exercise. Each role sends every
 action of the version that the specification gives to it (the direction
@@ -35,10 +35,10 @@ declared action and check its answer.
 
 | Declared actions | OCPP 1.6 (39) | OCPP 2.0.1 (64) | OCPP 2.1 (91) |
 |---|---|---|---|
-| Station sends | 14, all six stations | 25, all six stations | 37, cbsigma and ocppkit; 35, mobilityhouse and everest |
-| Station handles | 26, all six stations | 40, all six stations | 55, mobilityhouse and cbsigma; 54, everest and ocppkit |
-| CSMS sends | 26, all five CSMSs but citrineos | 40, all five CSMSs but citrineos | 55, mobilityhouse and cbsigma; 54, ocppkit |
-| CSMS handles | 14, all five CSMSs but citrineos | 25, all five CSMSs but citrineos | 37, cbsigma and ocppkit; 36, mobilityhouse |
+| Station sends | 14, the six other stations; 10, seanlee | 25, all seven stations | 37, cbsigma and ocppkit; 36, seanlee; 35, mobilityhouse and everest |
+| Station handles | 26, the six other stations; 19, seanlee | 40, all seven stations | 55, mobilityhouse, cbsigma and seanlee; 54, everest and ocppkit |
+| CSMS sends | 26, the five CSMSs but citrineos and seanlee; 19, seanlee | 40, all six CSMSs but citrineos | 55, mobilityhouse, cbsigma and seanlee; 54, ocppkit |
+| CSMS handles | 14, the five CSMSs but citrineos and seanlee; 10, seanlee | 25, all six CSMSs but citrineos | 37, cbsigma and ocppkit; 36, mobilityhouse and seanlee |
 
 The 2.1 station lists differ: mobilityhouse does not send BatterySwap
 (below), everest does not send GetCertificateChainStatus nor answer
@@ -49,7 +49,11 @@ station action of 2.1, the SEND NotifyPeriodicEventStream included (the
 feature `send`), and their CSMSs receive it. ocppkit leaves out
 NotifyWebPaymentStarted, which OCPP 2.1 has the CSMS send and ocpp-kit 0.3.0
 has as a station message
-([adapters/ocppkit/README.md](../adapters/ocppkit/README.md)). citrineos is
+([adapters/ocppkit/README.md](../adapters/ocppkit/README.md)). seanlee
+sends every station action of 2.1 but the SEND (its CSMS receives one), and
+in 1.6 only the 28 actions of OCPP 1.6 without the Security Whitepaper
+messages, which its `v16` package does not have
+([adapters/seanlee/README.md](../adapters/seanlee/README.md)). citrineos is
 counted apart (below).
 
 DataTransfer goes both ways and is counted in each direction. The pinned
@@ -99,14 +103,14 @@ and 14, 18 and 23 actions (sends and handles in 1.6, 2.0.1, 2.1).
 The features differ per adapter; they are the same in every version it
 declares, except `compression` for chargetime:
 
-| | mobilityhouse | chargetime | lorenzodonini | everest | citrineos | cbsigma | ocppkit |
-|---|---|---|---|---|---|---|---|
-| `securityProfiles` | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3; the station 1, 2, 3 (`client.securityProfiles`) |
-| `compression` | true (1.6, 2.0.1, 2.1) | 2.0.1: true, with known upstream defects in both roles; 1.6: false | false: the CSMS cannot accept it | false: libocpp cannot offer it | true: the CSMS accepts it (no station role) | false: the station cannot offer it | true |
-| `fixtureCallErrors` | true | false | true | true | false | true | true |
-| `fixtureAnswers` | (not declared: true) | (true) | (true) | (true) | false | (true) | (true) |
-| `messageIds` | true | false | true | true | true | true | false |
-| `send`, `callResultError` | false | false | false | false | false | true in 2.1 | true in 2.1 |
+| | mobilityhouse | chargetime | lorenzodonini | everest | citrineos | cbsigma | ocppkit | seanlee |
+|---|---|---|---|---|---|---|---|---|
+| `securityProfiles` | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3 | 0, 1, 2, 3; the station 1, 2, 3 (`client.securityProfiles`) | 0, 1, 2, 3 |
+| `compression` | true (1.6, 2.0.1, 2.1) | 2.0.1: true, with known upstream defects in both roles; 1.6: false | false: the CSMS cannot accept it | false: libocpp cannot offer it | true: the CSMS accepts it (no station role) | false: the station cannot offer it | true | false: neither role negotiates it |
+| `fixtureCallErrors` | true | false | true | true | false | true | true | true |
+| `fixtureAnswers` | (not declared: true) | (true) | (true) | (true) | false | (true) | (true) | (true) |
+| `messageIds` | true | false | true | true | true | true | false | false |
+| `send`, `callResultError` | false | false | false | false | false | true in 2.1 | true in 2.1 | false |
 
 Each adapter explains its limitations in `notes`, per version. Known
 upstream defects that the self-tests show are in

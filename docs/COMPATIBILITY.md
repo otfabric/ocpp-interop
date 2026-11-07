@@ -7,23 +7,25 @@ the station and by the CSMS. The matrix below is the output of `make matrix` (fr
 `reports/report-interop.json`, written by `make documents`); CI writes the
 same matrix for each architecture into its job summary.
 
-Run: 2026-11-07 on linux/arm64 (macOS, Docker 29.9), the seven adapters:
-the six images of v0.7.0 and the ocppkit image built from this repository,
-in seven shards (`INTEROP_PAIRS=<CSMS>@<version>`, one per CSMS) merged
-with `scripts/merge-reports.py`. The ocppkit station's profile 3 session
-with the chargetime CSMS hung now and then (about one handshake in seven) on
-a race in Java-WebSocket 1.6.0's TLS channel, which the chargetime adapter
-now avoids (adapters/chargetime/README.md, Transport security); these
-tables have the chargetime shard run with that fix. The
+Run: 2026-11-07 on linux/arm64 (macOS, Docker 29.9), the eight adapters:
+the images of v0.7.0 for mobilityhouse, lorenzodonini, everest, citrineos
+and cbsigma, and the chargetime, ocppkit and seanlee images built from this
+repository (chargetime with the TLS fix of v0.8.0: the ocppkit station's
+profile 3 handshake with it hung about one time in seven on a race in
+Java-WebSocket 1.6.0's TLS channel, adapters/chargetime/README.md), in seven
+shards (`INTEROP_PAIRS=<CSMS>@<version>`, one per CSMS) merged with
+`scripts/merge-reports.py`: 9902 results, 14 known-bug entries reproduced,
+none stale. The
 linux/amd64 images have not been self-tested locally; CI does that
 natively.
 
 `everest` (EVerest libocpp, everest-core 2026.02.2) is a station only, and
 `citrineos` (CitrineOS core v2.1.0) a CSMS only. Every pairing with `everest`
 as the CSMS or `citrineos` as the station is one `pairing` SKIP_UNSUPPORTED
-(not in the tables). The tables are from the run of the seven adapters on
-contract 0.7 (2026-11-07, linux/arm64): 6425 PASS, 47 KNOWN_ISSUE, 559
-SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR (v0.7.0, six adapters: 4190 PASS,
+(not in the tables). The tables are from the run of the eight adapters on
+contract 0.7 (2026-11-07, linux/arm64): 9010 PASS, 56 KNOWN_ISSUE, 836
+SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR (v0.8.0, seven adapters: 6425 PASS,
+47 KNOWN_ISSUE, 559 SKIP_UNSUPPORTED; v0.7.0, six adapters: 4190 PASS,
 37 KNOWN_ISSUE, 423 SKIP_UNSUPPORTED; v0.6.3, five
 adapters: 2455 PASS, 28 KNOWN_ISSUE, 300 SKIP_UNSUPPORTED; v0.4.0: 2196 PASS,
 29 KNOWN_ISSUE, 558 SKIP_UNSUPPORTED; the everest station now declares
@@ -49,7 +51,14 @@ with security profile 1 at both ends (contract 0.7). With it,
 `v21.send.notify-periodic-event-stream` and `v21.rpc.call-result-error`
 (both directions) pass between two independent implementations, cbsigma
 and ocppkit, in both roles; the own image runs them against both
-([own/go-ocpp/README.md](../own/go-ocpp/README.md)).
+([own/go-ocpp/README.md](../own/go-ocpp/README.md)). `seanlee`
+(seanlee0923/ocpp v0.3.0, Go) has both roles in the three versions and
+security profiles 0 to 3, without compression, SEND or CALLRESULTERROR; in
+the pairings with it, 2585 PASS, 9 KNOWN_ISSUE (the upstream defects of its
+peers, and one of its own, below), 298 SKIP_UNSUPPORTED: mostly the OCPP 1.6
+Security Whitepaper messages, which its `v16` package does not have (13 per
+action), compression, SEND and CALLRESULTERROR, and what its peers do not
+declare.
 
 Each cell: results of the CALLs and checks initiated by the station / by
 the CSMS. The baseline fixtures have a sample of every action of their
@@ -80,51 +89,55 @@ where both ends declare the profile or `compression`.
 
 ## OCPP 1.6J
 
-| Station ↓ / CSMS → | cbsigma v0.2.0 | chargetime v2.0 | citrineos v2.1.0 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 | ocppkit 0.3.0 |
-|---|---|---|---|---|---|---|
-| cbsigma v0.2.0 | 28 pass 1 skip / 29 pass | 27 pass 2 skip / 29 pass | 21 pass 8 skip / 20 pass 9 skip | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass |
-| chargetime v2.0 | 28 pass 1 skip / 28 pass 1 skip | 27 pass 2 skip / 28 pass 1 skip | 21 pass 8 skip / 19 pass 10 skip | 28 pass 1 skip / 28 pass 1 skip | 28 pass 1 skip / 28 pass 1 skip | 28 pass 1 skip / 28 pass 1 skip |
-| everest 2026.02.2 | 28 pass 1 skip / 29 pass | 27 pass 2 skip / 29 pass | 21 pass 8 skip / 20 pass 9 skip | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass |
-| lorenzodonini v0.19.0 | 28 pass 1 skip / 29 pass | 27 pass 2 skip / 29 pass | 21 pass 8 skip / 20 pass 9 skip | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass |
-| mobilityhouse 2.1.0 | 27 pass 1 skip 1 known / 29 pass | 26 pass 2 skip 1 known / 29 pass | 21 pass 7 skip 1 known / 20 pass 9 skip | 27 pass 1 skip 1 known / 29 pass | 28 pass 1 known / 29 pass | 28 pass 1 known / 29 pass |
-| ocppkit 0.3.0 | 27 pass 2 skip / 29 pass | 26 pass 3 skip / 29 pass | 21 pass 8 skip / 20 pass 9 skip | 27 pass 2 skip / 29 pass | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass |
+| Station ↓ / CSMS → | cbsigma v0.2.0 | chargetime v2.0 | citrineos v2.1.0 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 | ocppkit 0.3.0 | seanlee v0.3.0 |
+|---|---|---|---|---|---|---|---|
+| cbsigma v0.2.0 | 28 pass 1 skip / 29 pass | 27 pass 2 skip / 29 pass | 21 pass 8 skip / 20 pass 9 skip | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass | 23 pass 6 skip / 22 pass 7 skip |
+| chargetime v2.0 | 28 pass 1 skip / 28 pass 1 skip | 27 pass 2 skip / 28 pass 1 skip | 21 pass 8 skip / 19 pass 10 skip | 28 pass 1 skip / 28 pass 1 skip | 28 pass 1 skip / 28 pass 1 skip | 28 pass 1 skip / 28 pass 1 skip | 23 pass 6 skip / 21 pass 8 skip |
+| everest 2026.02.2 | 28 pass 1 skip / 29 pass | 27 pass 2 skip / 29 pass | 21 pass 8 skip / 20 pass 9 skip | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass | 23 pass 6 skip / 22 pass 7 skip |
+| lorenzodonini v0.19.0 | 28 pass 1 skip / 29 pass | 27 pass 2 skip / 29 pass | 21 pass 8 skip / 20 pass 9 skip | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass | 23 pass 6 skip / 22 pass 7 skip |
+| mobilityhouse 2.1.0 | 27 pass 1 skip 1 known / 29 pass | 26 pass 2 skip 1 known / 29 pass | 21 pass 7 skip 1 known / 20 pass 9 skip | 27 pass 1 skip 1 known / 29 pass | 28 pass 1 known / 29 pass | 28 pass 1 known / 29 pass | 23 pass 6 skip / 22 pass 7 skip |
+| ocppkit 0.3.0 | 27 pass 2 skip / 29 pass | 26 pass 3 skip / 29 pass | 21 pass 8 skip / 20 pass 9 skip | 27 pass 2 skip / 29 pass | 28 pass 1 skip / 29 pass | 28 pass 1 skip / 29 pass | 22 pass 7 skip / 22 pass 7 skip |
+| seanlee v0.3.0 | 23 pass 6 skip / 22 pass 7 skip | 22 pass 7 skip / 22 pass 7 skip | 19 pass 10 skip / 20 pass 9 skip | 23 pass 6 skip / 22 pass 7 skip | 23 pass 6 skip / 22 pass 7 skip | 23 pass 6 skip / 22 pass 7 skip | 23 pass 6 skip / 22 pass 7 skip |
 
-Totals: 1938 PASS, 6 KNOWN_ISSUE, 157 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
-Security profiles 2 and 3 pass in all 36 pairings (every station, everest
+Totals: 2514 PASS, 6 KNOWN_ISSUE, 329 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
+Security profiles 2 and 3 pass in all 49 pairings (every station, everest
 included, with every CSMS).
 
 | Station | CSMS | Test | Status | Evidence |
 |---|---|---|---|---|
-| mobilityhouse | all five | `v16.from-station.security-event-minimal` | KNOWN_ISSUE | [mobilityhouse/ocpp `v16/call.py`](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/v16/call.py#L232-L236) |
+| mobilityhouse | all six but seanlee | `v16.from-station.security-event-minimal` | KNOWN_ISSUE | [mobilityhouse/ocpp `v16/call.py`](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/v16/call.py#L232-L236) |
 | chargetime | all four | `v16.fixture-callerror.from-csms` | SKIP_UNSUPPORTED | chargetime does not declare `fixtureCallErrors` |
 | all four | chargetime | `v16.fixture-callerror.from-station` | SKIP_UNSUPPORTED | chargetime does not declare `fixtureCallErrors` |
 | all four | citrineos | `v16.not-implemented.from-station`, `v16.fixture-callerror.from-station` | SKIP_UNSUPPORTED (8) | citrineos declares `fixtureAnswers` and `fixtureCallErrors` false: CitrineOS answers by itself |
 | all four | citrineos | the actions citrineos does not declare | SKIP_UNSUPPORTED | see [adapters/citrineos/README.md](../adapters/citrineos/README.md) |
 | all but the mobilityhouse and ocppkit stations with the mobilityhouse and ocppkit CSMSs | | `v16.compression` | SKIP_UNSUPPORTED | only mobilityhouse and ocppkit declare `compression` in 1.6: chargetime's 1.6 classes have no extensions, lorenzodonini's CSMS cannot accept it, the everest and cbsigma stations cannot offer it |
+| seanlee at either end | | the OCPP 1.6 Security Whitepaper messages (SecurityEventNotification, SignCertificate, LogStatusNotification, SignedFirmwareStatusNotification, CertificateSigned, InstallCertificate, DeleteCertificate, GetInstalledCertificateIds, GetLog, SignedUpdateFirmware, ExtendedTriggerMessage) | SKIP_UNSUPPORTED | seanlee0923/ocpp's `v16` package has the 28 actions of OCPP 1.6 only ([adapters/seanlee/README.md](../adapters/seanlee/README.md)) |
 | ocppkit | all | `v16.profile1.no-credentials` (and in 2.0.1 and 2.1) | SKIP_UNSUPPORTED | the ocppkit station always sends credentials (`client.securityProfiles` `[1, 2, 3]`); its pairings run with security profile 1 at both ends |
 
 ## OCPP 2.0.1
 
-| Station ↓ / CSMS → | cbsigma v0.2.0 | chargetime v2.0 | citrineos v2.1.0 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 | ocppkit 0.3.0 |
-|---|---|---|---|---|---|---|
-| cbsigma v0.2.0 | 40 pass 1 skip / 44 pass | 39 pass 2 skip / 44 pass | 28 pass 13 skip / 41 pass 3 skip | 40 pass 1 skip / 43 pass 1 known | 40 pass 1 skip / 44 pass | 40 pass 1 skip / 44 pass |
-| chargetime v2.0 | 40 pass 1 skip / 43 pass 1 skip | 39 pass 1 skip 1 known / 43 pass 1 skip | 28 pass 12 skip 1 known / 40 pass 4 skip | 40 pass 1 skip / 42 pass 1 skip 1 known | 40 pass 1 known / 43 pass 1 skip | 40 pass 1 known / 43 pass 1 skip |
-| everest 2026.02.2 | 40 pass 1 skip / 44 pass | 39 pass 2 skip / 44 pass | 28 pass 13 skip / 41 pass 3 skip | 40 pass 1 skip / 43 pass 1 known | 39 pass 1 skip 1 known / 44 pass | 39 pass 1 skip 1 known / 44 pass |
-| lorenzodonini v0.19.0 | 39 pass 1 skip 1 known / 41 pass 3 known | 38 pass 2 skip 1 known / 43 pass 1 known | 27 pass 13 skip 1 known / 39 pass 3 skip 2 known | 39 pass 1 skip 1 known / 43 pass 1 known | 39 pass 1 skip 1 known / 41 pass 3 known | 39 pass 1 skip 1 known / 43 pass 1 known |
-| mobilityhouse 2.1.0 | 40 pass 1 skip / 44 pass | 39 pass 1 skip 1 known / 44 pass | 29 pass 12 skip / 41 pass 3 skip | 40 pass 1 skip / 43 pass 1 known | 41 pass / 44 pass | 41 pass / 44 pass |
-| ocppkit 0.3.0 | 39 pass 2 skip / 44 pass | 38 pass 2 skip 1 known / 44 pass | 28 pass 13 skip / 41 pass 3 skip | 39 pass 2 skip / 43 pass 1 known | 40 pass 1 skip / 44 pass | 40 pass 1 skip / 44 pass |
+| Station ↓ / CSMS → | cbsigma v0.2.0 | chargetime v2.0 | citrineos v2.1.0 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 | ocppkit 0.3.0 | seanlee v0.3.0 |
+|---|---|---|---|---|---|---|---|
+| cbsigma v0.2.0 | 40 pass 1 skip / 44 pass | 39 pass 2 skip / 44 pass | 28 pass 13 skip / 41 pass 3 skip | 40 pass 1 skip / 43 pass 1 known | 40 pass 1 skip / 44 pass | 40 pass 1 skip / 44 pass | 40 pass 1 skip / 44 pass |
+| chargetime v2.0 | 40 pass 1 skip / 43 pass 1 skip | 39 pass 1 skip 1 known / 43 pass 1 skip | 28 pass 12 skip 1 known / 40 pass 4 skip | 40 pass 1 skip / 42 pass 1 skip 1 known | 40 pass 1 known / 43 pass 1 skip | 40 pass 1 known / 43 pass 1 skip | 40 pass 1 skip / 43 pass 1 skip |
+| everest 2026.02.2 | 40 pass 1 skip / 44 pass | 39 pass 2 skip / 44 pass | 28 pass 13 skip / 41 pass 3 skip | 40 pass 1 skip / 43 pass 1 known | 39 pass 1 skip 1 known / 44 pass | 39 pass 1 skip 1 known / 44 pass | 39 pass 1 skip 1 known / 44 pass |
+| lorenzodonini v0.19.0 | 39 pass 1 skip 1 known / 41 pass 3 known | 38 pass 2 skip 1 known / 43 pass 1 known | 27 pass 13 skip 1 known / 39 pass 3 skip 2 known | 39 pass 1 skip 1 known / 43 pass 1 known | 39 pass 1 skip 1 known / 41 pass 3 known | 39 pass 1 skip 1 known / 43 pass 1 known | 39 pass 1 skip 1 known / 41 pass 3 known |
+| mobilityhouse 2.1.0 | 40 pass 1 skip / 44 pass | 39 pass 1 skip 1 known / 44 pass | 29 pass 12 skip / 41 pass 3 skip | 40 pass 1 skip / 43 pass 1 known | 41 pass / 44 pass | 41 pass / 44 pass | 40 pass 1 skip / 44 pass |
+| ocppkit 0.3.0 | 39 pass 2 skip / 44 pass | 38 pass 2 skip 1 known / 44 pass | 28 pass 13 skip / 41 pass 3 skip | 39 pass 2 skip / 43 pass 1 known | 40 pass 1 skip / 44 pass | 40 pass 1 skip / 44 pass | 39 pass 2 skip / 44 pass |
+| seanlee v0.3.0 | 40 pass 1 skip / 44 pass | 39 pass 2 skip / 44 pass | 28 pass 13 skip / 41 pass 3 skip | 40 pass 1 skip / 43 pass 1 known | 40 pass 1 skip / 44 pass | 40 pass 1 skip / 44 pass | 40 pass 1 skip / 44 pass |
 
-Totals: 2898 PASS, 30 KNOWN_ISSUE, 145 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
-Security profiles 2 and 3 pass in all 36 pairings.
+Totals: 3966 PASS, 36 KNOWN_ISSUE, 170 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
+Security profiles 2 and 3 pass in all 49 pairings.
 
 | Station | CSMS | Test | Status | Evidence |
 |---|---|---|---|---|
 | mobilityhouse, chargetime | chargetime | `v201.compression` | KNOWN_ISSUE (2) | the CSMS keeps its compression context although it announces `server_no_context_takeover`: [Java-WebSocket 1.6.0 `PerMessageDeflateExtension`](https://github.com/TooTallNate/Java-WebSocket/blob/da3cf2a777aed862f2f5b5cf060cae7969958667/src/main/java/org/java_websocket/extensions/permessage_deflate/PerMessageDeflateExtension.java#L335-L340) |
 | chargetime | mobilityhouse | `v201.compression` | KNOWN_ISSUE | the station keeps its compression context although it offers `client_no_context_takeover`: [Java-WebSocket 1.6.0 `PerMessageDeflateExtension`](https://github.com/TooTallNate/Java-WebSocket/blob/da3cf2a777aed862f2f5b5cf060cae7969958667/src/main/java/org/java_websocket/extensions/permessage_deflate/PerMessageDeflateExtension.java#L326-L333) |
-| lorenzodonini | all four | `v201.from-station.notify-report` | KNOWN_ISSUE | [ocpp-go `notify_report.go`](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/provisioning/notify_report.go#L98-L104) |
-| lorenzodonini | mobilityhouse, citrineos, cbsigma | `v201.from-csms.reset-immediate`, `v201.from-csms.set-network-profile` | KNOWN_ISSUE (6) | [ocpp-go `reset.go`](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/provisioning/reset.go#L61-L64) |
-| lorenzodonini, or any station with lorenzodonini | all four, or lorenzodonini | `v201.from-csms.get-composite-schedule` | KNOWN_ISSUE (6) | [ocpp-go `get_composite_schedule.go`](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/smartcharging/get_composite_schedule.go#L31-L50) |
+| lorenzodonini | all five | `v201.from-station.notify-report` | KNOWN_ISSUE | [ocpp-go `notify_report.go`](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/provisioning/notify_report.go#L98-L104) |
+| lorenzodonini | mobilityhouse, citrineos, cbsigma, seanlee | `v201.from-csms.reset-immediate`, `v201.from-csms.set-network-profile` | KNOWN_ISSUE (8) | [ocpp-go `reset.go`](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/provisioning/reset.go#L61-L64) |
+| lorenzodonini, or any station with lorenzodonini | all five, or lorenzodonini | `v201.from-csms.get-composite-schedule` | KNOWN_ISSUE (8) | [ocpp-go `get_composite_schedule.go`](https://github.com/lorenzodonini/ocpp-go/blob/a1eec917af884db0585752f909a61893aa667480/ocpp2.0.1/smartcharging/get_composite_schedule.go#L31-L50) |
 | everest | ocppkit | `v201.from-station.notify-evcharging-needs` | KNOWN_ISSUE | ocpp-kit reads the integer `energyAmount` as `i32` and refuses `20000.0` (`TypeConstraintViolation`), a valid integer in the draft-06 OCA schemas: [ocpp-kit `v2_0_1/types.rs`](https://github.com/hupe1980/ocpp-kit/blob/b64ce83ab46c742dfbd99e925cd0acfacbf2ddc9/src/v2_0_1/types.rs#L31), [hupe1980/ocpp-kit#2](https://github.com/hupe1980/ocpp-kit/issues/2) (tracked in #27) |
+| everest | seanlee | `v201.from-station.notify-evcharging-needs` | KNOWN_ISSUE | seanlee0923/ocpp validates `20000.0` as an integer (draft-06) and then cannot decode it into its Go `int` (`FormatViolation`, "request payload cannot be decoded"): [seanlee0923/ocpp `notify_evcharging_needs_request.go`](https://github.com/seanlee0923/ocpp/blob/7e3759d106605a11e4e3f1ce45fc44e6f595cd3c/v201/notify_evcharging_needs_request.go#L53-L55) |
 | everest | mobilityhouse | `v201.from-station.notify-evcharging-needs` | KNOWN_ISSUE | the CSMS validates the draft-06 OCA schemas with jsonschema's `Draft4Validator`, so the integer `energyAmount` written `20000.0` (libocpp's `float`, a valid integer in draft-06) gets `TypeConstraintViolation`: [mobilityhouse/ocpp `messages.py`](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/messages.py#L130-L173) |
 | chargetime | all four | `v201.fixture-callerror.from-csms` | SKIP_UNSUPPORTED | chargetime does not declare `fixtureCallErrors` |
 | all four | chargetime | `v201.fixture-callerror.from-station` | SKIP_UNSUPPORTED | chargetime does not declare `fixtureCallErrors` |
@@ -141,28 +154,29 @@ it, and 34 tests against the chargetime CSMS were KNOWN_ISSUE).
 
 ## OCPP 2.1
 
-`mobilityhouse`, `cbsigma` and `ocppkit` declare 2.1 in both roles,
+`mobilityhouse`, `cbsigma`, `ocppkit` and `seanlee` declare 2.1 in both roles,
 `everest` as a station and `citrineos` as a CSMS: the pinned releases of
 Java-OCA-OCPP (v2.0) and ocpp-go (v0.19.0) have no 2.1, so every pairing
 with them is one `v21.pairing` SKIP_UNSUPPORTED. Every 2.1 pairing of two
-different adapters joins two independent 2.1 implementations: 4 stations
-with 4 CSMSs.
+different adapters joins two independent 2.1 implementations: 5 stations
+with 5 CSMSs.
 
-| Station ↓ / CSMS → | cbsigma v0.2.0 | chargetime v2.0 | citrineos v2.1.0 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 | ocppkit 0.3.0 |
-|---|---|---|---|---|---|---|
-| cbsigma v0.2.0 | 53 pass 1 skip / 60 pass | 1 skip / — | 28 pass 26 skip / 42 pass 18 skip | 1 skip / — | 50 pass 3 skip 1 known / 59 pass 1 skip | 53 pass 1 skip / 59 pass 1 skip |
-| chargetime v2.0 | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — |
-| everest 2026.02.2 | 49 pass 4 skip 1 known / 58 pass 2 skip | 1 skip / — | 28 pass 26 skip / 42 pass 18 skip | 1 skip / — | 48 pass 4 skip 2 known / 58 pass 2 skip | 49 pass 4 skip 1 known / 58 pass 2 skip |
-| lorenzodonini v0.19.0 | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — |
-| mobilityhouse 2.1.0 | 50 pass 4 skip / 58 pass 1 skip 1 known | 1 skip / — | 29 pass 25 skip / 41 pass 18 skip 1 known | 1 skip / — | 50 pass 3 skip 1 known / 58 pass 1 skip 1 known | 51 pass 3 skip / 57 pass 2 skip 1 known |
-| ocppkit 0.3.0 | 52 pass 2 skip / 59 pass 1 skip | 1 skip / — | 28 pass 26 skip / 42 pass 18 skip | 1 skip / — | 50 pass 3 skip 1 known / 58 pass 2 skip | 53 pass 1 skip / 59 pass 1 skip |
+| Station ↓ / CSMS → | cbsigma v0.2.0 | chargetime v2.0 | citrineos v2.1.0 | lorenzodonini v0.19.0 | mobilityhouse 2.1.0 | ocppkit 0.3.0 | seanlee v0.3.0 |
+|---|---|---|---|---|---|---|---|
+| cbsigma v0.2.0 | 53 pass 1 skip / 60 pass | 1 skip / — | 28 pass 26 skip / 42 pass 18 skip | 1 skip / — | 50 pass 3 skip 1 known / 59 pass 1 skip | 53 pass 1 skip / 59 pass 1 skip | 51 pass 3 skip / 59 pass 1 skip |
+| chargetime v2.0 | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — |
+| everest 2026.02.2 | 49 pass 4 skip 1 known / 58 pass 2 skip | 1 skip / — | 28 pass 26 skip / 42 pass 18 skip | 1 skip / — | 48 pass 4 skip 2 known / 58 pass 2 skip | 49 pass 4 skip 1 known / 58 pass 2 skip | 49 pass 4 skip 1 known / 58 pass 2 skip |
+| lorenzodonini v0.19.0 | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — | 1 skip / — |
+| mobilityhouse 2.1.0 | 50 pass 4 skip / 58 pass 1 skip 1 known | 1 skip / — | 29 pass 25 skip / 41 pass 18 skip 1 known | 1 skip / — | 50 pass 3 skip 1 known / 58 pass 1 skip 1 known | 51 pass 3 skip / 57 pass 2 skip 1 known | 50 pass 4 skip / 58 pass 1 skip 1 known |
+| ocppkit 0.3.0 | 52 pass 2 skip / 59 pass 1 skip | 1 skip / — | 28 pass 26 skip / 42 pass 18 skip | 1 skip / — | 50 pass 3 skip 1 known / 58 pass 2 skip | 53 pass 1 skip / 59 pass 1 skip | 50 pass 4 skip / 58 pass 2 skip |
+| seanlee v0.3.0 | 51 pass 3 skip / 59 pass 1 skip | 1 skip / — | 28 pass 26 skip / 42 pass 18 skip | 1 skip / — | 50 pass 3 skip 1 known / 59 pass 1 skip | 51 pass 3 skip / 58 pass 2 skip | 51 pass 3 skip / 59 pass 1 skip |
 
-Totals: 1589 PASS, 11 KNOWN_ISSUE, 257 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
-`v21.tls.profile2` and `v21.tls.profile3` pass for the four stations with
-the four CSMSs (mobilityhouse, citrineos, cbsigma, ocppkit);
+Totals: 2530 PASS, 14 KNOWN_ISSUE, 337 SKIP_UNSUPPORTED, 0 FAIL, 0 INFRA_ERROR.
+`v21.tls.profile2` and `v21.tls.profile3` pass for the five stations with
+the five CSMSs (mobilityhouse, citrineos, cbsigma, ocppkit, seanlee);
 `v21.compression` passes for the mobilityhouse and ocppkit stations with the
 mobilityhouse, citrineos and ocppkit CSMSs (everest and cbsigma cannot offer
-compression). `v21.send.notify-periodic-event-stream` and
+compression, seanlee negotiates none). `v21.send.notify-periodic-event-stream` and
 `v21.rpc.call-result-error` (from each end) pass in the four pairings of
 cbsigma and ocppkit: between two independent implementations in both
 directions, and each with itself.
@@ -171,9 +185,10 @@ directions, and each with itself.
 |---|---|---|---|---|
 | mobilityhouse | mobilityhouse | `v21.not-implemented.from-station`, `v21.not-implemented.from-csms` | KNOWN_ISSUE (2) | [mobilityhouse/ocpp `charge_point.py`](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/charge_point.py#L161-L193) |
 | mobilityhouse | mobilityhouse, citrineos | `v21.from-station.battery-swap-in` | SKIP_UNSUPPORTED | the mobilityhouse station does not declare BatterySwap: ocpp 2.1.0 cannot send it (see below). The everest station sends it to the mobilityhouse CSMS: PASS |
-| all but cbsigma and ocppkit with each other | | `v21.send.notify-periodic-event-stream`, `v21.rpc.call-result-error` | SKIP_UNSUPPORTED | `send` and `callResultError`: only cbsigma and ocppkit declare them (mobilityhouse, everest and citrineos know the message types 2 to 4 only) |
+| all but cbsigma and ocppkit with each other | | `v21.send.notify-periodic-event-stream`, `v21.rpc.call-result-error` | SKIP_UNSUPPORTED | `send` and `callResultError`: only cbsigma and ocppkit declare them (mobilityhouse, everest and citrineos know the message types 2 to 4 only; seanlee's CSMS takes a SEND but neither role sends one, and it has no CALLRESULTERROR) |
 | ocppkit | all | `v21.from-csms.notify-web-payment-started` | SKIP_UNSUPPORTED | the ocppkit station does not declare NotifyWebPaymentStarted, nor its CSMS: ocpp-kit 0.3.0 has it as a station message (below) |
-| everest | ocppkit | `v21.from-station.report-dercontrol` | KNOWN_ISSUE | the libocpp defect below |
+| everest | ocppkit, seanlee | `v21.from-station.report-dercontrol` | KNOWN_ISSUE (2) | the libocpp defect below |
+| mobilityhouse, seanlee | seanlee, mobilityhouse | `v21.not-implemented.from-csms`, `v21.not-implemented.from-station` | KNOWN_ISSUE (2) | the mobilityhouse defect above (no answer to an unanswered 2.1 action) |
 | chargetime, lorenzodonini | all five | `v21.pairing` | SKIP_UNSUPPORTED (10) | 2.1 not declared by one of the two |
 | everest | mobilityhouse | `v21.from-station.report-dercontrol` | KNOWN_ISSUE | [libocpp `ocpp::v2::MessageType`](https://github.com/EVerest/everest-core/blob/45dba2c049223d05beb7611c75d59f6639c46ee0/lib/everest/ocpp/include/ocpp/v2/types.hpp#L15-L195) has no ReportDERControl |
 | everest | mobilityhouse | `v21.not-implemented.from-station` | KNOWN_ISSUE | the mobilityhouse defect above (no answer to an unanswered 2.1 action) |
@@ -191,7 +206,7 @@ or none, a server certificate from another CA or for another host name,
 `ws://` to a TLS server), and compression. everest: 147 (1.6, 2.0.1 and 2.1, station checks against
 the mobilityhouse CSMS). citrineos: 242 (1.6, 2.0.1 and 2.1, server checks
 with the mobilityhouse station, security profiles 2 and 3 and compression
-included).
+included). ocppkit: 277 and seanlee: 263 (1.6, 2.0.1 and 2.1, both roles).
 
 ### What a PASS means
 
@@ -233,7 +248,7 @@ about conformance to the specification.
 | mobilityhouse (CSMS, 2.0.1), with the everest station | ocpp 2.1.0 | `get_validator` validates every payload with jsonschema's `Draft4Validator`, although the bundled OCA 2.0.1 schemas declare draft-06, in which `20000.0` is an integer: a NotifyEVChargingNeeds with the integer `energyAmount` written `20000.0` is answered `TypeConstraintViolation`. libocpp writes it so: its `ocpp::v2` types come from the OCPP 2.1 schemas, where `energyAmount` is a number (`ACChargingParameters::energyAmount` is a `float`); a valid value, so the defect is the validator's. Still `Draft4Validator` on master (2026-10-04) | [source](https://github.com/mobilityhouse/ocpp/blob/91f4f89140a2198dc5a300cfea88d947ac91ae28/ocpp/messages.py#L130-L173) |
 | ocppkit (CSMS, 2.0.1), with the everest station | ocpp-kit 0.3.0 | The integer fields of the generated OCA types are `i32` (serde): `20000.0`, a valid integer in the draft-06 OCA schemas, is refused with `TypeConstraintViolation`. libocpp writes `energyAmount` of NotifyEVChargingNeeds so (see the mobilityhouse entry above). Unchanged on main (b64ce83, the release commit) | [source](https://github.com/hupe1980/ocpp-kit/blob/b64ce83ab46c742dfbd99e925cd0acfacbf2ddc9/src/v2_0_1/types.rs#L31), [hupe1980/ocpp-kit#2](https://github.com/hupe1980/ocpp-kit/issues/2) (tracked in #27) |
 | ocppkit (both roles, 2.1) | ocpp-kit 0.3.0 | NotifyWebPaymentStarted has `Origin::ChargingStation`; OCPP 2.1 Part 2 (use case C, payment) has the CSMS send it, as every other 2.1 reference here does. ocpp-kit's CSMS refuses to send it ("not valid in this direction") and its station answers it `NotSupported` before the handler. Not in known-bugs.tsv: ocppkit does not declare it | [source](https://github.com/hupe1980/ocpp-kit/blob/b64ce83ab46c742dfbd99e925cd0acfacbf2ddc9/src/v2_1/action.rs#L578), [hupe1980/ocpp-kit#1](https://github.com/hupe1980/ocpp-kit/issues/1) (tracked in #26) |
-
+| seanlee (CSMS, 2.0.1), with the everest station | seanlee0923/ocpp v0.3.0 | The CSMS validates a request against the generated draft-06 schema code, which takes `20000.0` as an integer, and then decodes it with `encoding/json` into the generated types, whose integer fields are Go `int`s: the decode fails and the CSMS answers `FormatViolation` ("request payload cannot be decoded"). libocpp writes `energyAmount` of NotifyEVChargingNeeds so (see the mobilityhouse entry above) | [source](https://github.com/seanlee0923/ocpp/blob/7e3759d106605a11e4e3f1ce45fc44e6f595cd3c/v201/notify_evcharging_needs_request.go#L53-L55) |
 | citrineos (CSMS, 2.1) | CitrineOS v2.1.0 | `OCPP2_1_CALL_SCHEMA_RECORD` has no schema for NotifyDERAlarm, NotifyDERStartStop, ReportDERControl, OpenPeriodicEventStream, ClosePeriodicEventStream, NotifyPriorityCharging, PullDynamicScheduleUpdate and GetCertificateChainStatus; `validateOCPPRequest` returns "invalid" when it finds no schema, so the router answers a valid CALL with `FormatViolation`, not `NotImplemented` (OCPP-J). Not in known-bugs.tsv: citrineos does not declare these actions, so no test runs them | [source](https://github.com/citrineos/citrineos-core/blob/4fd7599b91c2fb6e6065e7c9b94be69880cced27/packages/base/src/interfaces/modules/ocpp-validator.ts#L129-L190) |
 
 Not defects, but why citrineos declares fewer actions: CitrineOS answers by

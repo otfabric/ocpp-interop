@@ -21,7 +21,8 @@ of request flow, without owning any of that code.
 > (cB-Sigma/ocpp, Go) and `ocppkit` (hupe1980/ocpp-kit, Rust) have both
 > roles in all three versions and the OCPP 2.1 SEND and CALLRESULTERROR
 > frames, so each of those is tested between two independent
-> implementations. See [PLAN.md](PLAN.md).
+> implementations. `seanlee` (seanlee0923/ocpp, Go) has both roles in all
+> three versions, security profiles 0 to 3. See [PLAN.md](PLAN.md).
 
 ## Table of contents
 
@@ -64,6 +65,7 @@ to the specification. Neither does it establish OCA certification.
 | `everest` | [EVerest libocpp](https://github.com/EVerest/everest-core/tree/2026.02.2/lib/everest/ocpp), everest-core 2026.02.2 | C++ | 1.6J, 2.0.1, 2.1 (station only) | **built: 1.6J, 2.0.1 and 2.1, station (`client`) only**, security profiles 0 to 3; no compression (libocpp cannot offer it) |
 | `cbsigma` | [cB-Sigma/ocpp](https://github.com/cB-Sigma/ocpp) v0.2.0 | Go | 1.6J, 2.0.1, 2.1 | **built: 1.6J, 2.0.1 and 2.1, both roles**, security profiles 0 to 3, OCPP 2.1 SEND and CALLRESULTERROR; no compression (its station cannot offer it) |
 | `ocppkit` | [hupe1980/ocpp-kit](https://github.com/hupe1980/ocpp-kit) 0.3.0 | Rust | 1.6J, 2.0.1, 2.1 | **built: 1.6J, 2.0.1 and 2.1, both roles**, security profiles 0 to 3 (the station 1 to 3: it always authenticates), compression, OCPP 2.1 SEND and CALLRESULTERROR |
+| `seanlee` | [seanlee0923/ocpp](https://github.com/seanlee0923/ocpp) v0.3.0 | Go | 1.6J (without the Security Whitepaper messages), 2.0.1, 2.1 | **built: 1.6J, 2.0.1 and 2.1, both roles**, security profiles 0 to 3; no compression, no SEND or CALLRESULTERROR |
 | `citrineos` | [citrineos/citrineos-core](https://github.com/citrineos/citrineos-core) v2.1.0 | TypeScript | 1.6J, 2.0.1, 2.1 (CSMS only) | **built: 1.6J, 2.0.1 and 2.1, CSMS (`server`) only**, security profiles 0 to 3, compression; CitrineOS answers by itself (`fixtureAnswers: false`), with PostgreSQL and RabbitMQ in its image |
 
 The versions listed are what each upstream advertises. A version or feature
