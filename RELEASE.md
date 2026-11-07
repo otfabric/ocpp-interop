@@ -41,6 +41,23 @@ manual workflow and no releases (`own/go-ocpp/README.md`).
 
 ---
 
+## v0.10.0
+
+**Date:** 2026-11-07
+**Previous release:** v0.9.0
+
+### Added
+
+- Contract 0.8 (docs/CONTAINER_CONTRACT.md, `local-controller`): an optional OCPP 2.x Local Controller (Part 4 chapter 6) between stations and a CSMS, the `relayed` event, `localController` in the capabilities of a version, and `relay` in report results. In `ghcr.io/otfabric/ocpp-interop-ocppkit` (ocpp-kit's `transport::LocalController`), OCPP 2.0.1 and 2.1, security profiles 0 to 3.
+- `scripts/interop.sh`: every station through the Local Controller to one CSMS, and every CSMS behind it from one station, with every sample of both ends (`v<version>.lc.*`), the station's identity at the CSMS, the relayed events, close propagation in both directions and a station refused without a CSMS. 22 relayed pairings: 1712 PASS, 72 KNOWN_ISSUE, 65 SKIP_UNSUPPORTED, 0 FAIL (docs/COMPATIBILITY.md). `scripts/smoke.sh`: the command's usage, a relayed session and security profiles 2 and 3 on both legs (ocppkit: 289 checks).
+- Known bug `chargetime:server@ocppkit`: behind the Local Controller, which offers permessage-deflate as Part 4 §3.4 requires, the chargetime 2.0.1 CSMS's compression defect breaks every message after the first. A relayed test matches an entry for its own id, or for the same test without the controller.
+
+### Changed
+
+- CAPABILITIES.md, COVERAGE.md, PLAN.md, README.md and adapters/ocppkit/README.md describe the Local Controller; PLAN.md lists a second independent controller as open.
+
+---
+
 ## v0.9.0
 
 **Date:** 2026-11-07
