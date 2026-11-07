@@ -274,7 +274,10 @@ keep() {  # keep <label> <document>
 record() {
     local id="$1" client="$2" server="$3" initiator="$4" feat="$5" action="$6" status="$7" ms="$8" note="${9:-}"
     local bug evidence=""
-    if [[ "${status}" == FAIL ]] && bug=$(known_bug "${client}" "${server}" "${id}"); then
+    # A relayed test (v<version>.lc.*) matches an entry for its own id, or
+    # for the same test without the controller.
+    if [[ "${status}" == FAIL ]] && { bug=$(known_bug "${client}" "${server}" "${id}") \
+        || bug=$(known_bug "${client}" "${server}" "${id/.lc./.}"); }; then
         status=KNOWN_ISSUE; evidence="${bug%%$'\t'*}"
         echo "${bug#*$'\t'}" >> "${WORK}/reproduced"
         KNOWN=$((KNOWN + 1))
@@ -287,8 +290,9 @@ record() {
     esac
     jq -cn --arg id "${id}" --arg v "${OCPP}" --argjson c "$(impl "${client}")" --argjson s "$(impl "${server}")" \
         --arg i "${initiator}" --arg f "${feat}" --arg a "${action}" --arg st "${status}" --argjson ms "${ms}" \
-        --arg err "${note}" --arg ev "${evidence}" '
+        --arg err "${note}" --arg ev "${evidence}" --argjson rel "$([[ -n "${RELAY:-}" ]] && impl "${RELAY}" || echo null)" '
         {testId: $id, version: $v, client: $c, server: $s, initiator: $i, feature: $f, status: $st, durationMs: $ms}
+        + (if $rel != null then {relay: $rel} else {} end)
         + (if $a != "" then {action: $a} else {} end)
         + (if ($st == "FAIL" or $st == "INFRA_ERROR" or $st == "KNOWN_ISSUE") and $err != "" then {error: $err} else {} end)
         + (if $ev != "" then {evidence: $ev} else {} end)' >> "${WORK}/results.jsonl"
@@ -851,6 +855,111 @@ session() {
     stop_container "${sta}"; stop_container "${srv}"
 }
 
+# relayed_pairing <local controller> <client> <server> (contract 0.8): the
+# station connects to the Local Controller, which connects to the CSMS under
+# the station's identity (Part 4 chapter 6). Every sample of both ends goes
+# through it; the tests are those of a pairing, as v<version>.lc.*, with the
+# controller in the result's relay. The controller must relay every message
+# (relayed events), propagate a close in both directions, and refuse a
+# station when there is no CSMS.
+relayed_pairing() {
+    local lc="$1" client="$2" server="$3" srv sta rel name action payload problems ids
+    srv="csms-${server}-${RUN_ID}"; sta="station-${client}-${RUN_ID}"; rel="lc-${lc}-${RUN_ID}"
+    if ! declares "${client}" '.client.supported == true' || ! declares "${server}" '.server.supported == true'; then
+        return
+    fi
+    BASE_PROFILE=0
+    if ! profile "${client}" client 0; then
+        profile "${client}" client 1 && profile "${server}" server 1 || return
+        BASE_PROFILE=1
+    fi
+    RELAY="${lc}"
+    log "OCPP ${OCPP}: ${client} -> local controller ${lc} -> ${server}$([[ "${BASE_PROFILE}" == 0 ]] || echo " (security profile ${BASE_PROFILE})")"
+    start "${srv}" "${server}" -- server --version "${OCPP}"
+    if ! wait_ready "${srv}"; then
+        record "${VDIR}.lc.connect" "${client}" "${server}" client connectivity "" INFRA_ERROR 0 "the server did not become ready"
+        stop_container "${srv}"; RELAY=""; return
+    fi
+    start "${rel}" "${lc}" -- local-controller --version "${OCPP}" --upstream "ws://${srv}:9000/ocpp"
+    if ! wait_ready "${rel}"; then
+        record "${VDIR}.lc.connect" "${client}" "${server}" client connectivity "" INFRA_ERROR 0 "the local controller did not become ready"
+        stop_container "${rel}"; stop_container "${srv}"; RELAY=""; return
+    fi
+    start "${sta}" "${client}" -- client run --version "${OCPP}" --url "ws://${rel}:9000/ocpp"
+    if ! wait_ready "${sta}"; then
+        record "${VDIR}.lc.connect" "${client}" "${server}" client connectivity "" FAIL 0 "client run did not connect through the local controller"
+        stop_container "${sta}"; stop_container "${rel}"; stop_container "${srv}"; RELAY=""; return
+    fi
+    if wait_event "${srv}" '.event == "connection-opened" and .station == $s' --arg s "${STATION}" >/dev/null; then
+        record "${VDIR}.lc.connect" "${client}" "${server}" client connectivity "" PASS 0
+    else
+        record "${VDIR}.lc.connect" "${client}" "${server}" client connectivity "" FAIL 0 \
+            "the CSMS reported no connection-opened event for the station's identity"
+    fi
+
+    while IFS=$'\t' read -r name action payload; do
+        if is_send "${action}"; then
+            send_sample "${VDIR}.lc.send.$(kebab "${name}")" "${client}" "${server}" client "${sta}" "${srv}" "${action}" "${payload}"
+            continue
+        fi
+        exchange "${VDIR}.lc.from-station.$(kebab "${name}")" "${client}" "${server}" client "${sta}" "${srv}" "${action}" "${payload}"
+    done < <(jq -r '.samples | to_entries[] | select(.value.from == "station") | [.key, .value.action, (.value.payload | tojson)] | @tsv' "${FIXTURE}")
+    while IFS=$'\t' read -r name action payload; do
+        if is_send "${action}"; then
+            send_sample "${VDIR}.lc.send.$(kebab "${name}")" "${client}" "${server}" server "${srv}" "${sta}" "${action}" "${payload}" --station "${STATION}"
+            continue
+        fi
+        exchange "${VDIR}.lc.from-csms.$(kebab "${name}")" "${client}" "${server}" server "${srv}" "${sta}" "${action}" "${payload}" --station "${STATION}"
+    done < <(jq -r '.samples | to_entries[] | select(.value.from == "csms") | [.key, .value.action, (.value.payload | tojson)] | @tsv' "${FIXTURE}")
+
+    # Every CALL that passed went through the controller, in its direction.
+    problems=""
+    ids=$(jq -c --arg v "${OCPP}" --arg c "${client}" --arg s "${server}" --arg l "${lc}" -s '
+        [.[] | select(.version == $v and .client.name == $c and .server.name == $s and .relay.name == $l and .status == "PASS"
+                      and (.testId | test("\\.lc\\.from-(station|csms)\\.")))
+         | {action, direction: (if .initiator == "client" then "northbound" else "southbound" end)}] | unique' "${WORK}/results.jsonl")
+    if ! events "${rel}" | jq -s -e --argjson want "${ids}" --arg st "${STATION}" '
+        [.[] | select(.event == "relayed" and .station == $st and .messageType == "CALL") | {action, direction}] as $got
+        | [$want[] | . as $w | $got | index([$w]) != null] | all' >/dev/null 2>&1; then
+        problems="the local controller reported no relayed event for some of the CALLs that passed"
+    fi
+    record "${VDIR}.lc.relayed" "${client}" "${server}" client connectivity "" "$([[ -z "${problems}" ]] && echo PASS || echo FAIL)" 0 "${problems}"
+
+    # The station closes: the controller closes the CSMS leg (§6.3).
+    docker stop -t 15 "${sta}" >/dev/null 2>&1
+    if wait_event "${srv}" '.event == "connection-closed" and .station == $s' --arg s "${STATION}" >/dev/null; then
+        record "${VDIR}.lc.close-from-station" "${client}" "${server}" client connectivity "" PASS 0
+    else
+        record "${VDIR}.lc.close-from-station" "${client}" "${server}" client connectivity "" FAIL 0 \
+            "the station closed its connection, but the CSMS reported no connection-closed"
+    fi
+    stop_container "${sta}"
+
+    # The CSMS goes away: the controller closes the station's connection.
+    start "${sta}" "${client}" -- client run --version "${OCPP}" --url "ws://${rel}:9000/ocpp"
+    if wait_ready "${sta}"; then
+        stop_container "${srv}"
+        problems="the CSMS went away, but the station's connection stayed open"
+        for _ in $(seq 1 $((WAIT_TIMEOUT * 5))); do
+            [[ "$(docker inspect -f '{{.State.Running}}' "${sta}" 2>/dev/null)" == true ]] || { problems=""; break; }
+            events "${sta}" | jq -e 'select(.event == "connection-closed")' >/dev/null 2>&1 && { problems=""; break; }
+            sleep 0.2
+        done
+        record "${VDIR}.lc.close-from-csms" "${client}" "${server}" client connectivity "" "$([[ -z "${problems}" ]] && echo PASS || echo FAIL)" 0 "${problems}"
+    else
+        record "${VDIR}.lc.close-from-csms" "${client}" "${server}" client connectivity "" FAIL 0 "client run did not reconnect through the local controller"
+    fi
+    stop_container "${sta}"; stop_container "${srv}"
+
+    # No CSMS: the controller refuses the station's handshake.
+    one_shot "${VDIR}.lc.no-upstream" "${client}" "${server}" connectivity Heartbeat connect-failed "${rel}"
+    record "${VDIR}.lc.no-upstream" "${client}" "${server}" client connectivity "" \
+        "$([[ -z "${ONE_SHOT_PROBLEM}" ]] && echo PASS || echo FAIL)" "${ONE_SHOT_MS}" "${ONE_SHOT_PROBLEM}"
+    events "${rel}" | grep -v '^{' | grep -q . && record "${VDIR}.lc.events.json-lines" "${client}" "${server}" server other "" FAIL 0 \
+        "local-controller stdout has lines that are not JSON"
+    stop_container "${rel}"; RELAY=""
+}
+
 # transport <client> <server>: security profiles 2 and 3, and compression.
 transport() {
     local client="$1" server="$2" url="csms-$2-${RUN_ID}:9000/ocpp" tls="/tls/${VDIR}"
@@ -915,6 +1024,20 @@ for v in "${VERSIONS[@]}"; do
         for client in "${ADAPTERS[@]}"; do
             in_scope "${client}" "${server}" || continue
             pairing "${client}" "${server}"
+        done
+        # Contract 0.8: the Local Controllers of this version. Each CSMS
+        # behind each controller, with the controller's own station; and,
+        # in the shard of the controller's own CSMS, each station through it.
+        for lc in "${ADAPTERS[@]}"; do
+            declares "${lc}" '.localController.supported == true' || continue
+            if declares "${lc}" '.client.supported == true' && in_scope "${lc}" "${server}"; then
+                relayed_pairing "${lc}" "${lc}" "${server}"
+            fi
+            [[ "${server}" == "${lc}" ]] || continue
+            for client in "${ADAPTERS[@]}"; do
+                [[ "${client}" == "${lc}" ]] && continue
+                in_scope "${client}" "${lc}" && relayed_pairing "${lc}" "${client}" "${lc}"
+            done
         done
     done
 done

@@ -1,6 +1,6 @@
 # Container contract
 
-Version: **0.7 (draft)**. `contract_version` in [versions.yaml](../versions.yaml).
+Version: **0.8 (draft)**. `contract_version` in [versions.yaml](../versions.yaml).
 
 > Implemented by `mobilityhouse`, `chargetime` and `lorenzodonini` for OCPP
 > 1.6J and 2.0.1, and by `mobilityhouse` for OCPP 2.1, with security
@@ -12,7 +12,8 @@ Version: **0.7 (draft)**. `contract_version` in [versions.yaml](../versions.yaml
 > both roles, with SEND, CALLRESULTERROR and compression; its station has
 > security profiles 1 to 3 only; and by `seanlee` (seanlee0923/ocpp) for all
 > three in both roles, security profiles 0 to 3, without compression, SEND
-> or CALLRESULTERROR. It stays a draft (0.x)
+> or CALLRESULTERROR; and the optional `local-controller` (an OCPP 2.x
+> Local Controller) by `ocppkit` for 2.0.1 and 2.1. It stays a draft (0.x)
 > until every adapter implements every part of it;
 > [Gaps before 1.0](#gaps-before-10) lists what is missing. Until 1.0 it may
 > change without a major version bump.
@@ -31,6 +32,7 @@ compatible line and changes only with the major version.
 - [`server`](#server)
 - [`client`](#client)
 - [`call`](#call)
+- [`local-controller`](#local-controller)
 - [Answers](#answers)
 - [OCPP 2.1: SEND and CALLRESULTERROR](#ocpp-21-send-and-callresulterror)
 - [Transport security](#transport-security)
@@ -95,6 +97,7 @@ ocpp-interop server --version V [flags]
 ocpp-interop client run --version V --url URL [flags]
 ocpp-interop client <Action> --version V --url URL [--payload JSON] [flags]
 ocpp-interop call [--station ID] <Action> [--payload JSON] [--timeout-ms N] [--control-socket PATH]
+ocpp-interop local-controller --version V --upstream URL [flags]
 ocpp-interop print-capabilities
 ocpp-interop print-fixture --version V [NAME]
 ocpp-interop version
@@ -203,6 +206,57 @@ and the result document.
 
 When no `server` or `client run` listens on the control socket, `call` writes
 nothing to stdout, a diagnostic to stderr, and exits 3.
+
+## `local-controller`
+
+An OCPP 2.x Local Controller (Part 4 chapter 6): it accepts stations and
+opens one connection to the CSMS for each, under the station's own identity
+and path, and relays every message between them unchanged. Optional
+(contract 0.8): an adapter that has one declares `localController` in the
+version's capabilities, and exits 5 for a version it does not declare it
+in; for an adapter without one, `local-controller` is an unknown command
+(exit 2).
+
+```
+ocpp-interop local-controller --version V --upstream URL [--bind-address ADDR] [--port N]
+                              [--security-profile N] [--tls-dir DIR] [--upstream-tls-dir DIR]
+                              [--ready-file PATH]
+```
+
+| Flag | Meaning |
+|---|---|
+| `--version` | The OCPP version of both legs. Required |
+| `--upstream` | The CSMS endpoint without the identity, `ws://` or `wss://` (the `--url` a station would get). Required |
+| `--bind-address`, `--port` | Where stations connect, as for `server` (default `0.0.0.0`, `9000`) |
+| `--security-profile` | The profile of both legs (default 0). Profiles 1 and 2: the station's `Authorization` header is sent upstream as it is. Profile 3: no header; the controller presents the client certificate of `--upstream-tls-dir` upstream |
+| `--tls-dir` | The southbound server certificate, as `server --tls-dir` (profiles 2 and 3; with 3, `ca.crt` verifies the stations' certificates) |
+| `--upstream-tls-dir` | The northbound trust and identity, as `client --tls-dir` (`ca.crt`; `client.crt` and `client.key` with profile 3). Required with a `wss://` upstream |
+| `--ready-file` | As for `server` |
+
+The controller has no fixture and no control socket: it answers nothing
+itself. Behaviour the self-tests check (Part 4 §6.2 and §6.3):
+
+- every CALL, CALLRESULT, CALLERROR and (2.1) SEND of either end reaches
+  the other unchanged, so a station's CALL gets the CSMS's fixture answer
+  and the CSMS's CALL the station's;
+- the CSMS sees the station's identity (`connection-opened` with the
+  station's `station`);
+- when the station closes its connection, the controller closes the CSMS
+  leg (the CSMS writes `connection-closed`); when the CSMS goes away, the
+  station's connection is closed;
+- with no CSMS to connect to, the station's handshake is refused.
+
+Events ([Events](#events)): `ready` (`adapter`, `version`, `port`, `upstream`, `securityProfile`), one `relayed` per message, and `stopped`. The self-tests run every station through the controller to one CSMS, and every CSMS behind it from one station, with all the samples of both ends (`v<version>.lc.*` tests, with the controller as the result's `relay`).
+
+| Event | Fields |
+|---|---|
+| `relayed` | `station`, `direction` (`northbound`: station to CSMS; `southbound`), `messageType` (`CALL`, `CALLRESULT`, `CALLERROR`, `CALLRESULTERROR`, `SEND`), `messageId`, `action` (CALL and SEND, else `null`) |
+
+Capabilities, per version:
+
+```json
+"localController": { "supported": true, "securityProfiles": [0, 1, 2, 3] }
+```
 
 ## Answers
 
@@ -371,7 +425,7 @@ negotiated in the handshake.
 
 ## Events
 
-`server` and `client run` write [JSON Lines](https://jsonlines.org/) to
+`server`, `client run` and `local-controller` write [JSON Lines](https://jsonlines.org/) to
 stdout. Every event has these fields:
 
 - `event`
@@ -393,6 +447,7 @@ stdout. Every event has these fields:
 | `send-sent` | `messageId`, `action`, `payload`: a SEND sent (2.1) |
 | `send-received` | `messageId`, `action`, `payload`: a SEND received (2.1) |
 | `protocol-error` | `detail`, and the raw frame up to 4 KiB in `frame` |
+| `relayed` | `local-controller` only: `direction`, `messageType`, `messageId`, `action` ([`local-controller`](#local-controller)) |
 | `stopped` | — |
 
 `error` is `{code, description, details}`. A field whose value the upstream
@@ -515,6 +570,12 @@ from what the image serves. A fixture the image does not have exits 1.
 
 ## Changes
 
+- **0.8** (unreleased): the optional `local-controller` command, an OCPP
+  2.x Local Controller (Part 4 chapter 6) between stations and a CSMS, with
+  the `relayed` event and `localController` in the capabilities of a
+  version; report results of the relayed tests carry the controller as
+  `relay`. In `ocppkit` (ocpp-kit's `transport::LocalController`), OCPP
+  2.0.1 and 2.1.
 - **0.7** (unreleased): security profiles per role. The optional
   `securityProfiles` of `client` and `server` in the capabilities says which
   profiles a role has when they are not all of `features.securityProfiles`;

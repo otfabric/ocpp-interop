@@ -2,7 +2,8 @@
 //! ocpp-interop is the ocpp-interop adapter for hupe1980/ocpp-kit (Rust),
 //! behind the container contract (docs/CONTAINER_CONTRACT.md): a reference
 //! CSMS and station for OCPP 1.6J, 2.0.1 and 2.1, with the OCPP 2.1 SEND and
-//! CALLRESULTERROR message types and permessage-deflate.
+//! CALLRESULTERROR message types and permessage-deflate, and an OCPP 2.x
+//! Local Controller (contract 0.8).
 //!
 //! The adapter is glue: argument parsing, fixture loading, the control socket
 //! and JSON output. Framing, payload validation, request routing, pending
@@ -14,6 +15,7 @@ mod client;
 mod control;
 mod endpoint;
 mod fixture;
+mod lc;
 mod out;
 mod server;
 mod tls;
@@ -31,7 +33,7 @@ use crate::fixture::{Fixture, FixtureError};
 
 pub const ADAPTER: &str = "ocppkit";
 const SCHEMA_VERSION: &str = "1.0";
-const CONTRACT_VERSION: &str = "0.7";
+const CONTRACT_VERSION: &str = "0.8";
 const READY_FILE: &str = "/run/ocpp-interop/ready";
 const CONTROL_SOCKET: &str = "/run/ocpp-interop/control.sock";
 const VERSIONS: [&str; 3] = ["1.6", "2.0.1", "2.1"];
@@ -60,6 +62,8 @@ const USAGE: &str = "usage:
                       [--security-profile N] [--tls-dir DIR] [--compression] [--connect-timeout-ms N]
                       [--timeout-ms N]
   ocpp-interop call [--station ID] <Action> [--payload JSON] [--timeout-ms N] [--control-socket PATH]
+  ocpp-interop local-controller --version V --upstream URL [--bind-address ADDR] [--port N]
+                      [--security-profile N] [--tls-dir DIR] [--upstream-tls-dir DIR] [--ready-file PATH]
   ocpp-interop print-capabilities
   ocpp-interop print-fixture --version V [NAME]
   ocpp-interop version";
@@ -234,6 +238,7 @@ fn dispatch(args: &[String]) -> Outcome {
         "server" => command_server(rest),
         "client" => command_client(rest),
         "call" => command_call(rest),
+        "local-controller" => command_local_controller(rest),
         "print-capabilities" => {
             if !rest.is_empty() {
                 return Err(usage("print-capabilities takes no arguments"));
@@ -400,6 +405,86 @@ fn command_client(args: &[String]) -> Outcome {
     Err(Failure::Exit(code))
 }
 
+/// The OCPP versions with a Local Controller: Part 4 chapter 6 of OCPP 2.0.1
+/// and 2.1.
+const LOCAL_CONTROLLER_VERSIONS: [&str; 2] = ["2.0.1", "2.1"];
+
+fn command_local_controller(args: &[String]) -> Outcome {
+    let f = parse_flags(
+        args,
+        &[
+            "version",
+            "upstream",
+            "bind-address",
+            "port",
+            "security-profile",
+            "tls-dir",
+            "upstream-tls-dir",
+            "ready-file",
+        ],
+    )?;
+    if let Some(p) = f.positional.first() {
+        return Err(usage(format!("unexpected argument {p:?}")));
+    }
+    let port = f.number("port", 9000, 1, 65535)? as u16;
+    let bind = f.get("bind-address", "0.0.0.0");
+    if bind.parse::<IpAddr>().is_err() {
+        return Err(usage(format!(
+            "--bind-address: {bind:?} is not an IP address"
+        )));
+    }
+    if !f.has("upstream") {
+        return Err(usage("--upstream is required"));
+    }
+    let upstream = f.get("upstream", "");
+    let secure = upstream.starts_with("wss://");
+    if !secure && !upstream.starts_with("ws://") {
+        return Err(usage("--upstream must start with ws:// or wss://"));
+    }
+    let version = f.version()?;
+    let profile = f.security_profile()?;
+    if secure != (profile >= 2) {
+        return Err(usage(
+            "--upstream must be wss:// with security profiles 2 and 3, and ws:// otherwise",
+        ));
+    }
+    if f.has("upstream-tls-dir") != secure {
+        return Err(usage(
+            "--upstream-tls-dir is required with a wss:// upstream, and only then",
+        ));
+    }
+    let tls_dir = if profile >= 2 {
+        let dir = f.get("tls-dir", "");
+        tls::server_tls(&dir, profile).map_err(usage)?;
+        Some(dir)
+    } else {
+        None
+    };
+    let upstream_tls_dir = if secure {
+        let dir = f.get("upstream-tls-dir", "");
+        tls::client_tls(&dir, profile).map_err(usage)?;
+        Some(dir)
+    } else {
+        None
+    };
+    if !LOCAL_CONTROLLER_VERSIONS.contains(&version.as_str()) {
+        return Err(Failure::Unsupported(format!(
+            "OCPP {version} has no Local Controller (OCPP 2.0.1 and 2.1 Part 4 chapter 6)"
+        )));
+    }
+    let opts = lc::LcOptions {
+        version,
+        upstream,
+        bind,
+        port,
+        profile,
+        tls_dir,
+        upstream_tls_dir,
+        ready_file: f.get("ready-file", READY_FILE),
+    };
+    Err(Failure::Exit(runtime().block_on(lc::run(opts))))
+}
+
 fn command_call(args: &[String]) -> Outcome {
     let f = parse_flags(
         args,
@@ -519,7 +604,7 @@ fn version_capabilities(version: &str) -> Value {
             format!("OCPP {version} has no SEND or CALLRESULTERROR.")
         },
     ];
-    json!({
+    let mut doc = json!({
         "client": {"supported": true, "sends": station_sends, "handles": csms_sends, "securityProfiles": [1, 2, 3]},
         "server": {"supported": true, "sends": csms_sends, "handles": station_sends, "securityProfiles": [0, 1, 2, 3]},
         "features": {
@@ -531,5 +616,13 @@ fn version_capabilities(version: &str) -> Value {
             "messageIds": false,
         },
         "notes": notes,
-    })
+    });
+    if LOCAL_CONTROLLER_VERSIONS.contains(&version) {
+        // Contract 0.8: ocpp-kit's transport::LocalController.
+        doc["localController"] = json!({"supported": true, "securityProfiles": [0, 1, 2, 3]});
+        doc["notes"].as_array_mut().expect("notes").push(json!(
+            "local-controller (contract 0.8): ocpp-kit's transport::LocalController (Part 4 chapter 6): one CSMS connection per station under its identity and path, every frame forwarded unchanged (a Relay writes the relayed events), close propagation both ways, its own TLS roles; the station's Authorization header goes upstream at profiles 1 and 2, its client certificate (--upstream-tls-dir) at 3. It has no hook for a leg that opens or closes."
+        ));
+    }
+    doc
 }

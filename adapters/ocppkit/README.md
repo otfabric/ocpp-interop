@@ -3,8 +3,9 @@
 OCPP 1.6J, 2.0.1 and 2.1 reference CSMS and station built on
 [hupe1980/ocpp-kit](https://github.com/hupe1980/ocpp-kit), behind the
 [container contract](../../docs/CONTAINER_CONTRACT.md). It is the second
-reference with the OCPP 2.1 message types SEND and CALLRESULTERROR, and the
-first that offers and accepts permessage-deflate in both roles.
+reference with the OCPP 2.1 message types SEND and CALLRESULTERROR, the
+first that offers and accepts permessage-deflate in both roles, and the
+first with a Local Controller (`local-controller`, contract 0.8).
 
 | | |
 |---|---|
@@ -70,6 +71,20 @@ docker run --rm -p 127.0.0.1:9000:9000 ghcr.io/otfabric/ocpp-interop-ocppkit:dev
   `MessageKind`), from the calls the adapter makes and from each session's
   event channel (`Event::ResultRejected`). ocpp-kit does not return the id of
   a CALL it sends: `messageIds` is `false`.
+
+### Local Controller (contract 0.8)
+
+`local-controller` runs ocpp-kit's `transport::LocalController` (OCPP 2.0.1
+and 2.1 Part 4 chapter 6) on a listener the adapter binds: one CSMS
+connection per station under the station's identity and path, every frame
+forwarded unchanged, close propagation both ways, a server certificate
+southbound (`--tls-dir`) and a client identity northbound
+(`--upstream-tls-dir`). At profiles 1 and 2 the station's `Authorization`
+header goes upstream (`UpstreamCredentials::PassThrough`); at 3 none
+(`UpstreamCredentials::None`), the controller's client certificate. A
+`Relay` that forwards every frame writes a `relayed` event for each; the
+controller has no hook for a leg that opens or closes. Not in 1.6, which
+has no Local Controller (exit 5).
 
 ### OCPP 2.1 SEND and CALLRESULTERROR
 

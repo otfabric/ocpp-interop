@@ -114,9 +114,12 @@ interoperability. First slice: OCPP 1.6J only (2026-10-18).
       1.6J, 2.0.1 and 2.1, SEND, CALLRESULTERROR and compression; SEND and
       CALLRESULTERROR between two independent implementations. Contract
       0.7: security profiles per role (its station always authenticates)
-- [ ] The Local Controller (OCPP 2.0.1 and 2.1 Part 1): a contract role
-      that relays between stations and a CSMS, with ocpp-kit's
-      `LocalController`
+- [x] The Local Controller (OCPP 2.0.1 and 2.1 Part 4 chapter 6):
+      contract 0.8, the `local-controller` command, with ocpp-kit's
+      `LocalController`; every station through it to one CSMS and every
+      CSMS behind it from one station
+- [ ] A second independent Local Controller, so that the role is tested
+      between two implementations of it
 - [x] `seanlee` adapter (Go, seanlee0923/ocpp v0.3.0): both roles in
       1.6J (without the Security Whitepaper messages), 2.0.1 and 2.1,
       security profiles 0 to 3; no compression, SEND or CALLRESULTERROR

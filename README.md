@@ -9,7 +9,7 @@ against real implementation diversity, in both roles and in both directions
 of request flow, without owning any of that code.
 
 > **Status: Phase 6 (OCPP 2.1).** `mobilityhouse`, `chargetime` and
-> `lorenzodonini` implement the container contract (draft 0.7) for OCPP 1.6J
+> `lorenzodonini` implement the container contract (draft 0.8) for OCPP 1.6J
 > and 2.0.1 in both roles, and `mobilityhouse` also for OCPP 2.1 (the pinned
 > releases of the other two upstreams have no 2.1), with security profiles 0
 > to 3 (TLS and mutual TLS) and, where the upstream can, compression. `everest` (EVerest
@@ -22,7 +22,9 @@ of request flow, without owning any of that code.
 > roles in all three versions and the OCPP 2.1 SEND and CALLRESULTERROR
 > frames, so each of those is tested between two independent
 > implementations. `seanlee` (seanlee0923/ocpp, Go) has both roles in all
-> three versions, security profiles 0 to 3. See [PLAN.md](PLAN.md).
+> three versions, security profiles 0 to 3. `ocppkit` is also an OCPP 2.x
+> Local Controller (contract 0.8), tested between every station and every
+> CSMS. See [PLAN.md](PLAN.md).
 
 ## Table of contents
 
