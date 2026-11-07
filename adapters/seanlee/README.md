@@ -8,7 +8,7 @@ OCPP 1.6J, 2.0.1 and 2.1 reference CSMS and station built on
 |---|---|
 | Upstream | seanlee0923/ocpp (Go): its own OCPP-J framing (package `protocol`), message types and validation code generated from the OCA JSON schemas (`v16`, `v201`, `v21`), the CSMS (`csms`) and the station (`station`) |
 | Version | v0.3.0, released 2026-08-13 (git tag `v0.3.0`, commit `7e3759d106605a11e4e3f1ce45fc44e6f595cd3c`), the Go module `github.com/seanlee0923/ocpp@v0.3.0` |
-| Independence | Its own engine; the message types are generated from the OCA schemas by its own generator ([seanlee0923/ocpp-schema-gen](https://github.com/seanlee0923/ocpp-schema-gen)). No code of go-ocpp or of another reference here |
+| Independence | Its own engine; the message types are generated from the OCA schemas by its own generator ([seanlee0923/ocpp-schema-gen](https://github.com/seanlee0923/ocpp-schema-gen)). No code of another reference here |
 | Transport | [gorilla/websocket](https://github.com/gorilla/websocket) 1.5.3 |
 | Other modules in the binary | google/uuid 1.6.0 (message ids). These are the versions seanlee0923/ocpp's go.mod requires |
 | Licences | seanlee0923/ocpp MIT; gorilla/websocket BSD-2-Clause; google/uuid and the Go standard library BSD-3-Clause |
