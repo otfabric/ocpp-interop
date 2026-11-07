@@ -10,7 +10,7 @@ first that offers and accepts permessage-deflate in both roles.
 |---|---|
 | Upstream | hupe1980/ocpp-kit (Rust): its own codec (typed messages generated from the OCA JSON schemas), sans-I/O protocol engine, RFC 6455 WebSocket and RFC 7692 compression, and the `transport::Station` and `transport::Csms` roles |
 | Version | 0.3.0, released 2026-09-15 on crates.io (git tag `v0.3.0`, commit `b64ce83ab46c742dfbd99e925cd0acfacbf2ddc9`) |
-| Independence | Its own engine and WebSocket; written from the OCPP documents its [SPEC_EDITIONS.md](https://github.com/hupe1980/ocpp-kit/blob/b64ce83ab46c742dfbd99e925cd0acfacbf2ddc9/SPEC_EDITIONS.md) lists. No code of go-ocpp or of another reference here |
+| Independence | Its own engine and WebSocket; written from the OCPP documents its [SPEC_EDITIONS.md](https://github.com/hupe1980/ocpp-kit/blob/b64ce83ab46c742dfbd99e925cd0acfacbf2ddc9/SPEC_EDITIONS.md) lists. No code of another reference here |
 | Transport | ocpp-kit's own WebSocket over tokio, TLS with rustls 0.23 (ring) |
 | Other crates in the binary | tokio, rustls with ring and webpki-roots, serde and serde_json, and, for the adapter, jsonschema (the fixture schema), regex and x509-parser (the CommonName of a client certificate). `/licenses/BUNDLED-CRATES.txt` lists all of them |
 | Licences | ocpp-kit MIT OR Apache-2.0; the other crates MIT, Apache-2.0, ISC, BSD-3-Clause, Unicode-3.0, Zlib or CDLA-Permissive-2.0 (webpki-roots), each as its Cargo.toml declares |
@@ -104,10 +104,12 @@ docker run --rm -p 127.0.0.1:9000:9000 ghcr.io/otfabric/ocpp-interop-ocppkit:dev
   CSMS send it; ocpp-kit 0.3.0 has it as a station message
   ([`Origin::ChargingStation`](https://github.com/hupe1980/ocpp-kit/blob/b64ce83ab46c742dfbd99e925cd0acfacbf2ddc9/src/v2_1/action.rs#L578)),
   so its CSMS refuses to send it and its station refuses it before the
-  handler. Left out of the CSMS's `sends` and the station's `handles`.
+  handler. Left out of the CSMS's `sends` and the station's `handles`
+  ([hupe1980/ocpp-kit#1](https://github.com/hupe1980/ocpp-kit/issues/1)).
 - **Integers with a zero fraction**: ocpp-kit reads the integer fields of
   the OCA types as `i32`, so it refuses `20000.0`, which the draft-06 OCA
   schemas allow. The everest station sends NotifyEVChargingNeeds that way in
-  2.0.1 (tests/known-bugs.tsv).
+  2.0.1 (tests/known-bugs.tsv,
+  [hupe1980/ocpp-kit#2](https://github.com/hupe1980/ocpp-kit/issues/2)).
 - **`protocol-error` events**: ocpp-kit has no hook for a frame it cannot
   read.
