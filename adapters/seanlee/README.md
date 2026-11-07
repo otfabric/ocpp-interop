@@ -92,3 +92,8 @@ docker run --rm -p 127.0.0.1:9000:9000 ghcr.io/otfabric/ocpp-interop-seanlee:dev
   with `code` and `reason` `null`.
 - **`protocol-error` events**: the library has no hook for a frame it cannot
   read.
+- **Integers with a zero fraction**: the CSMS validates `20000.0` as an
+  integer (draft-06) but cannot decode it into its Go `int`, and answers
+  `FormatViolation`; the everest station sends NotifyEVChargingNeeds so in
+  2.0.1 (tests/known-bugs.tsv,
+  [seanlee0923/ocpp#2](https://github.com/seanlee0923/ocpp/issues/2)).
