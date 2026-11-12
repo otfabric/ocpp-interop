@@ -40,7 +40,7 @@ docker exec go-ocpp-station ocpp-interop call BootNotification --payload "$(dock
   ghcr.io/otfabric/ocpp-interop-otfabric:<tag> print-fixture --version 2.0.1 | jq -c .samples.boot.payload)"
 ```
 
-`<tag>` is a go-ocpp version such as `v0.2.0`, or `latest`, the newest one
+`<tag>` is a go-ocpp version such as `v0.3.3`, or `latest`, the newest one
 published. A rebuild of a version replaces its tag, so pin the digest if you need
 an exact build. The digest is in the summary of the
 [workflow run](https://github.com/otfabric/ocpp-interop/actions/workflows/own-go-ocpp.yml),
