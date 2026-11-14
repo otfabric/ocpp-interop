@@ -125,7 +125,7 @@ profile 1 at both ends.
 
 `compression` in `connection-opened` is what the handshake negotiated:
 go-ocpp's `ocpp.ConnInfo.Compression` and `server.Session.Compression` (from
-go-ocpp v0.3.3). Its CSMS accepts permessage-deflate whenever a station offers
+go-ocpp v0.4.0). Its CSMS accepts permessage-deflate whenever a station offers
 it, and its station offers it with `--compression` (`client.WithCompression`).
 
 Reported as `null`, because go-ocpp does not expose them:
