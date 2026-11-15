@@ -6,7 +6,8 @@
     scripts/release-manifest.py <version> <commit> <digests file> <manifest out> <body out>
 
 The digests file holds one "<adapter> <sha256:...>" line per published
-multi-arch image (make digests); the release workflow refuses an empty one.
+multi-arch image (make digests): exactly one for every adapter of ADAPTERS in
+the Makefile. A missing, repeated or unknown adapter fails.
 Upstream pins are read from the adapter Dockerfiles, the contract and fixture
 versions from versions.yaml.
 """
@@ -26,6 +27,30 @@ def arg(adapter, name):
     return match.group(1).strip() if match else ""
 
 
+def adapters():
+    """The adapters a release publishes: ADAPTERS of the Makefile."""
+    match = re.search(r"^ADAPTERS \?=(.*)$", (ROOT / "Makefile").read_text(), re.M)
+    if not match:
+        raise SystemExit("the Makefile has no ADAPTERS ?= line")
+    return match.group(1).split()
+
+
+def read_digests(path):
+    """The "<adapter> <digest>" lines of path, one for every adapter of ADAPTERS."""
+    lines = [line.split() for line in Path(path).read_text().splitlines() if line.strip()]
+    for fields in lines:
+        if len(fields) != 2:
+            raise SystemExit(f"{path}: {' '.join(fields)!r} is not \"<adapter> <digest>\"")
+    names, want = [fields[0] for fields in lines], adapters()
+    missing = [a for a in want if a not in names]
+    repeated = sorted({a for a in names if names.count(a) > 1})
+    unknown = [a for a in names if a not in want]
+    if missing or repeated or unknown:
+        raise SystemExit(f"{path} must have one line for every adapter of ADAPTERS ({' '.join(want)}): "
+                         f"missing {missing}, repeated {repeated}, not in ADAPTERS {unknown}")
+    return dict(lines)
+
+
 def manifest_value(key):
     match = re.search(rf'^{key}: "([^"]+)"', (ROOT / "versions.yaml").read_text(), re.M)
     if not match:
@@ -41,7 +66,7 @@ def main():
         raise SystemExit(f"{version!r} is not a vX.Y.Z version")
     if manifest_value("interop_version") != version[1:]:
         raise SystemExit(f"versions.yaml interop_version is not {version[1:]}")
-    digests = dict(line.split() for line in Path(digests_file).read_text().splitlines() if line.strip())
+    digests = read_digests(digests_file)
 
     upstream, images = {}, {}
     for adapter, digest in digests.items():

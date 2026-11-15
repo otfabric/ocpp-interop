@@ -212,7 +212,7 @@ def main(argv):
         import jsonschema
     except ImportError:
         if require_schema:
-            print("the jsonschema package is required (pip install jsonschema)", file=sys.stderr)
+            print("the jsonschema package is required (pip install jsonschema==4.26.0)", file=sys.stderr)
             return 1
         jsonschema = None
         print("warning: jsonschema is not installed; checking cross-field rules only", file=sys.stderr)

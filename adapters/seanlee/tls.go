@@ -110,15 +110,8 @@ func passwordOK(want, got string) bool {
 }
 
 // certNames reports whether the client certificate names the station: its
-// CommonName, or a DNS name of its subjectAltName.
+// subject CommonName is the station identity (docs/CONTAINER_CONTRACT.md,
+// Transport security). Names of the subjectAltName are not taken.
 func certNames(cert *x509.Certificate, station string) bool {
-	if cert.Subject.CommonName == station {
-		return true
-	}
-	for _, name := range cert.DNSNames {
-		if name == station {
-			return true
-		}
-	}
-	return false
+	return cert.Subject.CommonName == station
 }

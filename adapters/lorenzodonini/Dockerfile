@@ -62,6 +62,7 @@ COPY adapters/lorenzodonini/licenses /licenses-extra
 RUN set -eu; \
     test -z "$(gofmt -l .)"; \
     go vet ./...; \
+    go test ./...; \
     version="$(go list -m -f '{{.Version}}' github.com/lorenzodonini/ocpp-go)"; \
     test "${version}" = "${UPSTREAM_VERSION}"; \
     go build -trimpath -ldflags "-s -w \

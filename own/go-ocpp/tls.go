@@ -8,11 +8,14 @@ package main
 // crypto/tls, as go-ocpp uses it.
 
 import (
+	"crypto/subtle"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/otfabric/go-ocpp/server"
 )
 
 // tlsFile is the path of one file of --tls-dir; a missing file is a usage error.
@@ -101,4 +104,17 @@ func peerCommonName(state *tls.ConnectionState) (string, error) {
 		return "", fmt.Errorf("no client certificate")
 	}
 	return state.PeerCertificates[0].Subject.CommonName, nil
+}
+
+// passwordOK compares a Basic credential in constant time.
+func passwordOK(want, got string) bool {
+	return subtle.ConstantTimeCompare([]byte(want), []byte(got)) == 1
+}
+
+// basicAuthOK reports whether the request carries Basic credentials with the
+// station identity as user name and the station's password. The user name and
+// the password are both compared in constant time.
+func basicAuthOK(r server.ConnectRequest, id, password string) bool {
+	userOK, passwordMatches := passwordOK(id, r.Username), passwordOK(password, string(r.Password))
+	return r.HasBasicAuth && userOK && passwordMatches
 }

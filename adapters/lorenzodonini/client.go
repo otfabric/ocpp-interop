@@ -93,6 +93,27 @@ func commandClient(args []string) error {
 			return err
 		}
 	}
+	// What the adapter supports, after the usage checks and before the fixture.
+	if err := supported(version); err != nil {
+		return err
+	}
+	if f.has("station") && f.get("station", "") == "" {
+		return unsupportedf("--station \"\": ocpp-go's client always appends the station identity to the URL")
+	}
+	if !run {
+		// What the station cannot send is refused before any network access.
+		unsupported := ""
+		if feature(version, action) == nil {
+			unsupported = fmt.Sprintf("ocpp-go has no OCPP %s feature for %s", version, action)
+		} else if !versions[version].fromStation[action] {
+			unsupported = fmt.Sprintf("the station does not send %s in OCPP %s", action, version)
+		}
+		if unsupported != "" {
+			writeLine(resultDoc{version: version, operation: action, request: payload, errCode: "unsupported",
+				errMsg: unsupported}.object())
+			return exitCode(5)
+		}
+	}
 	fx, err := fixtureOf(f, version)
 	if err != nil {
 		return err
@@ -113,17 +134,6 @@ func commandClient(args []string) error {
 	}
 
 	started := time.Now()
-	unsupported := ""
-	if feature(version, action) == nil {
-		unsupported = fmt.Sprintf("ocpp-go has no OCPP %s feature for %s", version, action)
-	} else if !versions[version].fromStation[action] {
-		unsupported = fmt.Sprintf("the station does not send %s in OCPP %s", action, version)
-	}
-	if unsupported != "" {
-		writeLine(resultDoc{version: version, operation: action, request: payload, errCode: "unsupported",
-			errMsg: unsupported}.object())
-		return exitCode(5)
-	}
 	conn, err := connectStation(version, base, station, fx, opts, connectTimeout, false)
 	var doc resultDoc
 	if err != nil {

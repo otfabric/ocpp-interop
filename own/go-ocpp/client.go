@@ -87,6 +87,16 @@ func commandClient(args []string) error {
 			return err
 		}
 	}
+	if !run {
+		// What the station cannot send is refused before the fixture is read
+		// and before any network access; execute refuses it before it uses
+		// the fixture or a connection.
+		pre := &endpoint{version: version, role: "station", tracker: newTracker(false)}
+		if doc := pre.execute(f.get("station", ""), action, payload, timeoutMs, refuseCaller{}, nil); doc.errCode == "unsupported" {
+			writeLine(doc.object())
+			return exitCode(5)
+		}
+	}
 	fx, err := fixtureOf(f, version)
 	if err != nil {
 		return err
@@ -111,11 +121,6 @@ func commandClient(args []string) error {
 
 	started := time.Now()
 	e := &endpoint{version: version, fixture: fx, role: "station", tracker: newTracker(false)}
-	// What the station cannot send is refused before any network access.
-	if doc := e.execute(station, action, payload, timeoutMs, refuseCaller{}, nil); doc.errCode == "unsupported" {
-		writeLine(doc.object())
-		return exitCode(5)
-	}
 	conn, err := connectStation(fullURL, station, e, opts, connectTimeout)
 	var doc resultDoc
 	if err != nil {

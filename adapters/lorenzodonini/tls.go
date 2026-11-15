@@ -9,9 +9,11 @@ package main
 // the server name from the URL).
 
 import (
+	"crypto/subtle"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 )
@@ -103,4 +105,18 @@ func peerCommonName(state *tls.ConnectionState) (string, error) {
 		return "", fmt.Errorf("no client certificate")
 	}
 	return state.PeerCertificates[0].Subject.CommonName, nil
+}
+
+// passwordOK compares a Basic credential in constant time.
+func passwordOK(want, got string) bool {
+	return subtle.ConstantTimeCompare([]byte(want), []byte(got)) == 1
+}
+
+// basicAuthOK reports whether the request carries Basic credentials with the
+// station identity as user name and the station's password. The user name and
+// the password are both compared in constant time.
+func basicAuthOK(r *http.Request, id, password string) bool {
+	user, got, ok := r.BasicAuth()
+	userOK, passwordMatches := passwordOK(id, user), passwordOK(password, got)
+	return ok && userOK && passwordMatches
 }
