@@ -44,8 +44,9 @@ func (e *responseError) Error() string { return e.err.Error() }
 func (e *responseError) Unwrap() error { return e.err }
 
 type actionOps struct {
-	check func(request json.RawMessage) error // the checks Call makes before sending
-	send  bool                                // a SEND-only action (OCPP 2.1 NotifyPeriodicEventStream): no confirmation type
+	check       func(request json.RawMessage) error // the checks Call makes before sending
+	checkAnswer func(answer json.RawMessage) error  // the checks Handle makes of an answer before sending it
+	send        bool                                // a SEND-only action (OCPP 2.1 NotifyPeriodicEventStream): no confirmation type
 
 	csmsCall      func(ctx context.Context, s *csms.Session, request json.RawMessage) (json.RawMessage, error)
 	stationCall   func(ctx context.Context, s *station.Station, request json.RawMessage) (json.RawMessage, error)
@@ -99,6 +100,10 @@ func callOps[Q, C protocol.Payload]() actionOps {
 				return err
 			}
 			return q.Validate()
+		},
+		checkAnswer: func(raw json.RawMessage) error {
+			_, err := decodeAnswer[C](raw)
+			return err
 		},
 		csmsCall: func(ctx context.Context, s *csms.Session, raw json.RawMessage) (json.RawMessage, error) {
 			q, err := decodeRequest[Q](raw)
@@ -176,9 +181,22 @@ func typedAnswer[Q, C protocol.Payload](ctx context.Context, q Q, answer answerF
 	if err != nil {
 		return c, err
 	}
-	if err := json.Unmarshal(out, &c); err != nil {
+	return decodeAnswer[C](out)
+}
+
+// decodeAnswer is an answer in the confirmation type, checked as the
+// library's Handle checks it before sending (Validate). An answer that is
+// not a valid confirmation is an *answerError: the adapter answers it with
+// an InternalError CALLERROR itself.
+func decodeAnswer[C protocol.Payload](raw json.RawMessage) (C, error) {
+	var c C
+	if err := json.Unmarshal(raw, &c); err != nil {
 		return c, &answerError{code: "InternalError", description: "the fixture answer is not a " +
-			q.ActionName() + " confirmation: " + err.Error()}
+			c.ActionName() + " confirmation: " + err.Error()}
+	}
+	if err := c.Validate(); err != nil {
+		return c, &answerError{code: "InternalError", description: "the fixture answer is not a valid " +
+			c.ActionName() + " confirmation: " + err.Error()}
 	}
 	return c, nil
 }

@@ -83,6 +83,6 @@ Contributions are accepted under the MIT licence of this repository.
 | Push to a branch | none | nothing; dispatch `ci.yml` to test a branch without a pull request |
 | Push to `main` | `policy.yml` | the light checks; the merged commit was tested as the pull request's merge commit |
 | Schedule | `upstream.yml` | the scheduled runs, on `main` |
-| Release | `release.yml` | the release workflow tests the release commit again |
+| Release | `release.yml` | on a `vX.Y.Z` tag push or a manual run on `main`: checks that versions.yaml and RELEASE.md name the version, runs `make validate` and `scripts/release-check.sh`, then the self-test (`selftest.yml`: every adapter of `ADAPTERS` built natively on amd64 and arm64, the smoke tests, the interop shards and the validation of their documents); it pushes exactly the tested images, joins them into the multi-arch tag, and publishes the release with `manifest.json` (one digest for every adapter) |
 
 Documentation means an added or modified `*.md` file outside `.github/`, `testdata/` and `vendor/`, other than `AGENTS.md` and `CLAUDE.md`. A deleted or renamed document, or any other file, runs everything. `OT Fabric Required Checks` fails unless every job that applies succeeded; its summary lists them.

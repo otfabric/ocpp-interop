@@ -75,8 +75,8 @@ message ids from a call interceptor (`ocpp.CallInfo.MessageID`), protocol
 errors from `Metrics.OnProtocolError`, a lost connection from
 `Metrics.OnDisconnect` and the session handler. The CSMS's authenticator
 refuses an identity the fixture does not list (`server.ErrUnknownStation`, HTTP
-404), and wrong Basic credentials or a client certificate of another identity
-(HTTP 401). TLS (profiles 2 and 3) is `server.WithTLS` and `client.WithTLS`
+404), and wrong Basic credentials (the user name and the password are compared
+in constant time) or a client certificate of another identity (HTTP 401). TLS (profiles 2 and 3) is `server.WithTLS` and `client.WithTLS`
 with the files of `--tls-dir`. `OCPP_INTEROP_LOG_LEVEL` (`debug`, `info`,
 `warn`, `error`) passes go-ocpp's `slog` logging to stderr.
 

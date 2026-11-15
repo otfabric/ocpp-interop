@@ -41,6 +41,30 @@ manual workflow and no releases (`own/go-ocpp/README.md`).
 
 ---
 
+## v0.10.1
+
+**Date:** 2026-11-16
+**Previous release:** v0.10.0
+
+### Changed
+
+- The container contract (0.8), the schemas and the fixtures are unchanged. The adapters now do what the contract says in the points below.
+- lorenzodonini and the own image: the Basic user name and password are compared in constant time.
+- seanlee: with security profile 3 the CSMS takes a client certificate as the station's only when its subject CommonName is the station identity (docs/CONTAINER_CONTRACT.md, Transport security); a name of the subjectAltName is not taken.
+- Exit codes in the order of the contract's Commands section (usage 2, then what the adapter supports 5, then the fixture 4):
+  - cbsigma, lorenzodonini, seanlee and the own image: `client <Action>` refuses an action the station does not send (exit 5) before it reads the fixture;
+  - lorenzodonini: a `--bind-address` that is not an IP address is a usage error (exit 2), and every usage check of `server` and `client` comes before OCPP 2.1 and a listen address other than `0.0.0.0` are refused (exit 5).
+- lorenzodonini: `client --station ""` exits 5, since ocpp-go's client always appends the identity to the URL; the contract's gap table lists it.
+- lorenzodonini: a CALL that waits in ocpp-go's queue behind another keeps its own `--timeout-ms`; the adapter sets ocpp-go's one dispatcher timeout as the CALL is written.
+- lorenzodonini: when ocpp-go's `ws.Server` stops serving, the server removes its ready file, writes `stopped` and exits 1, as the other servers do.
+- cbsigma and seanlee: `call-answered` reports what is sent. A fixture answer the upstream would refuse (outside the action's schema, or not a valid confirmation of seanlee0923/ocpp's types) is answered with an InternalError CALLERROR, and the event carries that CALLERROR. In seanlee its description is the adapter's and names the action.
+- The image builds of cbsigma, lorenzodonini and seanlee run the adapters' Go unit tests, as the own image's build does.
+- Release workflow: the digest step runs with pipefail, and `scripts/release-manifest.py` wants exactly one digest for every adapter of `ADAPTERS`.
+- The workflows and the Makefile's container fallback install `jsonschema==4.26.0` instead of the newest release.
+- Documents: the contract's "Changes" name the release of each contract version; SECURITY.md lists all eight upstreams; lorenzodonini's capability notes say that its server writes `connection-rejected` for another subprotocol and that `--station ""` exits 5; CONTRIBUTING.md says what the release workflow runs.
+
+---
+
 ## v0.10.0
 
 **Date:** 2026-11-07

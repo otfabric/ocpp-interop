@@ -72,7 +72,7 @@ define with_jsonschema
 	else \
 		echo "(jsonschema not installed locally: running in a container)"; \
 		$(RETRY) docker run --rm -v "$(CURDIR):/work:ro" -w /work $(TOOLS_REGISTRY)/library/python:3.12-slim \
-			sh -c 'pip install -q --root-user-action=ignore jsonschema && python $(1)'; \
+			sh -c 'pip install -q --root-user-action=ignore jsonschema==4.26.0 && python $(1)'; \
 	fi
 endef
 

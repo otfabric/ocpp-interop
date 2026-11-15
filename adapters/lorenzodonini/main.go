@@ -152,10 +152,16 @@ func versionOf(f *flagSet) (string, error) {
 	if _, ok := versionDirs[v]; !ok {
 		return "", usagef("--version: %q is not 1.6, 2.0.1 or 2.1", v)
 	}
-	if _, ok := versions[v]; !ok {
-		return "", unsupportedf("OCPP %s is not supported by this adapter", v)
-	}
 	return v, nil
+}
+
+// supported refuses an OCPP version of the contract that this adapter does
+// not have (exit 5). The commands call it after every usage check.
+func supported(version string) error {
+	if _, ok := versions[version]; !ok {
+		return unsupportedf("OCPP %s is not supported by this adapter", version)
+	}
+	return nil
 }
 
 func securityProfileOf(f *flagSet) (int, error) {
@@ -366,9 +372,11 @@ func versionCapabilities(version string) *object {
 		"The server refuses an identity the fixture does not list, and wrong Basic credentials, with HTTP 401: " +
 			"ocpp-go's connection check (CheckClientHandler) can only refuse with 401, not 404.",
 		"The server listens on all addresses (ws.Server.Start takes a port only): --bind-address accepts 0.0.0.0 only.",
+		"The station always appends its identity to the URL (ocppj.Client): --station \"\" exits 5.",
 		"The station does not see the negotiated subprotocol (ws.Client does not expose it), and ocpp-go does not " +
 			"check it: connection-opened has subprotocol null. The server accepts only " + versions[version].subprotocol +
-			" and closes any other handshake (1002) before the adapter sees it.",
+			": ocpp-go upgrades a handshake without it and closes it at once (1002), after the adapter wrote " +
+			"connection-rejected with reason subprotocol.",
 		"The server does not see the close code of a station's connection: connection-closed has code and reason null.",
 		"Message ids are ocpp-go's (a random uint32, its default generator); the adapter reads them through " +
 			"ocppj.SetMessageIdGenerator.",

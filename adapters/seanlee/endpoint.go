@@ -56,6 +56,11 @@ func (e *endpoint) answerer(station, action string) answerFunc {
 	return func(_ context.Context, payload json.RawMessage) (json.RawMessage, error) {
 		e.event("call-received", station, "messageId", nil, "action", action, "payload", payload)
 		answer, err := e.answer(action, payload)
+		if err == nil {
+			// The event reports what is sent: an answer that is not a valid
+			// confirmation is answered with a CALLERROR instead.
+			err = e.checkAnswer(action, answer)
+		}
 		if err != nil {
 			code, description := "InternalError", err.Error()
 			var ae *answerError
@@ -69,6 +74,15 @@ func (e *endpoint) answerer(station, action string) answerFunc {
 		e.event("call-answered", station, "messageId", nil, "action", action, "payload", answer)
 		return answer, nil
 	}
+}
+
+// checkAnswer decodes and validates an answer as the library does before it
+// sends it (decodeAnswer).
+func (e *endpoint) checkAnswer(action string, answer json.RawMessage) error {
+	if check := actionTable[e.version][action].checkAnswer; check != nil {
+		return check(answer)
+	}
+	return nil
 }
 
 // taker is the sendFunc of one SEND action.

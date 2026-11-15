@@ -31,11 +31,13 @@ type tracker struct {
 	sentAction map[string]string          // station, id -> action of a CALL sent
 	results    map[string]bool            // station, id -> a CALLRESULT frame arrived
 	callErrors map[string]*object         // station, id -> the CALLERROR that arrived
+	written    map[string]func()          // station, id -> run as the CALL is written
 }
 
 func newTracker(emit bool) *tracker {
 	return &tracker{emit: emit, received: map[string]string{}, sent: map[string]json.RawMessage{},
-		sentAction: map[string]string{}, results: map[string]bool{}, callErrors: map[string]*object{}}
+		sentAction: map[string]string{}, results: map[string]bool{}, callErrors: map[string]*object{},
+		written: map[string]func(){}}
 }
 
 func key(station, id string) string { return station + "\x00" + id }
@@ -102,6 +104,10 @@ func (t *tracker) outgoing(station string, data []byte) {
 	k := key(station, id)
 	switch {
 	case kind == 2 && len(rest) == 2:
+		if f := t.written[k]; f != nil {
+			delete(t.written, k)
+			f()
+		}
 		var action string
 		_ = json.Unmarshal(rest[0], &action)
 		t.sent[k] = rest[1]
@@ -126,6 +132,18 @@ func nullable(s string) any {
 }
 
 func (t *tracker) actionOf(k string) any { return nullable(t.sentAction[k]) }
+
+// whenWritten runs f when ocpp-go writes the CALL with that id, on the
+// goroutine that writes it; a nil f forgets the CALL.
+func (t *tracker) whenWritten(station, id string, f func()) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if f == nil {
+		delete(t.written, key(station, id))
+		return
+	}
+	t.written[key(station, id)] = f
+}
 
 func (t *tracker) event(name, station string, fields ...any) {
 	if t.emit {
@@ -197,17 +215,22 @@ func (c *observedClient) Write(data []byte) error {
 // ocpp-go generates the id of a CALL inside SendRequest. The adapter keeps
 // ocpp-go's default generator (fmt.Sprintf("%v", rand.Uint32()), see
 // ocppj.SetMessageIdGenerator) and reads the id it produced while it holds
-// sendMu, which serialises all sends of the process.
+// sendMu, which serialises all sends of the process. onID, set while sendMu
+// is held, learns the id before ocpp-go can write the CALL.
 var (
 	sendMu sync.Mutex
 	lastID string
+	onID   func(id string)
 )
 
-func init() {
-	ocppj.SetMessageIdGenerator(func() string {
-		lastID = fmt.Sprintf("%v", rand.Uint32())
-		return lastID
-	})
+func init() { ocppj.SetMessageIdGenerator(nextMessageID) }
+
+func nextMessageID() string {
+	lastID = fmt.Sprintf("%v", rand.Uint32())
+	if onID != nil {
+		onID(lastID)
+	}
+	return lastID
 }
 
 // ---- answering and sending ----
@@ -313,14 +336,18 @@ func (e *endpoint) execute(station, action string, payload map[string]any, timeo
 	outcome := make(chan callOutcome, 1)
 	timeout := time.Duration(timeoutMs) * time.Millisecond
 	sendMu.Lock()
-	// ocpp-go's dispatcher times the CALL out itself; it takes the timeout of
-	// the next CALL it dispatches.
-	e.setTimeout(timeout)
+	// ocpp-go's dispatcher times the CALL out itself, with its one timeout,
+	// which its message pump reads right after it wrote a CALL (the server's
+	// dispatchNextRequest, the client's pump in ocppj/dispatcher.go). The
+	// timeout of this CALL is set as this CALL is written, on that goroutine:
+	// a CALL that waits in ocpp-go's queue keeps its own --timeout-ms.
 	lastID = ""
+	onID = func(id string) { e.tracker.whenWritten(station, id, func() { e.setTimeout(timeout) }) }
 	err := send(request.(ocpp.Request), func(response ocpp.Response, err error) {
 		outcome <- callOutcome{response, err}
 	})
 	id := lastID
+	onID = nil
 	sendMu.Unlock()
 	asSent := func() any {
 		if sent, _, _ := e.tracker.outcome(station, id); sent != nil {
@@ -330,6 +357,7 @@ func (e *endpoint) execute(station, action string, payload map[string]any, timeo
 		return json.RawMessage(wire)
 	}
 	if err != nil {
+		e.tracker.whenWritten(station, id, nil)
 		var invalid validator.ValidationErrors
 		if errors.As(err, &invalid) {
 			return done(resultDoc{request: asSent(), errCode: "invalid-request",

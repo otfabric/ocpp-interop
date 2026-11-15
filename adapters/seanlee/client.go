@@ -95,6 +95,16 @@ func commandClient(args []string) error {
 	if f.has("station") && f.get("station", "") == "" {
 		return unsupportedError{"--station \"\": seanlee0923/ocpp's station requires an identity and appends it to the URL"}
 	}
+	if !run {
+		// What the station cannot send is refused before the fixture is read
+		// and before any network access; execute refuses it before it uses
+		// the fixture or a connection.
+		pre := newEndpoint(version, nil, "station", false)
+		if doc := pre.execute(f.get("station", ""), action, payload, timeoutMs, nil, nil); doc.errCode == "unsupported" {
+			writeLine(doc.object())
+			return exitCode(5)
+		}
+	}
 	fx, err := fixtureOf(f, version)
 	if err != nil {
 		return err
@@ -113,11 +123,6 @@ func commandClient(args []string) error {
 
 	started := time.Now()
 	e := newEndpoint(version, fx, "station", false)
-	// What the station cannot send is refused before any network access.
-	if doc := e.execute(id, action, payload, timeoutMs, nil, nil); doc.errCode == "unsupported" {
-		writeLine(doc.object())
-		return exitCode(5)
-	}
 	conn, err := connectStation(base, id, e, opts, connectTimeout)
 	var doc resultDoc
 	if err != nil {

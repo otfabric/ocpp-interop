@@ -88,6 +88,11 @@ func (e *endpoint) handle(ctx context.Context, station, action string, payload j
 	}
 	e.event("call-received", station, "messageId", nullable(id), "action", action, "payload", payload)
 	answer, err := e.answer(action, payload)
+	if err == nil {
+		// The event reports what cB-Sigma sends: an answer it refuses after
+		// the handler is answered with its CALLERROR instead.
+		err = e.checkAnswer(action, payload, answer)
+	}
 	if err != nil {
 		var re *ocpp.RPCError
 		code, description := ocpp.KindInternal.Code(vi.wire), err.Error()
@@ -134,6 +139,28 @@ func (e *endpoint) answer(action string, payload json.RawMessage) (json.RawMessa
 	default:
 		return nil, fmt.Errorf("no answer for %s", action)
 	}
+}
+
+// checkAnswer is the check cB-Sigma makes of a handler's answer before it
+// sends it (csms.Station.handle, chargepoint.Client.handle in v0.2.0): an
+// answer outside the schema of the action becomes an InternalError
+// CALLERROR, and the adapter returns that error itself. The check is off with
+// SkipValidation, which the adapter sets for invalidAnswers, and for an
+// action cB-Sigma does not know.
+func (e *endpoint) checkAnswer(action string, request, answer json.RawMessage) error {
+	wire := versions[e.version].wire
+	if e.invalidAnswers() || !ocpp.Known(wire, action) {
+		return nil
+	}
+	if e.role == "csms" && ocpp.Is2(wire) {
+		_, err := ocpp.CheckAnswer(wire, action, answer, request)
+		return err
+	}
+	verr := ocpp.ValidateResponse(wire, action, answer)
+	if verr == nil || (e.role == "station" && ocpp.EchoesOnly(wire, action, answer, request)) {
+		return nil
+	}
+	return ocpp.RPCErrorf(ocpp.KindInternal, "our %s answer does not match the %s schema: %s", action, wire, verr.Desc)
 }
 
 // onResultError is cB-Sigma's OnResultError: the peer answered one of this

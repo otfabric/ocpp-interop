@@ -8,7 +8,7 @@ The OCA schemas are CC BY-ND 4.0 and are not part of this repository
 (REQUIREMENTS.md R8.2). Point this script at a copy, for example the one
 The Mobility House ocpp package ships:
 
-    python3 -m venv /tmp/oca && /tmp/oca/bin/pip install --index-url https://pypi.org/simple ocpp==2.1.0 jsonschema
+    python3 -m venv /tmp/oca && /tmp/oca/bin/pip install --index-url https://pypi.org/simple ocpp==2.1.0 jsonschema==4.26.0
     scripts/validate-payloads.py "$(/tmp/oca/bin/python -c 'import ocpp, os; print(os.path.dirname(ocpp.__file__))')/v201/schemas" \
         fixtures/v201/*/fixture.json
 

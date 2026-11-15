@@ -69,6 +69,7 @@ RUN set -eu; \
     if [ "${UPSTREAM_VERSION}" = "$(cat /tmp/pinned)" ]; then cmp actions_gen.go /tmp/actions_gen.go; fi; \
     test -z "$(gofmt -l .)"; \
     go vet ./...; \
+    go test ./...; \
     version="$(go list -m -f '{{.Version}}' github.com/seanlee0923/ocpp)"; \
     test "${version}" = "${UPSTREAM_VERSION}"; \
     go build -trimpath -ldflags "-s -w \

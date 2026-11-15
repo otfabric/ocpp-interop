@@ -93,7 +93,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - run: pip install jsonschema
+      - run: pip install jsonschema==4.26.0
       - name: Validate
         run: |
           make validate
@@ -179,7 +179,10 @@ jobs:
       - name: Create ${{ needs.version.outputs.tag }} from the amd64 and arm64 images
         run: make publish-manifest
 
+      # bash with pipefail: a `make digests` that stops partway fails the step.
+      # release-manifest.py then requires a digest for every adapter of ADAPTERS.
       - name: Digests of the multi-arch images
+        shell: bash
         run: |
           make -s digests | tee digests.txt
           while read -r adapter digest; do

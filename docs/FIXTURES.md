@@ -158,7 +158,7 @@ House ocpp 2.1.0. Its 2.1 schemas are identical to the OCA's
 fixture against a copy of them:
 
 ```bash
-python3 -m venv /tmp/oca && /tmp/oca/bin/pip install --index-url https://pypi.org/simple ocpp==2.1.0 jsonschema
+python3 -m venv /tmp/oca && /tmp/oca/bin/pip install --index-url https://pypi.org/simple ocpp==2.1.0 jsonschema==4.26.0
 schemas="$(/tmp/oca/bin/python -c 'import ocpp, os; print(os.path.dirname(ocpp.__file__))')"
 /tmp/oca/bin/python scripts/validate-payloads.py "$schemas/v16/schemas" fixtures/v16/baseline/fixture.json
 /tmp/oca/bin/python scripts/validate-payloads.py "$schemas/v201/schemas" fixtures/v201/baseline/fixture.json

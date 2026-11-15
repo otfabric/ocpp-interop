@@ -562,7 +562,7 @@ from what the image serves. A fixture the image does not have exits 1.
 | `--bind-address` other than `0.0.0.0` | lorenzodonini: ocpp-go's ws.Server listens on all addresses; another address exits 5 |
 | `server` (a CSMS) | everest: libocpp implements the charging station only; `server` exits 5 after the usage checks |
 | Close code in `connection-closed` | everest: libocpp's websocket does not pass it to the application |
-| `--station ""` | everest: libocpp always appends the identity to the URL; exits 5. cbsigma: `chargepoint` always appends the identity to the URL; exits 5. ocppkit: the station always appends the identity to the URL; exits 5. seanlee: `station.Config` requires an identity and appends it to the URL; exits 5 |
+| `--station ""` | everest: libocpp always appends the identity to the URL; exits 5. lorenzodonini: ocpp-go's client always appends the identity to the URL; exits 5. cbsigma: `chargepoint` always appends the identity to the URL; exits 5. ocppkit: the station always appends the identity to the URL; exits 5. seanlee: `station.Config` requires an identity and appends it to the URL; exits 5 |
 | Security profile 0 as a station | ocppkit: ocpp-kit's station always sends credentials (`client.securityProfiles` `[1, 2, 3]`); `client --security-profile 0` exits 5 |
 | `client` (a station) | citrineos: CitrineOS is a CSMS only; `client` exits 5 after the usage checks |
 | Answers from the fixture (`fixtureAnswers`), `NotImplemented` for an action the fixture does not answer, `callError` answers (`fixtureCallErrors`) | citrineos: CitrineOS answers every CALL itself; `handles` lists the actions whose answer is the fixture's ([adapters/citrineos/README.md](../adapters/citrineos/README.md)) |
@@ -570,20 +570,20 @@ from what the image serves. A fixture the image does not have exits 1.
 
 ## Changes
 
-- **0.8** (unreleased): the optional `local-controller` command, an OCPP
+- **0.8** (released in v0.10.0): the optional `local-controller` command, an OCPP
   2.x Local Controller (Part 4 chapter 6) between stations and a CSMS, with
   the `relayed` event and `localController` in the capabilities of a
   version; report results of the relayed tests carry the controller as
   `relay`. In `ocppkit` (ocpp-kit's `transport::LocalController`), OCPP
   2.0.1 and 2.1.
-- **0.7** (unreleased): security profiles per role. The optional
+- **0.7** (released in v0.8.0): security profiles per role. The optional
   `securityProfiles` of `client` and `server` in the capabilities says which
   profiles a role has when they are not all of `features.securityProfiles`;
   a station without profile 0 is tested with profile 1 at both ends. With a
   `--station` the fixture does not list, a station at profile 1 or 2 may
   send a password of its own. In the new adapter `ocppkit`, whose station
   always authenticates.
-- **0.6** (unreleased): OCPP 2.1 SEND and CALLRESULTERROR, in the new
+- **0.6** (released in v0.7.0): OCPP 2.1 SEND and CALLRESULTERROR, in the new
   adapter `cbsigma` and the own image. With `send`, `client <Action>` and
   `call` send a SEND action as a SEND frame (`response` `null`); the events
   `send-sent` and `send-received`. With `callResultError`, the fixture field
@@ -592,7 +592,7 @@ from what the image serves. A fixture the image does not have exits 1.
   `callResultError`), and the other end writes
   `call-result-error`. An adapter without `callResultError` refuses a fixture
   with `invalidAnswers` (exit 5).
-- **0.5** (unreleased): transport security and compression, in every
+- **0.5** (released in v0.3.0): transport security and compression, in every
   adapter. The section [Transport security](#transport-security) makes
   security profiles 2 (TLS and Basic authentication) and 3 (mutual TLS, the
   identity is the client certificate's CommonName) normative: the files of
@@ -605,17 +605,17 @@ from what the image serves. A fixture the image does not have exits 1.
   optional field `compression` of `connection-opened`. The feature
   `fixtureAnswers` (not declared: `true`), `false` for an upstream that
   answers by itself (citrineos).
-- **0.4** (unreleased): OCPP 2.1, in `mobilityhouse`. The section
+- **0.4** (released in v0.2.0): OCPP 2.1, in `mobilityhouse`. The section
   [OCPP 2.1: SEND and CALLRESULTERROR](#ocpp-21-send-and-callresulterror):
   without the `send` feature a SEND action is refused (exit 5), never sent as
   a CALL; a frame of type 5 or 6 the upstream cannot read is a
   `protocol-error`; a fixture answer to a SEND is invalid. No operation for
   SEND or CALLRESULTERROR yet: no pinned upstream release implements them.
-- **0.3** (unreleased): OCPP 2.0.1, and the third adapter. The derived
+- **0.3** (released in v0.1.0): OCPP 2.0.1, and the third adapter. The derived
   answer `variables` (GetVariables, SetVariables) is part of the answers. A
   `callError` answer whose code the upstream cannot send is refused (exit
   5). The gaps are listed per adapter and version.
-- **0.2** (unreleased): first implementation. Added `--control-socket`, the
+- **0.2** (released in v0.0.1): first implementation. Added `--control-socket`, the
   `connection-failed` event, `remote` on `connection-rejected`, the error
   codes `invalid-request` and `not-connected`, the [Answers](#answers)
   rules, `null` for values an upstream does not expose, the exit codes of

@@ -109,7 +109,7 @@ func runServer(version string, fx *fixture, bind string, port, profile int, tlsD
 		}
 		switch profile {
 		case 1, 2:
-			if !r.HasBasicAuth || r.Username != id || string(r.Password) != fx.password(id) {
+			if !basicAuthOK(r, id, fx.password(id)) {
 				event("connection-rejected", id, "reason", "authentication", "remote", r.RemoteAddr)
 				return server.ErrUnauthorized
 			}

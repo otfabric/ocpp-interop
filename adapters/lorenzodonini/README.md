@@ -58,7 +58,10 @@ that it can:
   `protocol-error`;
 - read the message id ocpp-go generates for a CALL, with its default
   generator installed through `ocppj.SetMessageIdGenerator`;
-- set the dispatcher's request timeout to the CALL's `--timeout-ms`.
+- set the dispatcher's request timeout to the CALL's `--timeout-ms` as
+  ocpp-go writes that CALL: the dispatcher has one timeout, which it reads
+  right after it wrote a CALL, so a CALL that waits in its queue keeps its
+  own.
 
 Sending: the payload becomes ocpp-go's request type the same way, and goes
 out with `SendRequestAsync`, which validates it first (`invalid-request`
@@ -68,7 +71,8 @@ written back with `encoding/json`.
 Server: `ws.Server` on the port, serving every path; ocpp-go takes the
 station identity from the last path segment. The adapter's
 `CheckClientHandler` refuses identities the fixture does not list and, with
-profiles 1 and 2, wrong Basic credentials. Client: `ws.Client` with the
+profiles 1 and 2, wrong Basic credentials (the user name and the password
+are compared in constant time). Client: `ws.Client` with the
 handshake timeout of `--connect-timeout-ms`; ocpp-go appends the identity to
 the URL.
 
@@ -118,6 +122,8 @@ These are listed in the `notes` of the capabilities and in
 - `ws.Server.Start` takes a port and listens on all addresses:
   `--bind-address` other than `0.0.0.0` exits 5. A port it cannot bind is
   reported only in its log; the adapter checks the port first.
+- ocpp-go's client always appends the station identity to the URL:
+  `--station ""` exits 5.
 - The station does not see the negotiated subprotocol, and ocpp-go does not
   check that the server accepted it. The server does not see the close code
   of a connection; the station sees it only for a connection the CSMS

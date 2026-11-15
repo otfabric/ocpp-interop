@@ -39,6 +39,10 @@ func commandServer(args []string) error {
 	if err != nil {
 		return err
 	}
+	bind := f.get("bind-address", "0.0.0.0")
+	if net.ParseIP(bind) == nil {
+		return usagef("--bind-address: %q is not an IP address", bind)
+	}
 	version, err := versionOf(f)
 	if err != nil {
 		return err
@@ -46,9 +50,6 @@ func commandServer(args []string) error {
 	profile, err := securityProfileOf(f)
 	if err != nil {
 		return err
-	}
-	if bind := f.get("bind-address", "0.0.0.0"); bind != "0.0.0.0" {
-		return unsupportedf("--bind-address %s: ocpp-go's ws.Server listens on all addresses", bind)
 	}
 	var wsServer *ws.Server
 	if profile >= 2 {
@@ -59,6 +60,13 @@ func commandServer(args []string) error {
 		wsServer = ws.NewTLSServer(certPath, keyPath, config)
 	} else {
 		wsServer = ws.NewServer()
+	}
+	// What the adapter supports, after the usage checks and before the fixture.
+	if err := supported(version); err != nil {
+		return err
+	}
+	if bind != "0.0.0.0" {
+		return unsupportedf("--bind-address %s: ocpp-go's ws.Server listens on all addresses", bind)
 	}
 	fx, err := fixtureOf(f, version)
 	if err != nil {
@@ -97,8 +105,7 @@ func runServer(version string, fx *fixture, wsServer *ws.Server, port, profile i
 			}
 		}
 		if profile == 1 || profile == 2 {
-			user, password, ok := r.BasicAuth()
-			if !ok || user != id || password != fx.password(id) {
+			if !basicAuthOK(r, id, fx.password(id)) {
 				event("connection-rejected", id, "reason", "authentication", "remote", r.RemoteAddr)
 				return false
 			}
@@ -231,7 +238,14 @@ func runServer(version string, fx *fixture, wsServer *ws.Server, port, profile i
 	}
 	event("ready", "", "adapter", adapterName, "version", version, "port", port, "fixture", fx.name,
 		"securityProfile", profile)
-	<-signals
+	code := 0
+	select {
+	case <-signals:
+	case <-returned:
+		// ws.Server.Start returns when it stops serving; it logs why.
+		fmt.Fprintf(os.Stderr, "server: ocpp-go's ws.Server stopped serving on port %d\n", port)
+		code = 1
+	}
 
 	_ = os.Remove(ready)
 	control.Close()
@@ -246,7 +260,7 @@ func runServer(version string, fx *fixture, wsServer *ws.Server, port, profile i
 		}
 	}
 	event("stopped", "")
-	return 0
+	return code
 }
 
 func listening(port int, returned <-chan struct{}) bool {
